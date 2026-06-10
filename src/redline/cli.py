@@ -11,6 +11,7 @@ from rich.table import Table
 from redline.models import ReasonCode, Status, VerificationLevel, VerificationStatus
 from redline.runner import run_redline
 from redline.schemas import export_schemas as export_schema_files
+from redline.sponsor.bitget import validate_sponsor_evidence_shape
 from redline.verifier import verify, verify_proof
 
 app = typer.Typer(no_args_is_help=True)
@@ -38,6 +39,7 @@ EXIT_BY_REASON: dict[ReasonCode, int] = {
     ReasonCode.DATA_MISSING: 6,
     ReasonCode.BASELINE_UNCHAINED: 7,
     ReasonCode.SPONSOR_READBACK_MISMATCH: 8,
+    ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED: 6,
     ReasonCode.CANDIDATE_SANDBOX_VIOLATION: 9,
     ReasonCode.VERDICT_PATH_VIOLATION: 9,
 }
@@ -83,11 +85,23 @@ def make_demo(
 def check(
     receipt: Path,
     package: Optional[Path] = None,
+    suite: Path = Path("fixtures/suites/demo_suite.json"),
+    spec: Path = Path("fixtures/specs/redline_spec.json"),
+    report: Optional[Path] = None,
+    ledger: Optional[Path] = None,
     rerun: bool = False,
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     level = VerificationLevel.REPLAYED if rerun else VerificationLevel.HASH_ONLY
-    result = verify(receipt_path=receipt, package=package, level=level)
+    result = verify(
+        receipt_path=receipt,
+        package=package,
+        level=level,
+        suite_path=suite if rerun else None,
+        spec_path=spec if rerun else None,
+        report_path=report,
+        ledger_path=ledger,
+    )
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
@@ -108,7 +122,20 @@ def verify_proof_cmd(
         console.print_json(data=result.model_dump(mode="json"))
     else:
         console.print(f"{result.status}: {result.proof_id}")
-    raise typer.Exit(0 if result.status == "proof_replayed" else 4)
+    raise typer.Exit(0 if result.status == "proof_verified" else EXIT_BY_REASON[result.reason_code])
+
+
+@app.command("verify-sponsor-evidence")
+def verify_sponsor_evidence_cmd(
+    evidence: Path,
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = validate_sponsor_evidence_shape(evidence)
+    if json_out:
+        console.print_json(data=result.model_dump(mode="json"))
+    else:
+        _print_envelope("verified" if result.ok else "rejected", (result.reason_code or ReasonCode.PASS).value, evidence)
+    raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH])
 
 
 @app.command("export-schemas")

@@ -43,25 +43,33 @@
     "envelope_version": "redline.decision.v1",
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids": [
-      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:coverage:9c1d66ec7d424f574b56330b",
+      "proof:decision:f8d03e0a21a873d73e6958b4",
+      "proof:package_canonical:54b2e97564c1ff5504651dd3",
       "proof:probe:146e7d8dee0ed2a684b541bd",
       "proof:probe:1e45bf22c63aa9fb2e110ad6",
       "proof:probe:50779d37ab95b560da66d8c7",
       "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43"
+      "proof:replay:26fb5b3971fa43e1bd854c43",
+      "proof:replay_wellformed:cb40391baf812adc052a058a",
+      "proof:spec_compile:fbb0609c303044cf00403afb"
     ],
     "satisfied_proof_ids": [
-      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:coverage:9c1d66ec7d424f574b56330b",
+      "proof:decision:f8d03e0a21a873d73e6958b4",
+      "proof:package_canonical:54b2e97564c1ff5504651dd3",
       "proof:probe:146e7d8dee0ed2a684b541bd",
       "proof:probe:1e45bf22c63aa9fb2e110ad6",
       "proof:probe:50779d37ab95b560da66d8c7",
       "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43"
+      "proof:replay:26fb5b3971fa43e1bd854c43",
+      "proof:replay_wellformed:cb40391baf812adc052a058a",
+      "proof:spec_compile:fbb0609c303044cf00403afb"
     ],
     "status": "withheld"
   },
   "proof_ids": [
-    "proof:package_canonical:42ebccab7ba79d9c7d43bd93",
+    "proof:package_canonical:54b2e97564c1ff5504651dd3",
     "proof:spec_compile:fbb0609c303044cf00403afb",
     "proof:replay:26fb5b3971fa43e1bd854c43",
     "proof:replay_wellformed:cb40391baf812adc052a058a",
@@ -70,12 +78,12 @@
     "proof:probe:50779d37ab95b560da66d8c7",
     "proof:probe:79df280e8eaed5f480f3de58",
     "proof:coverage:9c1d66ec7d424f574b56330b",
-    "proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+    "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:557b83d0280b056d654ca950",
-    "proof:decision:d61e9afcd8a65698806d649c"
+    "proof:decision:f8d03e0a21a873d73e6958b4"
   ],
-  "receipt_hash": "sha256:7b6eafb9e0b244cc0a0048d148475511fddc3da865f4733d3434b26d29e95d14",
-  "report_hash": "sha256:b7d224702be0436b4a4ccf63ded9b216ffba4d208d103a9da7daafb743571bb5",
+  "receipt_hash": "sha256:03a7163be30778e254ad92888f82397eb3d24c7ee822e4466f015f2c8ea286c9",
+  "report_hash": "sha256:3379a1d538d29b912ed5eb809806e05a1d85817f2c8d1f71600968d0450f6c0e",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0.01994876; max_drawdown <= 0.08000000 observed 0.17663366; replay_wellformed == 12 observed 12; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

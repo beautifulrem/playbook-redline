@@ -13,19 +13,37 @@ class VerdictPathViolation(RuntimeError):
 _ACTIVE = contextvars.ContextVar("redline_verdict_tripwire_active", default=False)
 _INSTALLED = False
 _FORBIDDEN_PREFIXES = (
+    "ctypes",
+    "os.exec",
+    "os.fork",
     "socket",
     "subprocess",
 )
 _FORBIDDEN_EVENTS = {
-    "os.system",
     "os.posix_spawn",
     "os.spawn",
+    "os.system",
 }
+_FORBIDDEN_IMPORT_PREFIXES = (
+    "anthropic",
+    "_ctypes",
+    "cffi",
+    "ctypes",
+    "google.generativeai",
+    "httpx",
+    "openai",
+    "requests",
+    "xai_sdk",
+)
 
 
 def _audit_hook(event: str, args: tuple[object, ...]) -> None:
     if not _ACTIVE.get():
         return
+    if event == "import" and args:
+        module_name = str(args[0])
+        if any(module_name == prefix or module_name.startswith(prefix + ".") for prefix in _FORBIDDEN_IMPORT_PREFIXES):
+            raise VerdictPathViolation(f"forbidden verdict-path import: {module_name}")
     if event in _FORBIDDEN_EVENTS or any(event.startswith(prefix) for prefix in _FORBIDDEN_PREFIXES):
         raise VerdictPathViolation(f"forbidden verdict-path side effect: {event}")
 

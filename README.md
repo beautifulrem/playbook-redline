@@ -11,9 +11,19 @@ Playbook Redline is a backend proof kernel and verifier for checking whether an 
 - Decision kernel with closed reason codes
 - Receipt issuer and verifier
 - Proof-level verification command
-- JSON schemas for receipts, specs, suites, decisions, and verification results
+- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
+
+## Security Boundary
+
+Candidate strategies run in a subprocess. On macOS, the worker is additionally
+wrapped with `sandbox-exec` to deny network access, process forking, and file
+writes. Inside the worker, Python audit hooks deny socket/subprocess/fork/exec,
+filesystem mutation, outside-root reads, and `ctypes`/`cffi`. The verdict path
+uses only built-in probes and a separate tripwire rejects network/LLM SDK
+imports. This is a local proof-kernel sandbox for demo and CI use; production
+exchange execution should still use the exchange's own runtime sandbox.
 
 ## Quick Start
 
@@ -21,8 +31,8 @@ Playbook Redline is a backend proof kernel and verifier for checking whether an 
 uv run --extra dev pytest
 uv run redline export-schemas
 uv run redline make-demo
-uv run redline check artifacts/demo/pass/receipt.json --json
-uv run redline check artifacts/demo/withheld/receipt.json --json
+uv run redline check artifacts/demo/pass/receipt.json --package fixtures/demo_pack --rerun --json
+uv run redline check artifacts/demo/withheld/receipt.json --package fixtures/demo_pack --rerun --json
 ```
 
 Expected demo outcomes:
@@ -31,6 +41,7 @@ Expected demo outcomes:
 - `candidate_bad`: `withheld` with `NEW_BLOCK_BREACH`
 
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
+Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses `--rerun` with the package, suite, and spec inputs.
 
 ## CLI
 
@@ -44,7 +55,7 @@ uv run redline run fixtures/demo_pack \
   --json
 
 uv run redline verify-proof artifacts/demo/pass/receipt.json \
-  --proof-id proof:package_canonical:9d8796de0b746e376ff758a8 \
+  --proof-id proof:package_canonical:74ad218b8a38881b82cb4964 \
   --json
 ```
 
@@ -55,6 +66,9 @@ scripts/verify-sponsor-run.sh
 ```
 
 The script runs receipt verification in replayed mode with package binding.
+It also validates the bundled recorded sponsor-attestation JSON shape. That
+recorded file is not treated as live Bitget read-back proof unless real API
+credentials are used in a future live adapter.
 
 ## Repository Layout
 
@@ -64,5 +78,6 @@ tests/            backend P0 tests
 fixtures/         demo packages, suites, specs
 schemas/          exported JSON schemas
 artifacts/demo/   checked-in demo receipts and proof artifacts
+artifacts/sponsor recorded sponsor-attestation shape fixture
 scripts/          helper verification scripts
 ```

@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "title": "Bar",
+          "type": "integer"
+        },
+        "holds": {
+          "title": "Holds",
+          "type": "boolean"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "observed": {
+          "title": "Observed",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "<=",
+            "<",
+            ">=",
+            ">",
+            "=="
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "threshold": {
+          "title": "Threshold",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "op",
+        "threshold",
+        "observed",
+        "scenario_id",
+        "bar",
+        "holds"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "ProofKind": {
+      "enum": [
+        "package_canonical",
+        "edit_provenance",
+        "spec_compile",
+        "baseline_calibration",
+        "replay",
+        "replay_wellformed",
+        "probe",
+        "coverage",
+        "candidate_absolute",
+        "decision",
+        "sponsor_readback",
+        "verification"
+      ],
+      "title": "ProofKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_hash": {
+      "title": "Artifact Hash",
+      "type": "string"
+    },
+    "assertions": {
+      "items": {
+        "$ref": "#/$defs/Assertion"
+      },
+      "title": "Assertions",
+      "type": "array"
+    },
+    "inputs_hash": {
+      "title": "Inputs Hash",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/ProofKind"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    },
+    "phase": {
+      "title": "Phase",
+      "type": "string"
+    },
+    "proof_id": {
+      "title": "Proof Id",
+      "type": "string"
+    },
+    "reproduce": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reproduce"
+    },
+    "verdict_bearing": {
+      "title": "Verdict Bearing",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "proof_id",
+    "phase",
+    "kind",
+    "verdict_bearing",
+    "inputs_hash",
+    "artifact_hash"
+  ],
+  "title": "Proof",
+  "type": "object"
+}

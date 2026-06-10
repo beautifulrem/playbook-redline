@@ -6,6 +6,6 @@
   "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
   "artifact_hash": "sha256:9c1d66ec7d424f574b56330b77f6ae113826313f888414c76729162ebf0d9cd0",
   "assertions": [],
-  "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:coverage:9c1d66ec7d424f574b56330b",
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:9c1d66ec7d424f574b56330b",
   "meta": {}
 }

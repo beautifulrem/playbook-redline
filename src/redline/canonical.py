@@ -79,8 +79,13 @@ def hash_tree(path: Path) -> str:
     entries: list[dict[str, str]] = []
     for file_path in sorted(p for p in root.rglob("*") if p.is_file()):
         rel = file_path.relative_to(root).as_posix()
-        if rel.startswith(".redline/"):
+        if (
+            rel.startswith(".redline/")
+            or rel.startswith("__pycache__/")
+            or "/__pycache__/" in rel
+            or rel.endswith(".pyc")
+            or rel.endswith(".pyo")
+        ):
             continue
         entries.append({"path": rel, "hash": hash_file(file_path)})
     return hash_obj(entries)
-

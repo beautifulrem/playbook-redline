@@ -1,28 +1,32 @@
 {
   "version": "redline.receipt.v3.2",
   "package": {
-    "identity_hash": "sha256:c4c4e9e5c65c2e2cc31c4d80dcd2bea4de5b882a1bc0068b375a58ddbab77591",
-    "manifest_hash": "sha256:c4c4e9e5c65c2e2cc31c4d80dcd2bea4de5b882a1bc0068b375a58ddbab77591",
+    "identity_hash": "sha256:639717a4fcb034fda49346785d98065f91ce9e167ffb2ae80828f23be68637a5",
+    "manifest_hash": "sha256:639717a4fcb034fda49346785d98065f91ce9e167ffb2ae80828f23be68637a5",
     "canonical_tar_rules": "redline.v9.canonical-tree"
   },
   "edit_provenance": {
     "tool": "fixture",
     "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
-    "diff_hash": "sha256:5f6cf15ef4b83f176679c74d9e7055594bb4032a302738e24a1271ac9bed5daa",
+    "diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
     "locked_by": "author",
-    "captured_at": "2026-06-10T17:31:33Z"
+    "captured_at": "2026-06-10T18:39:29Z"
   },
   "baseline": {
-    "package_hash": "sha256:e4d801d0ae461684b8350982763e5e5c291c66a52df0f48a2bad399b419c64b3",
+    "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
     "baseline_receipt_hash": null,
     "baseline_version_id": "fixture:baseline",
+    "package_name": "baseline",
     "chain_status": "genesis"
   },
   "candidate": {
-    "package_hash": "sha256:09b9f53ce1894206e835de6e0c583a7ee3667b3900f4d18554bc89bc9f4352a1"
+    "package_hash": "sha256:793cc8e832181add479ac37e2ed99090b24823779a25f6a68e82a346e10c7e71",
+    "candidate_version_id": "fixture:candidate_bad",
+    "package_name": "candidate_bad"
   },
   "spec": {
     "spec_hash": "sha256:fbb0609c303044cf00403afb3499bf08472a6fb15ffbd1af64fbae5893c61cb9",
+    "source_path": "fixtures/specs/redline_spec.json",
     "compiler": "json",
     "model": null,
     "tool_schema_hash": null
@@ -33,12 +37,13 @@
       "btc-crash-2024-03-05",
       "btc-chop-2024-08"
     ],
-    "suite_lock_hash": "sha256:46942384fd5b9faa07bf94428713c7e32081beaa5ea1ef278332e79c5fa57558"
+    "suite_lock_hash": "sha256:46942384fd5b9faa07bf94428713c7e32081beaa5ea1ef278332e79c5fa57558",
+    "source_path": "fixtures/suites/demo_suite.json"
   },
   "runner": {
     "engine": "deterministic",
-    "engine_source_tree_hash": "sha256:97408a2e4b41c20407695a6477f5cc8bb185d5be212b25c701ea3c2cd5d3a3fe",
-    "runner_lock_hash": "sha256:2f04eb5ca96879758683cc9aeeb23da664885dcaa8929af6815f350943b27a35",
+    "engine_source_tree_hash": "sha256:7a72249ce13ebe8cba18d620243f2a1455dff16747044b39b1b073be8b889f23",
+    "runner_lock_hash": "sha256:8c92fa6ee094cfdad41e11a4ab228348bf4dc3b5625ac8dedc8ff1d2599497de",
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
@@ -83,34 +88,42 @@
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids_source": "REQUIRED_PROOFS[status]",
     "required_proof_ids": [
-      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:coverage:9c1d66ec7d424f574b56330b",
+      "proof:decision:f8d03e0a21a873d73e6958b4",
+      "proof:package_canonical:54b2e97564c1ff5504651dd3",
       "proof:probe:146e7d8dee0ed2a684b541bd",
       "proof:probe:1e45bf22c63aa9fb2e110ad6",
       "proof:probe:50779d37ab95b560da66d8c7",
       "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43"
+      "proof:replay:26fb5b3971fa43e1bd854c43",
+      "proof:replay_wellformed:cb40391baf812adc052a058a",
+      "proof:spec_compile:fbb0609c303044cf00403afb"
     ],
     "satisfied_proof_ids": [
-      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:coverage:9c1d66ec7d424f574b56330b",
+      "proof:decision:f8d03e0a21a873d73e6958b4",
+      "proof:package_canonical:54b2e97564c1ff5504651dd3",
       "proof:probe:146e7d8dee0ed2a684b541bd",
       "proof:probe:1e45bf22c63aa9fb2e110ad6",
       "proof:probe:50779d37ab95b560da66d8c7",
       "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43"
+      "proof:replay:26fb5b3971fa43e1bd854c43",
+      "proof:replay_wellformed:cb40391baf812adc052a058a",
+      "proof:spec_compile:fbb0609c303044cf00403afb"
     ],
     "verdict_source": "deterministic_probe",
     "llm_used_for_verdict": false
   },
   "proofs": [
     {
-      "proof_id": "proof:package_canonical:42ebccab7ba79d9c7d43bd93",
+      "proof_id": "proof:package_canonical:54b2e97564c1ff5504651dd3",
       "phase": "import",
       "kind": "package_canonical",
       "verdict_bearing": true,
       "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
-      "artifact_hash": "sha256:42ebccab7ba79d9c7d43bd933b194361c0058348452b435b701d58829f313970",
+      "artifact_hash": "sha256:54b2e97564c1ff5504651dd326e0c9bff61de9a73c517971523cf7fdfa1a35c8",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:package_canonical:42ebccab7ba79d9c7d43bd93",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:54b2e97564c1ff5504651dd3",
       "meta": {}
     },
     {
@@ -118,10 +131,10 @@
       "phase": "compile",
       "kind": "spec_compile",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:3e8a39fa3e07b50b2ce1c327553e28652dc8c77f829aab9b049332f56290cdec",
+      "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
       "artifact_hash": "sha256:fbb0609c303044cf00403afb3499bf08472a6fb15ffbd1af64fbae5893c61cb9",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:spec_compile:fbb0609c303044cf00403afb",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:fbb0609c303044cf00403afb",
       "meta": {}
     },
     {
@@ -129,10 +142,10 @@
       "phase": "run",
       "kind": "replay",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:90257b3ad8d4aa68ab6cb80281545e8a8c91b739f12ee21b167383cfec39cf80",
+      "inputs_hash": "sha256:c18ded2d2ef19549a60e88e86639037ffa29d8b816a31cb594d4c15e46e31ec6",
       "artifact_hash": "sha256:26fb5b3971fa43e1bd854c43868001fff7cb8f394750b7fd88a9547bf025fe18",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:replay:26fb5b3971fa43e1bd854c43",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:26fb5b3971fa43e1bd854c43",
       "meta": {}
     },
     {
@@ -180,7 +193,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:replay_wellformed:cb40391baf812adc052a058a",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:cb40391baf812adc052a058a",
       "meta": {}
     },
     {
@@ -201,7 +214,7 @@
           "holds": false
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:probe:146e7d8dee0ed2a684b541bd",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:146e7d8dee0ed2a684b541bd",
       "meta": {}
     },
     {
@@ -222,7 +235,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:probe:1e45bf22c63aa9fb2e110ad6",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1e45bf22c63aa9fb2e110ad6",
       "meta": {}
     },
     {
@@ -243,7 +256,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:probe:50779d37ab95b560da66d8c7",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:50779d37ab95b560da66d8c7",
       "meta": {}
     },
     {
@@ -264,7 +277,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:probe:79df280e8eaed5f480f3de58",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:79df280e8eaed5f480f3de58",
       "meta": {}
     },
     {
@@ -275,16 +288,16 @@
       "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
       "artifact_hash": "sha256:9c1d66ec7d424f574b56330b77f6ae113826313f888414c76729162ebf0d9cd0",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:coverage:9c1d66ec7d424f574b56330b",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:9c1d66ec7d424f574b56330b",
       "meta": {}
     },
     {
-      "proof_id": "proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+      "proof_id": "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "phase": "calibrate",
       "kind": "baseline_calibration",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:505fc72544e5e3507bc48267ef4ef9a48aa9f5970865a92a031e20f46c84bbd1",
-      "artifact_hash": "sha256:3c1bc21b48f3d603b36cd548f46a41db0f0164fee5591ecde2c04935f6d467fe",
+      "inputs_hash": "sha256:c1c2f85d90c548db38461d421e2bafe1ac4703b62b2aae088009c0ebc2b79033",
+      "artifact_hash": "sha256:6dbf4d64bed1fe7aa8537e993317cf215c8079df048367775063ed51983855a3",
       "assertions": [
         {
           "metric": "trade_budget",
@@ -296,7 +309,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "meta": {}
     },
     {
@@ -304,7 +317,7 @@
       "phase": "probe",
       "kind": "candidate_absolute",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:ec12d7eae79d6881139d34545ab505a37214983cabac42240de52ded7ae8fd90",
+      "inputs_hash": "sha256:06d5ec40d25d7d4293d9eb75a7ae32e77b0aaa0472d04cab55e0eac9b8fd7ed1",
       "artifact_hash": "sha256:557b83d0280b056d654ca950561e2c0d8eb35e2b24bd3c8536c5a8e7dba4d35c",
       "assertions": [
         {
@@ -344,18 +357,18 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:candidate_absolute:557b83d0280b056d654ca950",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:557b83d0280b056d654ca950",
       "meta": {}
     },
     {
-      "proof_id": "proof:decision:d61e9afcd8a65698806d649c",
+      "proof_id": "proof:decision:f8d03e0a21a873d73e6958b4",
       "phase": "decide",
       "kind": "decision",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:767f572534f3830c819d5b295f8d818f99f26b53fd1d06a4334481b43f5f1862",
-      "artifact_hash": "sha256:881afb8041f318c4fb909efa2df2be7a58e014455f1e2e95815741df4cc3d500",
+      "inputs_hash": "sha256:9c9314d0201f8e367780f03f3a7e4fcbd4f63be135c8d3a65533b2401955aa3f",
+      "artifact_hash": "sha256:2cd14f2adea0507880cfc0de2d28c14aaf8c797ffe517d14aead7bea3c849765",
       "assertions": [],
-      "reproduce": "uv run redline check artifacts/receipt.json --proof-id proof:decision:d61e9afcd8a65698806d649c",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:f8d03e0a21a873d73e6958b4",
       "meta": {}
     }
   ],
@@ -377,7 +390,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0.01994876; max_drawdown <= 0.08000000 observed 0.17663366; replay_wellformed == 12 observed 12; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:c74fcfd269a494bdec6b918e4c87cf8dec4df1f1ce05354cc651f0b882e87d1f",
+    "report_hash": "sha256:3379a1d538d29b912ed5eb809806e05a1d85817f2c8d1f71600968d0450f6c0e",
     "attribution_report_hash": null
   },
   "publish": {
@@ -390,5 +403,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:7b6eafb9e0b244cc0a0048d148475511fddc3da865f4733d3434b26d29e95d14"
+  "receipt_hash": "sha256:03a7163be30778e254ad92888f82397eb3d24c7ee822e4466f015f2c8ea286c9"
 }

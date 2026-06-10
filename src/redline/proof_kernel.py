@@ -27,7 +27,17 @@ REQUIRED_PROOFS: dict[Status, frozenset[ProofKind]] = {
             ProofKind.DECISION,
         }
     ),
-    Status.WITHHELD: frozenset({ProofKind.REPLAY, ProofKind.PROBE, ProofKind.DECISION}),
+    Status.WITHHELD: frozenset(
+        {
+            ProofKind.PACKAGE_CANONICAL,
+            ProofKind.SPEC_COMPILE,
+            ProofKind.REPLAY,
+            ProofKind.REPLAY_WELLFORMED,
+            ProofKind.COVERAGE,
+            ProofKind.PROBE,
+            ProofKind.DECISION,
+        }
+    ),
     Status.REJECT: frozenset({ProofKind.DECISION}),
     Status.UNVERIFIED_NO_VERDICT: frozenset(),
 }
@@ -116,4 +126,3 @@ def _has_block_breach(proofs: Sequence[Proof]) -> bool:
                 if not assertion.holds:
                     return True
     return False
-

@@ -43,6 +43,7 @@ class ReasonCode(StrEnum):
     VERDICT_PATH_VIOLATION = "VERDICT_PATH_VIOLATION"
     RECEIPT_BINDING_FAILED = "RECEIPT_BINDING_FAILED"
     SPONSOR_READBACK_MISMATCH = "SPONSOR_READBACK_MISMATCH"
+    SPONSOR_EVIDENCE_UNVERIFIED = "SPONSOR_EVIDENCE_UNVERIFIED"
     UNVERIFIED_NO_VERDICT = "UNVERIFIED_NO_VERDICT"
     FILE_NOT_FOUND = "FILE_NOT_FOUND"
     PARSE_ERROR = "PARSE_ERROR"
@@ -237,15 +238,19 @@ class BaselineInfo(RedlineModel):
     package_hash: str
     baseline_receipt_hash: str | None = None
     baseline_version_id: str = "fixture:baseline"
+    package_name: str = "baseline"
     chain_status: ChainStatus = ChainStatus.GENESIS
 
 
 class CandidateInfo(RedlineModel):
     package_hash: str
+    candidate_version_id: str = "fixture:candidate"
+    package_name: str = "candidate"
 
 
 class SpecInfo(RedlineModel):
     spec_hash: str
+    source_path: str = ""
     compiler: str = "json"
     model: str | None = None
     tool_schema_hash: str | None = None
@@ -255,6 +260,7 @@ class SuiteInfo(RedlineModel):
     suite_id: str
     scenarios: list[str]
     suite_lock_hash: str
+    source_path: str = ""
 
 
 class RunnerInfo(RedlineModel):
@@ -296,7 +302,7 @@ class PublishInfo(RedlineModel):
 
 
 class Receipt(RedlineModel):
-    version: str = "redline.receipt.v3.2"
+    version: Literal["redline.receipt.v3.2"] = "redline.receipt.v3.2"
     package: PackageInfo
     edit_provenance: EditProvenance
     baseline: BaselineInfo
@@ -330,10 +336,20 @@ class VerificationResult(RedlineModel):
 
 class ProofVerification(RedlineModel):
     schema_version: str = "redline.proof_verification.v1"
-    status: Literal["proof_replayed", "proof_mismatch", "proof_unreplayable"]
+    status: Literal["proof_verified", "proof_mismatch", "proof_unreplayable"]
     proof_id: str
     artifact_hash: str | None = None
     reason_code: ReasonCode = ReasonCode.PASS
+
+
+class ReportJson(RedlineModel):
+    version: Literal["redline.report.v1"] = "redline.report.v1"
+    envelope: DecisionEnvelope
+    receipt_hash: str | None = None
+    strength_summary: str = ""
+    traces: list[ReplayTrace]
+    proof_ids: list[str]
+    report_hash: str
 
 
 class RunArtifacts(RedlineModel):
@@ -343,4 +359,3 @@ class RunArtifacts(RedlineModel):
     traces: list[ReplayTrace]
     report_json: dict[str, Any]
     out_dir: Path | None = None
-

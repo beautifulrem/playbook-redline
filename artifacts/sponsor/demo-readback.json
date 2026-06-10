@@ -1,0 +1,10 @@
+{
+  "version": "redline.sponsor.bitget.readback.v1",
+  "run_id": "recorded-demo-run-001",
+  "version_id": "recorded-demo-version-001",
+  "status": "completed",
+  "metrics_output_hash": "sha256:56ff6f3f8a2789f64b0d3e0e0f32d1bb933c7d9dca44aee86e9bf0e4dfae2168",
+  "expected_version_id": "recorded-demo-version-001",
+  "expected_metrics_output_hash": "sha256:56ff6f3f8a2789f64b0d3e0e0f32d1bb933c7d9dca44aee86e9bf0e4dfae2168",
+  "transcript_hash": "sha256:f187b7ac43293584b491e6fcb28f7f6d1c125cfbda10ca1341df9ee8587c94f7"
+}

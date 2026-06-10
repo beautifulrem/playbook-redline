@@ -1,0 +1,64 @@
+name: Playbook Redline
+description: Run Playbook Redline backend verification and upload demo artifacts.
+
+inputs:
+  package:
+    description: Playbook package directory.
+    default: fixtures/demo_pack
+  baseline:
+    description: Baseline package name under the package directory.
+    default: baseline
+  candidate:
+    description: Candidate package name under the package directory.
+    default: candidate_good
+  allow-amber-baseline-genesis:
+    description: Treat BASELINE_GENESIS exit 10 as a successful CI outcome.
+    default: "true"
+  suite:
+    description: Redline suite JSON path.
+    default: fixtures/suites/demo_suite.json
+  spec:
+    description: Redline spec JSON path.
+    default: fixtures/specs/redline_spec.json
+  out:
+    description: Artifact output directory.
+    default: artifacts/action-redline
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+    - name: Install dependencies
+      shell: bash
+      run: uv sync --extra dev
+    - name: Run Redline
+      id: redline
+      shell: bash
+      run: |
+        set +e
+        uv run redline run "${{ inputs.package }}" \
+          --baseline "${{ inputs.baseline }}" \
+          --candidate "${{ inputs.candidate }}" \
+          --suite "${{ inputs.suite }}" \
+          --spec "${{ inputs.spec }}" \
+          --out "${{ inputs.out }}" \
+          --json
+        code=$?
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        exit 0
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: redline-artifacts
+        path: ${{ inputs.out }}
+    - name: Enforce Redline result
+      shell: bash
+      run: |
+        code="${{ steps.redline.outputs.exit_code }}"
+        if [ "$code" -eq 0 ]; then
+          exit 0
+        fi
+        if [ "$code" -eq 10 ] && [ "${{ inputs.allow-amber-baseline-genesis }}" = "true" ]; then
+          exit 0
+        fi
+        exit "$code"

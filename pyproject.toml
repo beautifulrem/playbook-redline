@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Proof kernel and verifier for AI-edited Bitget Playbook crash-test receipts."
 requires-python = ">=3.12"
 dependencies = [
+  "mcp>=1.0",
   "pydantic>=2.8",
   "typer>=0.12",
   "rich>=13.7",
@@ -19,6 +20,7 @@ dev = [
 
 [project.scripts]
 redline = "redline.cli:app"
+redline-mcp = "redline.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,4 +32,3 @@ packages = ["src/redline"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-

@@ -28,6 +28,10 @@ from redline.models import (
 from redline.proof_kernel import decision_proof_id
 
 
+class IssuanceLedgerConflict(RuntimeError):
+    pass
+
+
 def make_decision_proof(*, envelope: DecisionEnvelope, proofs: list[Proof]) -> Proof:
     proof_id = decision_proof_id(
         status=envelope.status,
@@ -43,7 +47,7 @@ def make_decision_proof(*, envelope: DecisionEnvelope, proofs: list[Proof]) -> P
         inputs_hash=hash_obj({"proof_ids": [proof.proof_id for proof in proofs], "coverage": envelope.coverage}),
         artifact_hash=hash_obj(envelope),
         assertions=[],
-        reproduce=f"uv run redline check artifacts/receipt.json --proof-id {proof_id}",
+        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id}",
     )
 
 
@@ -57,12 +61,16 @@ def issue_receipt(
     proofs: list[Proof],
     coverage: CoverageManifest,
     package_hash: str,
+    baseline_name: str,
     baseline_hash: str,
+    candidate_name: str,
     candidate_hash: str,
     spec_hash: str,
+    spec_source_path: str,
     suite_id: str,
     scenario_ids: list[str],
     suite_lock_hash: str,
+    suite_source_path: str,
     engine_source_tree_hash: str,
     runner_lock_hash: str,
     report_hash: str = "sha256:pending",
@@ -84,10 +92,19 @@ def issue_receipt(
             diff_hash=hash_obj({"baseline": baseline_hash, "candidate": candidate_hash}),
             captured_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         ),
-        baseline=BaselineInfo(package_hash=baseline_hash, chain_status=envelope.chain_status),
-        candidate=CandidateInfo(package_hash=candidate_hash),
-        spec=SpecInfo(spec_hash=spec_hash),
-        suite=SuiteInfo(suite_id=suite_id, scenarios=scenario_ids, suite_lock_hash=suite_lock_hash),
+        baseline=BaselineInfo(
+            package_hash=baseline_hash,
+            baseline_version_id=f"fixture:{baseline_name}",
+            package_name=baseline_name,
+            chain_status=envelope.chain_status,
+        ),
+        candidate=CandidateInfo(
+            package_hash=candidate_hash,
+            candidate_version_id=f"fixture:{candidate_name}",
+            package_name=candidate_name,
+        ),
+        spec=SpecInfo(spec_hash=spec_hash, source_path=spec_source_path),
+        suite=SuiteInfo(suite_id=suite_id, scenarios=scenario_ids, suite_lock_hash=suite_lock_hash, source_path=suite_source_path),
         runner=RunnerInfo(
             engine_source_tree_hash=engine_source_tree_hash,
             runner_lock_hash=runner_lock_hash,
@@ -111,6 +128,8 @@ def issue_receipt(
 
 def atomic_write_receipt(path: Path, receipt: Receipt, *, ledger_path: Path | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if ledger_path is not None:
+        _raise_on_ledger_conflict(ledger_path, receipt)
     tmp = path.with_suffix(path.suffix + ".tmp")
     data = receipt.model_dump_json(indent=2)
     with tmp.open("w", encoding="utf-8") as fh:
@@ -125,21 +144,63 @@ def atomic_write_receipt(path: Path, receipt: Receipt, *, ledger_path: Path | No
 
 def _append_ledger(path: Path, receipt: Receipt) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    key = {
-        "package_hash": receipt.package.identity_hash,
-        "candidate_hash": receipt.candidate.package_hash,
-        "suite_lock_hash": receipt.suite.suite_lock_hash,
-        "spec_hash": receipt.spec.spec_hash,
-    }
+    previous_entry_hash = _last_ledger_entry_hash(path)
     entry = {
-        "key_hash": hash_obj(key),
+        "key_hash": _ledger_key_hash(receipt),
         "status": receipt.result.status,
         "receipt_hash": receipt.receipt_hash,
+        "previous_entry_hash": previous_entry_hash,
         "written_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
+    entry["entry_hash"] = hash_obj(entry)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry, sort_keys=True))
         fh.write("\n")
+
+
+def _raise_on_ledger_conflict(path: Path, receipt: Receipt) -> None:
+    if not path.exists():
+        return
+    key_hash = _ledger_key_hash(receipt)
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise IssuanceLedgerConflict("issuance ledger is not valid JSONL") from exc
+            if entry.get("key_hash") == key_hash and entry.get("status") != receipt.result.status:
+                raise IssuanceLedgerConflict(
+                    f"anti-reroll conflict for {key_hash}: historical={entry.get('status')} new={receipt.result.status}"
+                )
+
+
+def _ledger_key_hash(receipt: Receipt) -> str:
+    return hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
+
+
+def _last_ledger_entry_hash(path: Path) -> str:
+    previous = "sha256:genesis"
+    if not path.exists():
+        return previous
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            entry = json.loads(line)
+            entry_hash = entry.get("entry_hash")
+            if not isinstance(entry_hash, str):
+                raise IssuanceLedgerConflict("issuance ledger entry is missing entry_hash")
+            previous = entry_hash
+    return previous
 
 
 def _strength_summary(proofs: list[Proof], scenario_count: int) -> str:

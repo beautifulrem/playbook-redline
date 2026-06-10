@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "ReasonCode": {
+      "enum": [
+        "PASS",
+        "NEW_BLOCK_BREACH",
+        "RECEIPT_MISMATCH",
+        "BASELINE_UNCHAINED",
+        "BASELINE_GENESIS",
+        "COVERAGE_INCOMPLETE",
+        "PROBE_ERROR",
+        "ENGINE_FAILURE",
+        "DATA_MISSING",
+        "CALIBRATION_FAILED",
+        "BASELINE_BREACHES",
+        "BASELINE_UNRUNNABLE",
+        "NONFINITE_VALUE",
+        "ENGINE_IDENTITY_MISMATCH",
+        "CANDIDATE_SANDBOX_VIOLATION",
+        "VERDICT_PATH_VIOLATION",
+        "RECEIPT_BINDING_FAILED",
+        "SPONSOR_READBACK_MISMATCH",
+        "SPONSOR_EVIDENCE_UNVERIFIED",
+        "UNVERIFIED_NO_VERDICT",
+        "FILE_NOT_FOUND",
+        "PARSE_ERROR",
+        "SCHEMA_INVALID",
+        "VERSION_UNSUPPORTED"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifact Hash"
+    },
+    "proof_id": {
+      "title": "Proof Id",
+      "type": "string"
+    },
+    "reason_code": {
+      "$ref": "#/$defs/ReasonCode",
+      "default": "PASS"
+    },
+    "schema_version": {
+      "default": "redline.proof_verification.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "proof_verified",
+        "proof_mismatch",
+        "proof_unreplayable"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "proof_id"
+  ],
+  "title": "ProofVerification",
+  "type": "object"
+}

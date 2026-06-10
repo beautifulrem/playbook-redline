@@ -5,21 +5,36 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_tree
+from redline.canonical import hash_obj, hash_tree
 from redline.models import (
+    DecisionEnvelope,
+    Proof,
+    ProofKind,
     ProofVerification,
     ReasonCode,
     Receipt,
+    ReportJson,
     Status,
     VerificationLevel,
     VerificationResult,
     VerificationStatus,
 )
 from redline.proof_kernel import REQUIRED_PROOFS
+from redline.proof_kernel import decision_proof_id
 from redline.receipt import compute_receipt_hash
-from redline.report import render_strength_summary
+from redline.report import render_strength_summary, to_report
 
 BAD_INPUT = {ReasonCode.FILE_NOT_FOUND, ReasonCode.PARSE_ERROR, ReasonCode.SCHEMA_INVALID, ReasonCode.VERSION_UNSUPPORTED}
+SINGLETON_PROOF_KINDS = {
+    ProofKind.PACKAGE_CANONICAL,
+    ProofKind.SPEC_COMPILE,
+    ProofKind.REPLAY,
+    ProofKind.REPLAY_WELLFORMED,
+    ProofKind.COVERAGE,
+    ProofKind.BASELINE_CALIBRATION,
+    ProofKind.CANDIDATE_ABSOLUTE,
+    ProofKind.DECISION,
+}
 
 
 def load_receipt(path: Path) -> Receipt:
@@ -27,12 +42,25 @@ def load_receipt(path: Path) -> Receipt:
         return Receipt.model_validate(json.load(fh))
 
 
-def verify(*, receipt_path: Path, package: Path | None = None, level: VerificationLevel | None = None) -> VerificationResult:
+def verify(
+    *,
+    receipt_path: Path,
+    package: Path | None = None,
+    level: VerificationLevel | None = None,
+    suite_path: Path | None = None,
+    spec_path: Path | None = None,
+    report_path: Path | None = None,
+    ledger_path: Path | None = None,
+) -> VerificationResult:
     level = level or VerificationLevel.HASH_ONLY
     try:
         if not receipt_path.exists():
             return _bad(ReasonCode.FILE_NOT_FOUND, level)
-        receipt = load_receipt(receipt_path)
+        with receipt_path.open(encoding="utf-8") as fh:
+            payload = json.load(fh)
+        if payload.get("version") != "redline.receipt.v3.2":
+            return _bad(ReasonCode.VERSION_UNSUPPORTED, level)
+        receipt = Receipt.model_validate(payload)
     except (json.JSONDecodeError, OSError):
         return _bad(ReasonCode.PARSE_ERROR, level)
     except ValidationError:
@@ -55,6 +83,12 @@ def verify(*, receipt_path: Path, package: Path | None = None, level: Verificati
             proof_coverage="incomplete",
             missing_proof_ids=missing,
         )
+    binding_error = _receipt_binding_error(receipt)
+    if binding_error is not None:
+        return _reject(receipt, binding_error, level)
+    ledger_error = _ledger_error(receipt=receipt, ledger_path=ledger_path or receipt_path.parent / "issuance-ledger.jsonl")
+    if ledger_error is not None:
+        return _reject(receipt, ledger_error, level)
     if not receipt.coverage.complete:
         return VerificationResult(
             status=VerificationStatus.UNVERIFIED_NO_VERDICT,
@@ -80,13 +114,47 @@ def verify(*, receipt_path: Path, package: Path | None = None, level: Verificati
             edit_provenance_present=True,
             proof_coverage="complete",
         )
+    if level == VerificationLevel.HASH_ONLY:
+        return VerificationResult(
+            status=VerificationStatus.UNVERIFIED_NO_VERDICT,
+            reason_code=ReasonCode.UNVERIFIED_NO_VERDICT,
+            verification_level=level,
+            receipt_hash=receipt.receipt_hash,
+            strength_summary=receipt.strength_summary,
+            chain_status=receipt.baseline.chain_status,
+            edit_provenance_present=True,
+            proof_coverage="complete",
+        )
     if level == VerificationLevel.REPLAYED and package is not None:
+        if suite_path is None or spec_path is None:
+            return VerificationResult(
+                status=VerificationStatus.UNVERIFIED_NO_VERDICT,
+                reason_code=ReasonCode.DATA_MISSING,
+                verification_level=level,
+                receipt_hash=receipt.receipt_hash,
+                strength_summary=receipt.strength_summary,
+                chain_status=receipt.baseline.chain_status,
+                edit_provenance_present=True,
+                proof_coverage="complete",
+            )
         try:
             package_hash = hash_tree(package)
         except (OSError, ValueError):
             return _bad(ReasonCode.FILE_NOT_FOUND, level)
         if package_hash != receipt.package.identity_hash:
             return _reject(receipt, ReasonCode.RECEIPT_BINDING_FAILED, level)
+        proofs_error = _external_proofs_error(receipt=receipt, proofs_dir=receipt_path.parent / "proofs")
+        if proofs_error is not None:
+            return _reject(receipt, proofs_error, level)
+        replay_error = _replay_error(
+            receipt=receipt,
+            package=package,
+            suite_path=suite_path,
+            spec_path=spec_path,
+            report_path=report_path or receipt_path.parent / "report.json",
+        )
+        if replay_error is not None:
+            return _reject(receipt, replay_error, level)
     return VerificationResult(
         status=VerificationStatus.VERIFIED,
         reason_code=receipt.decision.reason_code,
@@ -99,14 +167,21 @@ def verify(*, receipt_path: Path, package: Path | None = None, level: Verificati
     )
 
 
-def verify_proof(*, receipt_path: Path, proof_id: str) -> ProofVerification:
+def verify_proof(*, receipt_path: Path, proof_id: str, proofs_dir: Path | None = None) -> ProofVerification:
     try:
         receipt = load_receipt(receipt_path)
     except Exception:
         return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.PARSE_ERROR)
     for proof in receipt.proofs:
         if proof.proof_id == proof_id:
-            return ProofVerification(status="proof_replayed", proof_id=proof_id, artifact_hash=proof.artifact_hash)
+            proof_path = (proofs_dir or receipt_path.parent / "proofs") / f"{proof_id.replace(':', '_')}.json"
+            try:
+                external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
+            except Exception:
+                return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+            if external != proof:
+                return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+            return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=proof.artifact_hash)
     return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
 
 
@@ -126,6 +201,181 @@ def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
     if set(expected_ids) != set(receipt.decision.required_proof_ids):
         missing.extend(sorted(set(receipt.decision.required_proof_ids).symmetric_difference(expected_ids)))
     return sorted(set(missing))
+
+
+def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
+    if receipt.package.manifest_hash != receipt.package.identity_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    for kind in SINGLETON_PROOF_KINDS:
+        matches = [proof for proof in receipt.proofs if proof.kind is kind]
+        if len(matches) > 1:
+            return ReasonCode.RECEIPT_MISMATCH
+    if receipt.result.result_hash != hash_obj({"status": receipt.result.status, "breaches": receipt.result.new_breaches}):
+        return ReasonCode.RECEIPT_MISMATCH
+    package_proof = _single_proof(receipt, ProofKind.PACKAGE_CANONICAL)
+    if package_proof is not None:
+        expected_package_artifact = hash_obj(
+            {
+                "package_hash": receipt.package.identity_hash,
+                "baseline_hash": receipt.baseline.package_hash,
+                "candidate_hash": receipt.candidate.package_hash,
+            }
+        )
+        if package_proof.artifact_hash != expected_package_artifact:
+            return ReasonCode.RECEIPT_MISMATCH
+    coverage_proof = _single_proof(receipt, ProofKind.COVERAGE)
+    if coverage_proof is not None and coverage_proof.artifact_hash != hash_obj(receipt.coverage):
+        return ReasonCode.RECEIPT_MISMATCH
+    decision_proof = _single_proof(receipt, ProofKind.DECISION)
+    if decision_proof is not None:
+        non_decision_ids = [proof.proof_id for proof in receipt.proofs if proof.kind is not ProofKind.DECISION]
+        expected_decision_id = decision_proof_id(
+            status=Status(receipt.result.status),
+            reason_code=receipt.decision.reason_code,
+            proof_ids=non_decision_ids,
+            coverage=receipt.coverage,
+        )
+        if decision_proof.proof_id != expected_decision_id:
+            return ReasonCode.RECEIPT_MISMATCH
+        expected_envelope = DecisionEnvelope(
+            status=Status(receipt.result.status),
+            reason_code=receipt.decision.reason_code,
+            chain_status=receipt.baseline.chain_status,
+            required_proof_ids=receipt.decision.required_proof_ids,
+            satisfied_proof_ids=receipt.decision.satisfied_proof_ids,
+            coverage=receipt.coverage,
+            capabilities=receipt.capabilities,
+        )
+        if decision_proof.artifact_hash != hash_obj(expected_envelope):
+            return ReasonCode.RECEIPT_MISMATCH
+    return None
+
+
+def _replay_error(*, receipt: Receipt, package: Path, suite_path: Path, spec_path: Path, report_path: Path) -> ReasonCode | None:
+    try:
+        from redline.runner import load_spec, load_suite, run_redline
+
+        spec = load_spec(spec_path)
+        suite = load_suite(suite_path)
+        suite_lock_hash = suite.suite_lock_hash or hash_obj(suite)
+        if hash_obj(spec) != receipt.spec.spec_hash or suite_lock_hash != receipt.suite.suite_lock_hash:
+            return ReasonCode.RECEIPT_BINDING_FAILED
+        rerun = run_redline(
+            package_dir=package,
+            baseline=receipt.baseline.package_name,
+            candidate=receipt.candidate.package_name,
+            suite_path=suite_path,
+            spec_path=spec_path,
+            out_dir=None,
+        )
+    except Exception:
+        return ReasonCode.ENGINE_FAILURE
+    if rerun.receipt is None:
+        return rerun.envelope.reason_code
+    if rerun.envelope.status != Status(receipt.result.status):
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if rerun.envelope.reason_code != receipt.decision.reason_code:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if rerun.envelope.coverage != receipt.coverage:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if set(rerun.envelope.required_proof_ids) != set(receipt.decision.required_proof_ids):
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if _proof_fingerprint(rerun.receipt.proofs) != _proof_fingerprint(receipt.proofs):
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if render_strength_summary(rerun.receipt) != receipt.strength_summary:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if rerun.receipt.report.report_hash != receipt.report.report_hash:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    expected_report = to_report(envelope=rerun.envelope, receipt=receipt, traces=rerun.traces)
+    report_error = _external_report_error(report_path=report_path, expected_report=expected_report, receipt=receipt)
+    if report_error is not None:
+        return report_error
+    return None
+
+
+def _proof_fingerprint(proofs: list[Proof]) -> list[str]:
+    return sorted(hash_obj(proof) for proof in proofs)
+
+
+def _single_proof(receipt: Receipt, kind: ProofKind) -> Proof | None:
+    matches = [proof for proof in receipt.proofs if proof.kind is kind]
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _ledger_error(*, receipt: Receipt, ledger_path: Path) -> ReasonCode | None:
+    if not ledger_path.exists():
+        return ReasonCode.RECEIPT_MISMATCH
+    key_hash = hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
+    matched = False
+    previous_entry_hash = "sha256:genesis"
+    try:
+        with ledger_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                entry_hash = entry.get("entry_hash")
+                if not isinstance(entry_hash, str):
+                    return ReasonCode.RECEIPT_MISMATCH
+                expected_entry_hash = hash_obj({key: value for key, value in entry.items() if key != "entry_hash"})
+                if entry_hash != expected_entry_hash or entry.get("previous_entry_hash") != previous_entry_hash:
+                    return ReasonCode.RECEIPT_MISMATCH
+                previous_entry_hash = entry_hash
+                if entry.get("key_hash") != key_hash:
+                    continue
+                if entry.get("status") != receipt.result.status:
+                    return ReasonCode.RECEIPT_MISMATCH
+                if entry.get("receipt_hash") == receipt.receipt_hash:
+                    matched = True
+    except (OSError, json.JSONDecodeError):
+        return ReasonCode.RECEIPT_MISMATCH
+    return None if matched else ReasonCode.RECEIPT_MISMATCH
+
+
+def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode | None:
+    if not proofs_dir.exists():
+        return ReasonCode.RECEIPT_MISMATCH
+    receipt_proofs = {proof.proof_id: proof for proof in receipt.proofs}
+    for proof_id in receipt.decision.required_proof_ids:
+        proof = receipt_proofs.get(proof_id)
+        if proof is None:
+            return ReasonCode.RECEIPT_MISMATCH
+        proof_path = proofs_dir / f"{proof_id.replace(':', '_')}.json"
+        try:
+            external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
+        except Exception:
+            return ReasonCode.RECEIPT_MISMATCH
+        if external != proof:
+            return ReasonCode.RECEIPT_MISMATCH
+    return None
+
+
+def _external_report_error(*, report_path: Path, expected_report: dict, receipt: Receipt) -> ReasonCode | None:
+    if not report_path.exists():
+        return ReasonCode.RECEIPT_MISMATCH
+    try:
+        report_json = json.loads(report_path.read_text(encoding="utf-8"))
+        report = ReportJson.model_validate(report_json)
+    except (OSError, json.JSONDecodeError, ValidationError):
+        return ReasonCode.RECEIPT_MISMATCH
+    report_payload = report.model_dump(mode="json")
+    recomputed_report_hash = hash_obj({key: value for key, value in {**report_payload, "receipt_hash": None}.items() if key != "report_hash"})
+    if recomputed_report_hash != report.report_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    if report.report_hash != receipt.report.report_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    if report.model_dump(mode="json") != expected_report:
+        return ReasonCode.RECEIPT_MISMATCH
+    return None
 
 
 def _bad(reason: ReasonCode, level: VerificationLevel) -> VerificationResult:

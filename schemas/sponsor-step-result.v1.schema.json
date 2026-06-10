@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ReasonCode": {
+      "enum": [
+        "PASS",
+        "NEW_BLOCK_BREACH",
+        "RECEIPT_MISMATCH",
+        "BASELINE_UNCHAINED",
+        "BASELINE_GENESIS",
+        "COVERAGE_INCOMPLETE",
+        "PROBE_ERROR",
+        "ENGINE_FAILURE",
+        "DATA_MISSING",
+        "CALIBRATION_FAILED",
+        "BASELINE_BREACHES",
+        "BASELINE_UNRUNNABLE",
+        "NONFINITE_VALUE",
+        "ENGINE_IDENTITY_MISMATCH",
+        "CANDIDATE_SANDBOX_VIOLATION",
+        "VERDICT_PATH_VIOLATION",
+        "RECEIPT_BINDING_FAILED",
+        "SPONSOR_READBACK_MISMATCH",
+        "SPONSOR_EVIDENCE_UNVERIFIED",
+        "UNVERIFIED_NO_VERDICT",
+        "FILE_NOT_FOUND",
+        "PARSE_ERROR",
+        "SCHEMA_INVALID",
+        "VERSION_UNSUPPORTED"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "SponsorState": {
+      "enum": [
+        "LOCAL_PASS_REQUIRED",
+        "ANNOTATED_PACKAGE_READY",
+        "UPLOAD_ACCEPTED",
+        "RUN_STARTED",
+        "RUN_COMPLETED",
+        "READBACK_VERIFIED",
+        "RECORDED_ATTESTATION_VALID",
+        "MISMATCH"
+      ],
+      "title": "SponsorState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evidence": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Evidence",
+      "type": "object"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "state": {
+      "$ref": "#/$defs/SponsorState"
+    }
+  },
+  "required": [
+    "ok",
+    "state"
+  ],
+  "title": "SponsorStepResult",
+  "type": "object"
+}

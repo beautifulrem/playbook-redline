@@ -60,6 +60,8 @@ def run_redline(
     out_dir: Path | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
+    suite_path = suite_path.resolve()
+    spec_path = spec_path.resolve()
     baseline_dir = package_dir / baseline
     candidate_dir = package_dir / candidate
     spec = load_spec(spec_path)
@@ -130,6 +132,10 @@ def run_redline(
                 if probe is None:
                     missing.append(f"{scenario.id}:{probe_spec.id}:errored")
                     continue
+                if not probe.__class__.__module__.startswith("redline.probes."):
+                    reject_reason = ReasonCode.VERDICT_PATH_VIOLATION
+                    missing.append(f"{scenario.id}:{probe_spec.id}:untrusted_probe")
+                    break
                 try:
                     with verdict_path_tripwire():
                         result = probe.evaluate(baseline=baseline_trace, candidate=candidate_trace, params=probe_spec.params)
@@ -207,12 +213,16 @@ def run_redline(
         proofs=proofs,
         coverage=coverage,
         package_hash=package_hash,
+        baseline_name=baseline,
         baseline_hash=baseline_hash,
+        candidate_name=candidate,
         candidate_hash=candidate_hash,
         spec_hash=spec_hash,
+        spec_source_path=_portable_path(spec_path),
         suite_id=suite.suite_id,
         scenario_ids=[scenario.id for scenario in suite.scenarios],
         suite_lock_hash=suite.suite_lock_hash or hash_obj(suite),
+        suite_source_path=_portable_path(suite_path),
         engine_source_tree_hash=engine_hash,
         runner_lock_hash=hash_obj({"engine": "deterministic", "engine_hash": engine_hash}),
     )
@@ -236,7 +246,8 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
     (out_dir / "report.json").write_text(json.dumps(artifacts.report_json, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     proofs_dir = out_dir / "proofs"
     proofs_dir.mkdir(exist_ok=True)
-    for proof in artifacts.proofs:
+    proofs = artifacts.receipt.proofs if artifacts.receipt is not None else artifacts.proofs
+    for proof in proofs:
         (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if artifacts.receipt is not None:
         atomic_write_receipt(out_dir / "receipt.json", artifacts.receipt, ledger_path=out_dir / "issuance-ledger.jsonl")
@@ -262,7 +273,7 @@ def _simple_proof(
         inputs_hash=inputs_hash,
         artifact_hash=artifact_hash,
         assertions=assertions or [],
-        reproduce=f"uv run redline verify-proof artifacts/receipt.json --proof-id {proof_id}",
+        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id}",
     )
 
 
@@ -297,3 +308,11 @@ def parse_run_inputs(package_dir: Path, suite_path: Path, spec_path: Path) -> tu
     if not package_dir.exists():
         raise ValueError(f"package not found: {package_dir}")
     return package_dir, suite_path, spec_path
+
+
+def _portable_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return str(resolved)

@@ -1,0 +1,391 @@
+{
+  "$defs": {
+    "Capabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "$ref": "#/$defs/Capability"
+        },
+        "llm_in_verdict": {
+          "default": false,
+          "title": "Llm In Verdict",
+          "type": "boolean"
+        },
+        "qwen_compile": {
+          "$ref": "#/$defs/Capability"
+        },
+        "scenario_count": {
+          "default": 0,
+          "title": "Scenario Count",
+          "type": "integer"
+        },
+        "sponsor_readback": {
+          "$ref": "#/$defs/Capability"
+        }
+      },
+      "title": "Capabilities",
+      "type": "object"
+    },
+    "Capability": {
+      "additionalProperties": false,
+      "properties": {
+        "degraded": {
+          "default": false,
+          "title": "Degraded",
+          "type": "boolean"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "Capability",
+      "type": "object"
+    },
+    "ChainStatus": {
+      "enum": [
+        "chained",
+        "genesis",
+        "unchained"
+      ],
+      "title": "ChainStatus",
+      "type": "string"
+    },
+    "CoverageManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "manifest": {
+          "default": "suite.scenarios\u00d7spec.block_probes",
+          "title": "Manifest",
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
+        }
+      },
+      "required": [
+        "cells",
+        "complete"
+      ],
+      "title": "CoverageManifest",
+      "type": "object"
+    },
+    "DecisionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "$ref": "#/$defs/Capabilities"
+        },
+        "chain_status": {
+          "$ref": "#/$defs/ChainStatus"
+        },
+        "coverage": {
+          "$ref": "#/$defs/CoverageManifest"
+        },
+        "envelope_version": {
+          "default": "redline.decision.v1",
+          "title": "Envelope Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "required_proof_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Proof Ids",
+          "type": "array"
+        },
+        "satisfied_proof_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Satisfied Proof Ids",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "status",
+        "reason_code",
+        "chain_status",
+        "required_proof_ids",
+        "satisfied_proof_ids",
+        "coverage",
+        "capabilities"
+      ],
+      "title": "DecisionEnvelope",
+      "type": "object"
+    },
+    "ReasonCode": {
+      "enum": [
+        "PASS",
+        "NEW_BLOCK_BREACH",
+        "RECEIPT_MISMATCH",
+        "BASELINE_UNCHAINED",
+        "BASELINE_GENESIS",
+        "COVERAGE_INCOMPLETE",
+        "PROBE_ERROR",
+        "ENGINE_FAILURE",
+        "DATA_MISSING",
+        "CALIBRATION_FAILED",
+        "BASELINE_BREACHES",
+        "BASELINE_UNRUNNABLE",
+        "NONFINITE_VALUE",
+        "ENGINE_IDENTITY_MISMATCH",
+        "CANDIDATE_SANDBOX_VIOLATION",
+        "VERDICT_PATH_VIOLATION",
+        "RECEIPT_BINDING_FAILED",
+        "SPONSOR_READBACK_MISMATCH",
+        "SPONSOR_EVIDENCE_UNVERIFIED",
+        "UNVERIFIED_NO_VERDICT",
+        "FILE_NOT_FOUND",
+        "PARSE_ERROR",
+        "SCHEMA_INVALID",
+        "VERSION_UNSUPPORTED"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "ReplayPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "title": "Bar",
+          "type": "integer"
+        },
+        "close": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Close"
+        },
+        "drawdown": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown"
+        },
+        "nav": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Nav"
+        },
+        "peak": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Peak"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Position"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bar",
+        "timestamp",
+        "close",
+        "nav",
+        "peak",
+        "drawdown",
+        "position"
+      ],
+      "title": "ReplayPoint",
+      "type": "object"
+    },
+    "ReplayTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_hash": {
+          "title": "Artifact Hash",
+          "type": "string"
+        },
+        "bars": {
+          "title": "Bars",
+          "type": "integer"
+        },
+        "engine": {
+          "default": "deterministic",
+          "enum": [
+            "deterministic",
+            "nautilus"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "input_hash": {
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/ReplayPoint"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "baseline",
+            "candidate"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "trade_count": {
+          "title": "Trade Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scenario_id",
+        "role",
+        "bars",
+        "trade_count",
+        "points",
+        "input_hash",
+        "artifact_hash"
+      ],
+      "title": "ReplayTrace",
+      "type": "object"
+    },
+    "Status": {
+      "enum": [
+        "pass",
+        "withheld",
+        "reject",
+        "unverified_no_verdict"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "envelope": {
+      "$ref": "#/$defs/DecisionEnvelope"
+    },
+    "proof_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Proof Ids",
+      "type": "array"
+    },
+    "receipt_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Receipt Hash"
+    },
+    "report_hash": {
+      "title": "Report Hash",
+      "type": "string"
+    },
+    "strength_summary": {
+      "default": "",
+      "title": "Strength Summary",
+      "type": "string"
+    },
+    "traces": {
+      "items": {
+        "$ref": "#/$defs/ReplayTrace"
+      },
+      "title": "Traces",
+      "type": "array"
+    },
+    "version": {
+      "const": "redline.report.v1",
+      "default": "redline.report.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "envelope",
+    "traces",
+    "proof_ids",
+    "report_hash"
+  ],
+  "title": "ReportJson",
+  "type": "object"
+}

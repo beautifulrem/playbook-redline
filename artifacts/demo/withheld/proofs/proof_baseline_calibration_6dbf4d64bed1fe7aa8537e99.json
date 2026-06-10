@@ -1,0 +1,21 @@
+{
+  "proof_id": "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+  "phase": "calibrate",
+  "kind": "baseline_calibration",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:c1c2f85d90c548db38461d421e2bafe1ac4703b62b2aae088009c0ebc2b79033",
+  "artifact_hash": "sha256:6dbf4d64bed1fe7aa8537e993317cf215c8079df048367775063ed51983855a3",
+  "assertions": [
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 11,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+  "meta": {}
+}

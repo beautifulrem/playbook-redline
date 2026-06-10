@@ -4,20 +4,28 @@
   "reason_code": "NEW_BLOCK_BREACH",
   "chain_status": "genesis",
   "required_proof_ids": [
-    "proof:decision:d61e9afcd8a65698806d649c",
+    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:decision:f8d03e0a21a873d73e6958b4",
+    "proof:package_canonical:54b2e97564c1ff5504651dd3",
     "proof:probe:146e7d8dee0ed2a684b541bd",
     "proof:probe:1e45bf22c63aa9fb2e110ad6",
     "proof:probe:50779d37ab95b560da66d8c7",
     "proof:probe:79df280e8eaed5f480f3de58",
-    "proof:replay:26fb5b3971fa43e1bd854c43"
+    "proof:replay:26fb5b3971fa43e1bd854c43",
+    "proof:replay_wellformed:cb40391baf812adc052a058a",
+    "proof:spec_compile:fbb0609c303044cf00403afb"
   ],
   "satisfied_proof_ids": [
-    "proof:decision:d61e9afcd8a65698806d649c",
+    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:decision:f8d03e0a21a873d73e6958b4",
+    "proof:package_canonical:54b2e97564c1ff5504651dd3",
     "proof:probe:146e7d8dee0ed2a684b541bd",
     "proof:probe:1e45bf22c63aa9fb2e110ad6",
     "proof:probe:50779d37ab95b560da66d8c7",
     "proof:probe:79df280e8eaed5f480f3de58",
-    "proof:replay:26fb5b3971fa43e1bd854c43"
+    "proof:replay:26fb5b3971fa43e1bd854c43",
+    "proof:replay_wellformed:cb40391baf812adc052a058a",
+    "proof:spec_compile:fbb0609c303044cf00403afb"
   ],
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",

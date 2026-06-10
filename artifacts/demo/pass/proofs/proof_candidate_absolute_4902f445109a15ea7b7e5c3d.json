@@ -3,7 +3,7 @@
   "phase": "probe",
   "kind": "candidate_absolute",
   "verdict_bearing": true,
-  "inputs_hash": "sha256:315d26fbaf4a2f136bc2646155f3041c17d38cbe49d313963f55ef7e27c22921",
+  "inputs_hash": "sha256:e047f1d44ec6ba4998a15dfbcc9619dc476bb7cb82fbd53ef53c944b7c75265f",
   "artifact_hash": "sha256:4902f445109a15ea7b7e5c3d11cbed4f8aeb86dbe05eb3342b95c401eee3ce56",
   "assertions": [
     {
@@ -43,6 +43,6 @@
       "holds": true
     }
   ],
-  "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
   "meta": {}
 }

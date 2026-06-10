@@ -16,6 +16,6 @@
       "holds": true
     }
   ],
-  "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:probe:1e45bf22c63aa9fb2e110ad6",
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1e45bf22c63aa9fb2e110ad6",
   "meta": {}
 }

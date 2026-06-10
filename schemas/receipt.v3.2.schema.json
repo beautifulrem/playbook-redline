@@ -78,6 +78,11 @@
         "package_hash": {
           "title": "Package Hash",
           "type": "string"
+        },
+        "package_name": {
+          "default": "baseline",
+          "title": "Package Name",
+          "type": "string"
         }
       },
       "required": [
@@ -89,8 +94,18 @@
     "CandidateInfo": {
       "additionalProperties": false,
       "properties": {
+        "candidate_version_id": {
+          "default": "fixture:candidate",
+          "title": "Candidate Version Id",
+          "type": "string"
+        },
         "package_hash": {
           "title": "Package Hash",
+          "type": "string"
+        },
+        "package_name": {
+          "default": "candidate",
+          "title": "Package Name",
           "type": "string"
         }
       },
@@ -431,6 +446,7 @@
         "VERDICT_PATH_VIOLATION",
         "RECEIPT_BINDING_FAILED",
         "SPONSOR_READBACK_MISMATCH",
+        "SPONSOR_EVIDENCE_UNVERIFIED",
         "UNVERIFIED_NO_VERDICT",
         "FILE_NOT_FOUND",
         "PARSE_ERROR",
@@ -594,6 +610,11 @@
           "default": null,
           "title": "Model"
         },
+        "source_path": {
+          "default": "",
+          "title": "Source Path",
+          "type": "string"
+        },
         "spec_hash": {
           "title": "Spec Hash",
           "type": "string"
@@ -626,6 +647,11 @@
           },
           "title": "Scenarios",
           "type": "array"
+        },
+        "source_path": {
+          "default": "",
+          "title": "Source Path",
+          "type": "string"
         },
         "suite_id": {
           "title": "Suite Id",
@@ -702,6 +728,7 @@
       "$ref": "#/$defs/SuiteInfo"
     },
     "version": {
+      "const": "redline.receipt.v3.2",
       "default": "redline.receipt.v3.2",
       "title": "Version",
       "type": "string"

@@ -15,7 +15,8 @@ def to_report(*, envelope: DecisionEnvelope, receipt: Receipt | None, traces: li
         "traces": [trace.model_dump(mode="json") for trace in traces],
         "proof_ids": [proof.proof_id for proof in receipt.proofs] if receipt else [],
     }
-    report["report_hash"] = hash_obj(report)
+    hash_payload = {**report, "receipt_hash": None}
+    report["report_hash"] = hash_obj(hash_payload)
     return report
 
 
@@ -26,4 +27,3 @@ def render_strength_summary(receipt: Receipt) -> str:
             metrics.append(f"{assertion.metric} {assertion.op} {assertion.threshold} observed {assertion.observed}")
     scenario_count = len(receipt.suite.scenarios)
     return f"tested: {'; '.join(sorted(set(metrics)))}; {scenario_count} anchored scenarios"
-

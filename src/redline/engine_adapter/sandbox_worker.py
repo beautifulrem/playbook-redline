@@ -5,20 +5,71 @@ import csv
 import importlib.util
 import json
 import os
+import resource
+import site
 import sys
+import sysconfig
 from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 
-from redline.canonical import hash_obj
-from redline.models import Bar, ReasonCode, ReplayPoint, ReplayTrace
+from redline.models import Bar, ReasonCode
+
+_MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
+_MAX_CPU_SECONDS = 3
 
 
-def _audit_hook(event: str, args: tuple[object, ...]) -> None:
-    blocked_prefixes = ("socket", "subprocess")
-    blocked_events = {"os.system", "os.posix_spawn", "os.spawn", "pty.spawn"}
-    if event.startswith(blocked_prefixes) or event in blocked_events:
-        raise RuntimeError(f"{ReasonCode.CANDIDATE_SANDBOX_VIOLATION.value}:{event}")
+def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
+    path_type = os.PathLike
+    reason = ReasonCode.CANDIDATE_SANDBOX_VIOLATION.value
+
+    def audit_hook(event: str, args: tuple[object, ...]) -> None:
+        blocked_prefixes = ("ctypes", "socket", "subprocess", "os.exec", "os.fork")
+        blocked_events = {
+            "os.chdir",
+            "os.chmod",
+            "os.chown",
+            "os.link",
+            "os.mkdir",
+            "os.posix_spawn",
+            "os.remove",
+            "os.rename",
+            "os.rmdir",
+            "os.spawn",
+            "os.symlink",
+            "os.system",
+            "os.truncate",
+            "os.unlink",
+            "os.utime",
+            "pty.spawn",
+            "shutil.copyfile",
+            "shutil.copymode",
+            "shutil.copystat",
+            "shutil.copytree",
+            "shutil.move",
+            "tempfile.mkstemp",
+            "tempfile.mkdtemp",
+        }
+        if event.startswith(blocked_prefixes) or event in blocked_events:
+            raise RuntimeError(f"{reason}:{event}")
+        if event == "import" and args:
+            module_name = str(args[0])
+            if module_name in {"_ctypes", "ctypes", "cffi"} or module_name.startswith(("ctypes.", "cffi.")):
+                raise RuntimeError(f"{reason}:import-{module_name}")
+        if event == "open" and args:
+            target = args[0]
+            if not isinstance(target, (str, bytes, path_type)):
+                return
+            mode = str(args[1]) if len(args) > 1 and args[1] is not None else "r"
+            flags = args[2] if len(args) > 2 and isinstance(args[2], int) else 0
+            write_flags = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+            if any(flag in mode for flag in ("w", "a", "x", "+")) or bool(flags & write_flags):
+                raise RuntimeError(f"{reason}:open-write")
+            path = Path(target).resolve()
+            if allowed_read_roots and not any(path == root or root in path.parents for root in allowed_read_roots):
+                raise RuntimeError(f"{reason}:open-outside-sandbox")
+
+    return audit_hook
 
 
 def _load_strategy(strategy_path: Path) -> ModuleType:
@@ -58,53 +109,16 @@ def _read_config(path: Path) -> dict[str, object]:
         return json.load(fh)
 
 
-def _replay(*, package_dir: Path, scenario_id: str, scenario_path: Path, role: str) -> ReplayTrace:
+def _run_signals(*, package_dir: Path, scenario_path: Path) -> list[str]:
     bars = _read_bars(scenario_path)
     config = _read_config(package_dir / "config.json")
     strategy = _load_strategy(package_dir / "strategy.py")
-    nav = Decimal("10000")
-    peak = nav
-    previous_position = Decimal("0")
-    trade_count = 0
-    points: list[ReplayPoint] = []
+    signals: list[str] = []
     state: dict[str, object] = {}
-    previous_close = bars[0].close
     for bar in bars:
         signal_value = Decimal(str(strategy.signal(bar.model_dump(mode="json"), state, config)))
-        leverage = Decimal(str(config.get("leverage", "1")))
-        position = signal_value * leverage
-        if bar.i > 0:
-            ret = (bar.close - previous_close) / previous_close
-            nav = nav * (Decimal("1") + position * ret)
-        if position != previous_position:
-            trade_count += 1
-        previous_position = position
-        previous_close = bar.close
-        if nav > peak:
-            peak = nav
-        drawdown = Decimal("0") if peak == 0 else (peak - nav) / peak
-        points.append(
-            ReplayPoint(
-                bar=bar.i,
-                timestamp=bar.timestamp,
-                close=bar.close,
-                nav=nav,
-                peak=peak,
-                drawdown=drawdown,
-                position=position,
-            )
-        )
-    trace_without_hash = {
-        "scenario_id": scenario_id,
-        "role": role,
-        "engine": "deterministic",
-        "bars": len(bars),
-        "trade_count": trade_count,
-        "points": points,
-        "input_hash": hash_obj({"bars": bars, "config": config, "strategy": (package_dir / "strategy.py").read_text(encoding="utf-8")}),
-    }
-    artifact_hash = hash_obj(trace_without_hash)
-    return ReplayTrace(**trace_without_hash, artifact_hash=artifact_hash)
+        signals.append(str(signal_value))
+    return signals
 
 
 def main() -> int:
@@ -114,14 +128,22 @@ def main() -> int:
     parser.add_argument("--scenario-path", required=True)
     parser.add_argument("--role", choices=["baseline", "candidate"], required=True)
     args = parser.parse_args()
+    json_dumps = json.dumps
+    stdout_write = sys.stdout.write
     os.environ.setdefault("TZ", "UTC")
-    sys.addaudithook(_audit_hook)
+    sys.dont_write_bytecode = True
+    _apply_resource_limits()
+    roots = {Path(args.package).resolve(), Path(args.scenario_path).resolve().parent}
+    for path in {sys.prefix, sys.base_prefix, sysconfig.get_paths().get("stdlib", ""), sysconfig.get_paths().get("purelib", "")}:
+        if path:
+            roots.add(Path(path).resolve())
+    for path in site.getsitepackages():
+        roots.add(Path(path).resolve())
+    sys.addaudithook(_make_audit_hook(tuple(roots)))
     try:
-        trace = _replay(
+        signals = _run_signals(
             package_dir=Path(args.package).resolve(),
-            scenario_id=args.scenario_id,
             scenario_path=Path(args.scenario_path).resolve(),
-            role=args.role,
         )
     except Exception as exc:  # subprocess boundary: return typed error instead of traceback contract drift
         reason = ReasonCode.ENGINE_FAILURE.value
@@ -130,12 +152,22 @@ def main() -> int:
             if code.value in text:
                 reason = code.value
                 break
-        print(json.dumps({"ok": False, "reason_code": reason, "message": text}, sort_keys=True))
+        stdout_write(json_dumps({"ok": False, "reason_code": reason, "message": text}, sort_keys=True))
         return 0
-    print(json.dumps({"ok": True, "trace": trace.model_dump(mode="json")}, sort_keys=True))
+    stdout_write(json_dumps({"ok": True, "signals": signals}, sort_keys=True))
     return 0
+
+
+def _apply_resource_limits() -> None:
+    try:
+        resource.setrlimit(resource.RLIMIT_CPU, (_MAX_CPU_SECONDS, _MAX_CPU_SECONDS + 1))
+    except (ValueError, OSError, AttributeError):
+        pass
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (_MAX_ADDRESS_SPACE_BYTES, _MAX_ADDRESS_SPACE_BYTES))
+    except (ValueError, OSError, AttributeError):
+        pass
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

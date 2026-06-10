@@ -12,3 +12,5 @@ proofs/
 artifacts/*
 !artifacts/demo/
 !artifacts/demo/**
+!artifacts/sponsor/
+!artifacts/sponsor/**

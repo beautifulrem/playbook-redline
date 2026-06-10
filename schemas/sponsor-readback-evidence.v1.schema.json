@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expected_metrics_output_hash": {
+      "title": "Expected Metrics Output Hash",
+      "type": "string"
+    },
+    "expected_version_id": {
+      "title": "Expected Version Id",
+      "type": "string"
+    },
+    "metrics_output_hash": {
+      "title": "Metrics Output Hash",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "transcript_hash": {
+      "title": "Transcript Hash",
+      "type": "string"
+    },
+    "version": {
+      "const": "redline.sponsor.bitget.readback.v1",
+      "default": "redline.sponsor.bitget.readback.v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "version_id": {
+      "title": "Version Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "version_id",
+    "status",
+    "metrics_output_hash",
+    "expected_version_id",
+    "expected_metrics_output_hash",
+    "transcript_hash"
+  ],
+  "title": "SponsorReadbackEvidence",
+  "type": "object"
+}
