@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
+from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN, localcontext
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -25,7 +25,10 @@ def canonical_number(value: Decimal) -> str:
         dec = Decimal(value)
         if not dec.is_finite():
             raise CanonicalizationError("non-finite decimal")
-        quantized = dec.quantize(QUANT, rounding=ROUND_HALF_EVEN)
+        with localcontext() as ctx:
+            integer_digits = max(dec.adjusted() + 1, 1)
+            ctx.prec = max(28, integer_digits + abs(QUANT.as_tuple().exponent) + 4)
+            quantized = dec.quantize(QUANT, rounding=ROUND_HALF_EVEN)
     except (InvalidOperation, ValueError) as exc:
         raise CanonicalizationError(f"cannot canonicalize number: {value!r}") from exc
     if quantized == 0:

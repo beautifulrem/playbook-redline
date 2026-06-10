@@ -4,28 +4,32 @@
   "reason_code": "NEW_BLOCK_BREACH",
   "chain_status": "genesis",
   "required_proof_ids": [
-    "proof:coverage:9c1d66ec7d424f574b56330b",
-    "proof:decision:f8d03e0a21a873d73e6958b4",
-    "proof:package_canonical:54b2e97564c1ff5504651dd3",
-    "proof:probe:146e7d8dee0ed2a684b541bd",
-    "proof:probe:1e45bf22c63aa9fb2e110ad6",
-    "proof:probe:50779d37ab95b560da66d8c7",
-    "proof:probe:79df280e8eaed5f480f3de58",
-    "proof:replay:26fb5b3971fa43e1bd854c43",
-    "proof:replay_wellformed:cb40391baf812adc052a058a",
-    "proof:spec_compile:fbb0609c303044cf00403afb"
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:ac37bb9b81789b609465e688",
+    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:probe:1ea0185c616b3d37f783091d",
+    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:a13bf024e0d494f47d38b48f",
+    "proof:probe:b3e8d95ec8b37d9651c0dde7",
+    "proof:probe:b5785a8f2f863c305e84df47",
+    "proof:probe:c3ad8af9ce3ea6a163703aee",
+    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:793a7818c323072d18bcf8d8"
   ],
   "satisfied_proof_ids": [
-    "proof:coverage:9c1d66ec7d424f574b56330b",
-    "proof:decision:f8d03e0a21a873d73e6958b4",
-    "proof:package_canonical:54b2e97564c1ff5504651dd3",
-    "proof:probe:146e7d8dee0ed2a684b541bd",
-    "proof:probe:1e45bf22c63aa9fb2e110ad6",
-    "proof:probe:50779d37ab95b560da66d8c7",
-    "proof:probe:79df280e8eaed5f480f3de58",
-    "proof:replay:26fb5b3971fa43e1bd854c43",
-    "proof:replay_wellformed:cb40391baf812adc052a058a",
-    "proof:spec_compile:fbb0609c303044cf00403afb"
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:ac37bb9b81789b609465e688",
+    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:probe:1ea0185c616b3d37f783091d",
+    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:a13bf024e0d494f47d38b48f",
+    "proof:probe:b3e8d95ec8b37d9651c0dde7",
+    "proof:probe:b5785a8f2f863c305e84df47",
+    "proof:probe:c3ad8af9ce3ea6a163703aee",
+    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:793a7818c323072d18bcf8d8"
   ],
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",
@@ -36,11 +40,19 @@
       ],
       [
         "btc-crash-2024-03-05",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-crash-2024-03-05",
         "trade_budget"
       ],
       [
         "btc-chop-2024-08",
         "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "no_entry_when_crash"
       ],
       [
         "btc-chop-2024-08",

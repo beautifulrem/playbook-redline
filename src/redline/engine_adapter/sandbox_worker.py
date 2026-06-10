@@ -109,8 +109,7 @@ def _read_config(path: Path) -> dict[str, object]:
         return json.load(fh)
 
 
-def _run_signals(*, package_dir: Path, scenario_path: Path) -> list[str]:
-    bars = _read_bars(scenario_path)
+def _run_signals(*, package_dir: Path, bars: list[Bar]) -> list[str]:
     config = _read_config(package_dir / "config.json")
     strategy = _load_strategy(package_dir / "strategy.py")
     signals: list[str] = []
@@ -133,7 +132,12 @@ def main() -> int:
     os.environ.setdefault("TZ", "UTC")
     sys.dont_write_bytecode = True
     _apply_resource_limits()
-    roots = {Path(args.package).resolve(), Path(args.scenario_path).resolve().parent}
+    try:
+        bars = _read_bars(Path(args.scenario_path).resolve())
+    except Exception as exc:
+        stdout_write(json_dumps({"ok": False, "reason_code": ReasonCode.DATA_MISSING.value, "message": str(exc)}, sort_keys=True))
+        return 0
+    roots = {Path(args.package).resolve()}
     for path in {sys.prefix, sys.base_prefix, sysconfig.get_paths().get("stdlib", ""), sysconfig.get_paths().get("purelib", "")}:
         if path:
             roots.add(Path(path).resolve())
@@ -143,7 +147,7 @@ def main() -> int:
     try:
         signals = _run_signals(
             package_dir=Path(args.package).resolve(),
-            scenario_path=Path(args.scenario_path).resolve(),
+            bars=bars,
         )
     except Exception as exc:  # subprocess boundary: return typed error instead of traceback contract drift
         reason = ReasonCode.ENGINE_FAILURE.value

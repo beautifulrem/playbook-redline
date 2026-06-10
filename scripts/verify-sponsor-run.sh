@@ -13,7 +13,7 @@ set +e
 uv run redline check "$receipt_path" --package "$package_path" --rerun --json
 receipt_code=$?
 set -e
-if [ "$receipt_code" -ne 0 ]; then
+if [ "$receipt_code" -ne 0 ] && [ "$receipt_code" -ne 10 ]; then
   exit "$receipt_code"
 fi
 if [ "$evidence_code" -ne 0 ]; then

@@ -121,7 +121,7 @@ def decide(
 
 def _has_block_breach(proofs: Sequence[Proof]) -> bool:
     for proof in proofs:
-        if proof.kind == ProofKind.PROBE:
+        if proof.kind == ProofKind.PROBE and proof.verdict_bearing:
             for assertion in proof.assertions:
                 if not assertion.holds:
                     return True

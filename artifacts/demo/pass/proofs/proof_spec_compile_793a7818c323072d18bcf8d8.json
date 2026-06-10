@@ -1,0 +1,11 @@
+{
+  "proof_id": "proof:spec_compile:793a7818c323072d18bcf8d8",
+  "phase": "compile",
+  "kind": "spec_compile",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
+  "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8",
+  "meta": {}
+}

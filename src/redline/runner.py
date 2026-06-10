@@ -21,10 +21,11 @@ from redline.models import (
     Scenario,
     Status,
     Suite,
+    EditProvenance,
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import atomic_write_receipt, issue_receipt
+from redline.receipt import atomic_write_receipt, issue_receipt, make_decision_proof
 from redline.report import to_report
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
 
@@ -58,6 +59,7 @@ def run_redline(
     suite_path: Path,
     spec_path: Path,
     out_dir: Path | None = None,
+    edit_provenance: EditProvenance | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
     suite_path = suite_path.resolve()
@@ -98,7 +100,8 @@ def run_redline(
 
     coverage_cells: list[tuple[str, str]] = []
     missing: list[str] = []
-    probe_assertions: list[Assertion] = []
+    baseline_probe_assertions: list[Assertion] = []
+    candidate_probe_assertions: list[Assertion] = []
     if reject_reason is None:
         proofs.append(
             _simple_proof(
@@ -127,7 +130,8 @@ def run_redline(
             baseline_trace = trace_map[(scenario.id, "baseline")]
             candidate_trace = trace_map[(scenario.id, "candidate")]
             for probe_spec in spec.probes:
-                coverage_cells.append((scenario.id, probe_spec.id))
+                if probe_spec.block:
+                    coverage_cells.append((scenario.id, probe_spec.id))
                 probe = PROBE_REGISTRY.get(probe_spec.type)
                 if probe is None:
                     missing.append(f"{scenario.id}:{probe_spec.id}:errored")
@@ -138,7 +142,8 @@ def run_redline(
                     break
                 try:
                     with verdict_path_tripwire():
-                        result = probe.evaluate(baseline=baseline_trace, candidate=candidate_trace, params=probe_spec.params)
+                        baseline_result = probe.evaluate(baseline=baseline_trace, candidate=baseline_trace, params=probe_spec.params)
+                        candidate_result = probe.evaluate(baseline=baseline_trace, candidate=candidate_trace, params=probe_spec.params)
                 except VerdictPathViolation:
                     reject_reason = ReasonCode.VERDICT_PATH_VIOLATION
                     missing.append(f"{scenario.id}:{probe_spec.id}:verdict_path_violation")
@@ -146,17 +151,23 @@ def run_redline(
                 except Exception:
                     missing.append(f"{scenario.id}:{probe_spec.id}:errored")
                     continue
-                if result.outcome == ProbeOutcome.ERRORED:
+                if probe_spec.block and (baseline_result.outcome == ProbeOutcome.ERRORED or candidate_result.outcome == ProbeOutcome.ERRORED):
                     missing.append(f"{scenario.id}:{probe_spec.id}:errored")
-                probe_assertions.extend(result.assertions)
+                if probe_spec.block and any(not assertion.holds for assertion in baseline_result.assertions):
+                    reject_reason = ReasonCode.BASELINE_BREACHES
+                    missing.append(f"{scenario.id}:{probe_spec.id}:baseline_breach")
+                    break
+                if probe_spec.block:
+                    baseline_probe_assertions.extend(baseline_result.assertions)
+                    candidate_probe_assertions.extend(candidate_result.assertions)
                 proofs.append(
                     _simple_proof(
                         kind=ProofKind.PROBE,
                         phase="probe",
                         inputs={"scenario": scenario.id, "probe": probe_spec.id},
-                        artifact=result,
-                        verdict_bearing=True,
-                        assertions=result.assertions,
+                        artifact={"baseline": baseline_result, "candidate": candidate_result},
+                        verdict_bearing=probe_spec.block,
+                        assertions=candidate_result.assertions,
                     )
                 )
         if reject_reason is None:
@@ -170,7 +181,6 @@ def run_redline(
                     verdict_bearing=True,
                 )
             )
-            baseline_assertions = [assertion for assertion in probe_assertions if assertion.holds]
             proofs.append(
                 _simple_proof(
                     kind=ProofKind.BASELINE_CALIBRATION,
@@ -178,10 +188,10 @@ def run_redline(
                     inputs={"baseline_hash": baseline_hash, "suite": suite.suite_id},
                     artifact={"baseline": baseline_hash, "suite": suite.suite_id},
                     verdict_bearing=True,
-                    assertions=baseline_assertions[:1],
+                    assertions=baseline_probe_assertions,
                 )
             )
-            candidate_absolute = _candidate_absolute_assertions(probe_assertions)
+            candidate_absolute = _candidate_absolute_assertions(candidate_probe_assertions)
             proofs.append(
                 _simple_proof(
                     kind=ProofKind.CANDIDATE_ABSOLUTE,
@@ -225,7 +235,12 @@ def run_redline(
         suite_source_path=_portable_path(suite_path),
         engine_source_tree_hash=engine_hash,
         runner_lock_hash=hash_obj({"engine": "deterministic", "engine_hash": engine_hash}),
+        edit_provenance=edit_provenance,
     )
+    if receipt is None:
+        decision_proof = make_decision_proof(envelope=envelope, proofs=proofs)
+        if decision_proof.proof_id not in {proof.proof_id for proof in proofs}:
+            proofs.append(decision_proof)
     report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
     if receipt is not None:
         receipt = receipt.model_copy(update={"report": receipt.report.model_copy(update={"report_hash": report_json["report_hash"]})})

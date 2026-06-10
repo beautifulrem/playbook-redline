@@ -151,6 +151,7 @@
       "$ref": "#/$defs/CoverageManifest"
     },
     "envelope_version": {
+      "const": "redline.decision.v1",
       "default": "redline.decision.v1",
       "title": "Envelope Version",
       "type": "string"

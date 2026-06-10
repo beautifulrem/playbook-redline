@@ -74,6 +74,7 @@ class ProbeOutcome(StrEnum):
 
 class ProbeType(StrEnum):
     MAX_DRAWDOWN = "max_drawdown"
+    NO_ENTRY_WHEN = "no_entry_when"
     TRADE_BUDGET = "trade_budget"
 
 
@@ -116,7 +117,7 @@ class ProbeSpec(RedlineModel):
 
 
 class RedlineSpec(RedlineModel):
-    version: str = "redline.spec.v2.1"
+    version: Literal["redline.spec.v2.1"] = "redline.spec.v2.1"
     spec_id: str
     probes: list[ProbeSpec]
     compiler: str = "json"
@@ -131,7 +132,7 @@ class Scenario(RedlineModel):
 
 
 class Suite(RedlineModel):
-    version: str = "redline.suite.v2"
+    version: Literal["redline.suite.v2"] = "redline.suite.v2"
     suite_id: str
     scenarios: list[Scenario]
     suite_lock_hash: str | None = None
@@ -210,7 +211,7 @@ class DecisionContext(RedlineModel):
 
 
 class DecisionEnvelope(RedlineModel):
-    envelope_version: str = "redline.decision.v1"
+    envelope_version: Literal["redline.decision.v1"] = "redline.decision.v1"
     status: Status
     reason_code: ReasonCode
     chain_status: ChainStatus
@@ -232,6 +233,23 @@ class EditProvenance(RedlineModel):
     diff_hash: str
     locked_by: str = "author"
     captured_at: str
+
+
+class PackageImportResult(RedlineModel):
+    schema_version: Literal["redline.package_import.v1"] = "redline.package_import.v1"
+    path: str
+    identity_hash: str
+    files: list[str]
+
+
+class PublishPreflightResult(RedlineModel):
+    schema_version: Literal["redline.publish_preflight.v1"] = "redline.publish_preflight.v1"
+    ok: bool
+    state: str
+    receipt_hash: str | None = None
+    package_hash: str | None = None
+    annotation_hash: str | None = None
+    reason_code: ReasonCode | None = None
 
 
 class BaselineInfo(RedlineModel):
@@ -349,6 +367,11 @@ class ReportJson(RedlineModel):
     strength_summary: str = ""
     traces: list[ReplayTrace]
     proof_ids: list[str]
+    proofs: list[Proof] = Field(default_factory=list)
+    edit_provenance: EditProvenance | None = None
+    publish: PublishInfo | None = None
+    coverage_missing: list[str] = Field(default_factory=list)
+    verification_level: VerificationLevel | None = None
     report_hash: str
 
 

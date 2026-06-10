@@ -34,6 +34,7 @@
     "ProbeType": {
       "enum": [
         "max_drawdown",
+        "no_entry_when",
         "trade_budget"
       ],
       "title": "ProbeType",
@@ -83,6 +84,7 @@
       "title": "Tool Schema Hash"
     },
     "version": {
+      "const": "redline.spec.v2.1",
       "default": "redline.spec.v2.1",
       "title": "Version",
       "type": "string"

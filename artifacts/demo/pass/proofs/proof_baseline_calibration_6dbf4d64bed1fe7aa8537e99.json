@@ -10,9 +10,54 @@
       "metric": "max_drawdown",
       "op": "<=",
       "threshold": "0.08000000",
-      "observed": "0.04475248",
+      "observed": "0",
       "scenario_id": "btc-crash-2024-03-05",
-      "bar": 3,
+      "bar": 0,
+      "holds": true
+    },
+    {
+      "metric": "no_entry_when",
+      "op": "<=",
+      "threshold": "0",
+      "observed": "0",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 0,
+      "holds": true
+    },
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 23,
+      "holds": true
+    },
+    {
+      "metric": "max_drawdown",
+      "op": "<=",
+      "threshold": "0.08000000",
+      "observed": "0.00498134",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 13,
+      "holds": true
+    },
+    {
+      "metric": "no_entry_when",
+      "op": "<=",
+      "threshold": "0",
+      "observed": "0",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 0,
+      "holds": true
+    },
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 23,
       "holds": true
     }
   ],

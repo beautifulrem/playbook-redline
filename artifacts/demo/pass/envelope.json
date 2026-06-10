@@ -5,23 +5,23 @@
   "chain_status": "genesis",
   "required_proof_ids": [
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
-    "proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
-    "proof:coverage:9c1d66ec7d424f574b56330b",
-    "proof:decision:0c10de3b306abca53d2f38ca",
-    "proof:package_canonical:74ad218b8a38881b82cb4964",
-    "proof:replay:1aa3f92794bfd7739a613487",
-    "proof:replay_wellformed:cb40391baf812adc052a058a",
-    "proof:spec_compile:fbb0609c303044cf00403afb"
+    "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:c32b0885a7f8dcbf92babae6",
+    "proof:package_canonical:d626e536e38620bff850851f",
+    "proof:replay:90796eb2f6174bc3f22ab72b",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:793a7818c323072d18bcf8d8"
   ],
   "satisfied_proof_ids": [
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
-    "proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
-    "proof:coverage:9c1d66ec7d424f574b56330b",
-    "proof:decision:0c10de3b306abca53d2f38ca",
-    "proof:package_canonical:74ad218b8a38881b82cb4964",
-    "proof:replay:1aa3f92794bfd7739a613487",
-    "proof:replay_wellformed:cb40391baf812adc052a058a",
-    "proof:spec_compile:fbb0609c303044cf00403afb"
+    "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:c32b0885a7f8dcbf92babae6",
+    "proof:package_canonical:d626e536e38620bff850851f",
+    "proof:replay:90796eb2f6174bc3f22ab72b",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:793a7818c323072d18bcf8d8"
   ],
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",
@@ -32,11 +32,19 @@
       ],
       [
         "btc-crash-2024-03-05",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-crash-2024-03-05",
         "trade_budget"
       ],
       [
         "btc-chop-2024-08",
         "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "no_entry_when_crash"
       ],
       [
         "btc-chop-2024-08",

@@ -30,10 +30,16 @@ runs:
     - uses: astral-sh/setup-uv@v6
     - name: Install dependencies
       shell: bash
-      run: uv sync --extra dev
+      working-directory: ${{ github.action_path }}
+      run: uv sync --frozen --extra dev
+    - name: Doctor
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: uv run redline doctor
     - name: Run Redline
       id: redline
       shell: bash
+      working-directory: ${{ github.action_path }}
       run: |
         set +e
         uv run redline run "${{ inputs.package }}" \
@@ -50,7 +56,7 @@ runs:
       if: always()
       with:
         name: redline-artifacts
-        path: ${{ inputs.out }}
+        path: ${{ github.action_path }}/${{ inputs.out }}
     - name: Enforce Redline result
       shell: bash
       run: |

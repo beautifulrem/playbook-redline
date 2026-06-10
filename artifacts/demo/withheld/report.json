@@ -1,4 +1,12 @@
 {
+  "coverage_missing": [],
+  "edit_provenance": {
+    "captured_at": "2026-06-10T18:58:52Z",
+    "diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
+    "locked_by": "author",
+    "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
+    "tool": "fixture"
+  },
   "envelope": {
     "capabilities": {
       "engine": {
@@ -25,11 +33,19 @@
         ],
         [
           "btc-crash-2024-03-05",
+          "no_entry_when_crash"
+        ],
+        [
+          "btc-crash-2024-03-05",
           "trade_budget"
         ],
         [
           "btc-chop-2024-08",
           "drawdown_limit"
+        ],
+        [
+          "btc-chop-2024-08",
+          "no_entry_when_crash"
         ],
         [
           "btc-chop-2024-08",
@@ -43,54 +59,415 @@
     "envelope_version": "redline.decision.v1",
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids": [
-      "proof:coverage:9c1d66ec7d424f574b56330b",
-      "proof:decision:f8d03e0a21a873d73e6958b4",
-      "proof:package_canonical:54b2e97564c1ff5504651dd3",
-      "proof:probe:146e7d8dee0ed2a684b541bd",
-      "proof:probe:1e45bf22c63aa9fb2e110ad6",
-      "proof:probe:50779d37ab95b560da66d8c7",
-      "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43",
-      "proof:replay_wellformed:cb40391baf812adc052a058a",
-      "proof:spec_compile:fbb0609c303044cf00403afb"
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:ac37bb9b81789b609465e688",
+      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:probe:1ea0185c616b3d37f783091d",
+      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:793a7818c323072d18bcf8d8"
     ],
     "satisfied_proof_ids": [
-      "proof:coverage:9c1d66ec7d424f574b56330b",
-      "proof:decision:f8d03e0a21a873d73e6958b4",
-      "proof:package_canonical:54b2e97564c1ff5504651dd3",
-      "proof:probe:146e7d8dee0ed2a684b541bd",
-      "proof:probe:1e45bf22c63aa9fb2e110ad6",
-      "proof:probe:50779d37ab95b560da66d8c7",
-      "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43",
-      "proof:replay_wellformed:cb40391baf812adc052a058a",
-      "proof:spec_compile:fbb0609c303044cf00403afb"
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:ac37bb9b81789b609465e688",
+      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:probe:1ea0185c616b3d37f783091d",
+      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:793a7818c323072d18bcf8d8"
     ],
     "status": "withheld"
   },
   "proof_ids": [
-    "proof:package_canonical:54b2e97564c1ff5504651dd3",
-    "proof:spec_compile:fbb0609c303044cf00403afb",
-    "proof:replay:26fb5b3971fa43e1bd854c43",
-    "proof:replay_wellformed:cb40391baf812adc052a058a",
-    "proof:probe:146e7d8dee0ed2a684b541bd",
-    "proof:probe:1e45bf22c63aa9fb2e110ad6",
-    "proof:probe:50779d37ab95b560da66d8c7",
-    "proof:probe:79df280e8eaed5f480f3de58",
-    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:spec_compile:793a7818c323072d18bcf8d8",
+    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:probe:b5785a8f2f863c305e84df47",
+    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:b3e8d95ec8b37d9651c0dde7",
+    "proof:probe:1ea0185c616b3d37f783091d",
+    "proof:probe:a13bf024e0d494f47d38b48f",
+    "proof:probe:c3ad8af9ce3ea6a163703aee",
+    "proof:coverage:07629775749a0c50afc55033",
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
-    "proof:candidate_absolute:557b83d0280b056d654ca950",
-    "proof:decision:f8d03e0a21a873d73e6958b4"
+    "proof:candidate_absolute:8670b636e72e32d864f7e227",
+    "proof:decision:ac37bb9b81789b609465e688"
   ],
-  "receipt_hash": "sha256:03a7163be30778e254ad92888f82397eb3d24c7ee822e4466f015f2c8ea286c9",
-  "report_hash": "sha256:3379a1d538d29b912ed5eb809806e05a1d85817f2c8d1f71600968d0450f6c0e",
-  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0.01994876; max_drawdown <= 0.08000000 observed 0.17663366; replay_wellformed == 12 observed 12; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
+  "proofs": [
+    {
+      "artifact_hash": "sha256:4cd04e9bfa40c96d2f823de9fe36cd405e48b48dddd3cece1f4f89a056f7f01d",
+      "assertions": [],
+      "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
+      "kind": "package_canonical",
+      "meta": {},
+      "phase": "import",
+      "proof_id": "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
+      "assertions": [],
+      "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
+      "kind": "spec_compile",
+      "meta": {},
+      "phase": "compile",
+      "proof_id": "proof:spec_compile:793a7818c323072d18bcf8d8",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:c149d9a88c7c8e1a3d333339f8012aaf47f78a1d87da7128a85cd6505553b40f",
+      "assertions": [],
+      "inputs_hash": "sha256:c18ded2d2ef19549a60e88e86639037ffa29d8b816a31cb594d4c15e46e31ec6",
+      "kind": "replay",
+      "meta": {},
+      "phase": "run",
+      "proof_id": "proof:replay:c149d9a88c7c8e1a3d333339",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:c149d9a88c7c8e1a3d333339",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:6c1df9b834122230a053526fe6cc45179a7cab042a3f953a1f3ca6b31d6d7cd7",
+      "assertions": [
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "replay_wellformed",
+          "observed": "24",
+          "op": "==",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "24"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "replay_wellformed",
+          "observed": "24",
+          "op": "==",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "24"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "replay_wellformed",
+          "observed": "24",
+          "op": "==",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "24"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "replay_wellformed",
+          "observed": "24",
+          "op": "==",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "24"
+        }
+      ],
+      "inputs_hash": "sha256:23c3d55fe162c06c2a8492af17ec1c0bd5ef804f43caf74fb5ff1be8ba9f18fe",
+      "kind": "replay_wellformed",
+      "meta": {},
+      "phase": "run",
+      "proof_id": "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:b5785a8f2f863c305e84df47806fb56f5916db50c287f3e3100a5748e53236ac",
+      "assertions": [
+        {
+          "bar": 3,
+          "holds": false,
+          "metric": "max_drawdown",
+          "observed": "0.17663366",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "0.08000000"
+        }
+      ],
+      "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:b5785a8f2f863c305e84df47",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b5785a8f2f863c305e84df47",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:2b0b31d7e8e89665ae2fab01a16fbe72311e839c048e6d929ac08f01a8cce469",
+      "assertions": [
+        {
+          "bar": 1,
+          "holds": false,
+          "metric": "no_entry_when",
+          "observed": "2.00000000",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "0"
+        }
+      ],
+      "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:2b0b31d7e8e89665ae2fab01",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:b3e8d95ec8b37d9651c0dde76a346dbb84fb8d254d027d1b8e8a2f810ed3fe25",
+      "assertions": [
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "20.00000000"
+        }
+      ],
+      "inputs_hash": "sha256:cbb0ac11c03eb69951c8a01f550a31939b2fbb8d4678ebe8025be0a0fe5b2982",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:1ea0185c616b3d37f783091d68006833acaa0398af0563b14b0ab0cfd927e85a",
+      "assertions": [
+        {
+          "bar": 21,
+          "holds": true,
+          "metric": "max_drawdown",
+          "observed": "0.02029149",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "0.08000000"
+        }
+      ],
+      "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:1ea0185c616b3d37f783091d",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ea0185c616b3d37f783091d",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:a13bf024e0d494f47d38b48fac208e01d294596e45abe6ee90dc13c77cade633",
+      "assertions": [
+        {
+          "bar": 0,
+          "holds": true,
+          "metric": "no_entry_when",
+          "observed": "0",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "0"
+        }
+      ],
+      "inputs_hash": "sha256:f64b2947296784cd46902d3d0716d8e9e2b0505bc5b7e43ae113512958902a35",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:a13bf024e0d494f47d38b48f",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:c3ad8af9ce3ea6a163703aee9be209e0daa44981ecc32f8144052ccd67b82d88",
+      "assertions": [
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "20.00000000"
+        }
+      ],
+      "inputs_hash": "sha256:c549f70424b2bdc144ae5416b387cb50d50e28651b19e571e6a72a6c34d3b89c",
+      "kind": "probe",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
+      "assertions": [],
+      "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
+      "kind": "coverage",
+      "meta": {},
+      "phase": "decide",
+      "proof_id": "proof:coverage:07629775749a0c50afc55033",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:6dbf4d64bed1fe7aa8537e993317cf215c8079df048367775063ed51983855a3",
+      "assertions": [
+        {
+          "bar": 0,
+          "holds": true,
+          "metric": "max_drawdown",
+          "observed": "0",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "0.08000000"
+        },
+        {
+          "bar": 0,
+          "holds": true,
+          "metric": "no_entry_when",
+          "observed": "0",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "0"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "20.00000000"
+        },
+        {
+          "bar": 13,
+          "holds": true,
+          "metric": "max_drawdown",
+          "observed": "0.00498134",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "0.08000000"
+        },
+        {
+          "bar": 0,
+          "holds": true,
+          "metric": "no_entry_when",
+          "observed": "0",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "0"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "20.00000000"
+        }
+      ],
+      "inputs_hash": "sha256:c1c2f85d90c548db38461d421e2bafe1ac4703b62b2aae088009c0ebc2b79033",
+      "kind": "baseline_calibration",
+      "meta": {},
+      "phase": "calibrate",
+      "proof_id": "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:8670b636e72e32d864f7e227a102f89cc479c21d70fcd4d2a823aebfd186c825",
+      "assertions": [
+        {
+          "bar": 3,
+          "holds": false,
+          "metric": "max_drawdown",
+          "observed": "0.17663366",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "0.08000000"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-crash-2024-03-05",
+          "threshold": "20.00000000"
+        },
+        {
+          "bar": 21,
+          "holds": true,
+          "metric": "max_drawdown",
+          "observed": "0.02029149",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "0.08000000"
+        },
+        {
+          "bar": 23,
+          "holds": true,
+          "metric": "trade_budget",
+          "observed": "1.00000000",
+          "op": "<=",
+          "scenario_id": "btc-chop-2024-08",
+          "threshold": "20.00000000"
+        }
+      ],
+      "inputs_hash": "sha256:06d5ec40d25d7d4293d9eb75a7ae32e77b0aaa0472d04cab55e0eac9b8fd7ed1",
+      "kind": "candidate_absolute",
+      "meta": {},
+      "phase": "probe",
+      "proof_id": "proof:candidate_absolute:8670b636e72e32d864f7e227",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:8670b636e72e32d864f7e227",
+      "verdict_bearing": true
+    },
+    {
+      "artifact_hash": "sha256:abc6755c991b3bd7445d8136c12a3724ef73aa948b63177c88625ec467ae83ca",
+      "assertions": [],
+      "inputs_hash": "sha256:ba1240931b909bc825f0e676d87a1d7f5b9ac19a7b4afe33b038bfc62e1a4dc9",
+      "kind": "decision",
+      "meta": {},
+      "phase": "decide",
+      "proof_id": "proof:decision:ac37bb9b81789b609465e688",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:ac37bb9b81789b609465e688",
+      "verdict_bearing": true
+    }
+  ],
+  "publish": {
+    "attempted": false,
+    "note": "run_id is platform execution evidence, not local-equivalence proof",
+    "readback_hash": null,
+    "run_evidence_hash": null,
+    "run_id": null,
+    "sponsor_status": "not_attempted",
+    "stop_before_final_publish": true,
+    "version_id": null
+  },
+  "receipt_hash": "sha256:c0e58c27a26041ec61ec635f17a609b83b61a2e31489215f5a1f31afbd554c4b",
+  "report_hash": "sha256:64c3c0262d08047d92873c94399e77a23fa7643dee8f4964e3db920370e2854a",
+  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {
-      "artifact_hash": "sha256:d609a3f66b5b1c5ba19c0c54b8b1b93ef0444f737770b6fd24ca83830c587d80",
-      "bars": 12,
+      "artifact_hash": "sha256:6bb9225c9a9df8fa74f192b1c40f3e6931ddba6ea1753f3f05f85d612d73d976",
+      "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:55d493e72f07e6f7fa1ff4b44655e364084725c98fb5f48b20206e05a1371ba6",
+      "input_hash": "sha256:cff848bede7da2c59da555bb3807f98e141e38a6322bcc880fb667b2e9e1fa80",
       "points": [
         {
           "bar": 0,
@@ -199,6 +576,114 @@
           "peak": "10206.73884180937292130222910",
           "position": "0.5",
           "timestamp": "2024-03-05T11:00:00Z"
+        },
+        {
+          "bar": 12,
+          "close": "101",
+          "drawdown": "0",
+          "nav": "10257.77253601841978590874025",
+          "peak": "10257.77253601841978590874025",
+          "position": "0.5",
+          "timestamp": "2024-03-05T12:00:00Z"
+        },
+        {
+          "bar": 13,
+          "close": "102",
+          "drawdown": "0",
+          "nav": "10308.55358817692681455185283",
+          "peak": "10308.55358817692681455185283",
+          "position": "0.5",
+          "timestamp": "2024-03-05T13:00:00Z"
+        },
+        {
+          "bar": 14,
+          "close": "103",
+          "drawdown": "0",
+          "nav": "10359.08571360916665187808740",
+          "peak": "10359.08571360916665187808740",
+          "position": "0.5",
+          "timestamp": "2024-03-05T14:00:00Z"
+        },
+        {
+          "bar": 15,
+          "close": "104",
+          "drawdown": "0",
+          "nav": "10409.37253746163833465419462",
+          "peak": "10409.37253746163833465419462",
+          "position": "0.5",
+          "timestamp": "2024-03-05T15:00:00Z"
+        },
+        {
+          "bar": 16,
+          "close": "105",
+          "drawdown": "0",
+          "nav": "10459.41759773789621126310901",
+          "peak": "10459.41759773789621126310901",
+          "position": "0.5",
+          "timestamp": "2024-03-05T16:00:00Z"
+        },
+        {
+          "bar": 17,
+          "close": "106",
+          "drawdown": "0",
+          "nav": "10509.22434820331476465007620",
+          "peak": "10509.22434820331476465007620",
+          "position": "0.5",
+          "timestamp": "2024-03-05T17:00:00Z"
+        },
+        {
+          "bar": 18,
+          "close": "107",
+          "drawdown": "0",
+          "nav": "10558.79616116653794750219921",
+          "peak": "10558.79616116653794750219921",
+          "position": "0.5",
+          "timestamp": "2024-03-05T18:00:00Z"
+        },
+        {
+          "bar": 19,
+          "close": "108",
+          "drawdown": "0",
+          "nav": "10608.13633014395167622884500",
+          "peak": "10608.13633014395167622884500",
+          "position": "0.5",
+          "timestamp": "2024-03-05T19:00:00Z"
+        },
+        {
+          "bar": 20,
+          "close": "109",
+          "drawdown": "0",
+          "nav": "10657.24807241313663769286743",
+          "peak": "10657.24807241313663769286743",
+          "position": "0.5",
+          "timestamp": "2024-03-05T20:00:00Z"
+        },
+        {
+          "bar": 21,
+          "close": "110",
+          "drawdown": "0",
+          "nav": "10706.13453146090331951714664",
+          "peak": "10706.13453146090331951714664",
+          "position": "0.5",
+          "timestamp": "2024-03-05T21:00:00Z"
+        },
+        {
+          "bar": 22,
+          "close": "111",
+          "drawdown": "0",
+          "nav": "10754.79877933118015278767913",
+          "peak": "10754.79877933118015278767913",
+          "position": "0.5",
+          "timestamp": "2024-03-05T22:00:00Z"
+        },
+        {
+          "bar": 23,
+          "close": "112",
+          "drawdown": "0",
+          "nav": "10803.24381887771700032275877",
+          "peak": "10803.24381887771700032275877",
+          "position": "0.5",
+          "timestamp": "2024-03-05T23:00:00Z"
         }
       ],
       "role": "baseline",
@@ -206,10 +691,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:5a0e0e80939801f8026c3c9302129d2e73fcc206ff94d8ab09f92630fb9bc91a",
-      "bars": 12,
+      "artifact_hash": "sha256:d40084a618c36bd31c600596d51582a9e6df5a59e3f92702abec185017c19bc9",
+      "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:6bb8374f1fa017f36f587cdf549a3c7b20e16169658b9184eea196ad770427ed",
+      "input_hash": "sha256:7e0b288cff436ebdc3a8d7e81227bb130d77c33f89f411ffe716b93fc33e3f10",
       "points": [
         {
           "bar": 0,
@@ -318,6 +803,114 @@
           "peak": "10200.000",
           "position": "2.0",
           "timestamp": "2024-03-05T11:00:00Z"
+        },
+        {
+          "bar": 12,
+          "close": "101",
+          "drawdown": "0.008611500701262272089761571569",
+          "nav": "10112.16269284712482468443197",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T12:00:00Z"
+        },
+        {
+          "bar": 13,
+          "close": "102",
+          "drawdown": "0",
+          "nav": "10312.40353825003818754947023",
+          "peak": "10312.40353825003818754947023",
+          "position": "2.0",
+          "timestamp": "2024-03-05T13:00:00Z"
+        },
+        {
+          "bar": 14,
+          "close": "103",
+          "drawdown": "0",
+          "nav": "10514.60752919611736769749906",
+          "peak": "10514.60752919611736769749906",
+          "position": "2.0",
+          "timestamp": "2024-03-05T14:00:00Z"
+        },
+        {
+          "bar": 15,
+          "close": "104",
+          "drawdown": "0",
+          "nav": "10718.77466568536236512851846",
+          "peak": "10718.77466568536236512851846",
+          "position": "2.0",
+          "timestamp": "2024-03-05T15:00:00Z"
+        },
+        {
+          "bar": 16,
+          "close": "105",
+          "drawdown": "0",
+          "nav": "10924.90494771777317984252843",
+          "peak": "10924.90494771777317984252843",
+          "position": "2.0",
+          "timestamp": "2024-03-05T16:00:00Z"
+        },
+        {
+          "bar": 17,
+          "close": "106",
+          "drawdown": "0",
+          "nav": "11132.99837529334981183952897",
+          "peak": "11132.99837529334981183952897",
+          "position": "2.0",
+          "timestamp": "2024-03-05T17:00:00Z"
+        },
+        {
+          "bar": 18,
+          "close": "107",
+          "drawdown": "0",
+          "nav": "11343.05494841209226111952008",
+          "peak": "11343.05494841209226111952008",
+          "position": "2.0",
+          "timestamp": "2024-03-05T18:00:00Z"
+        },
+        {
+          "bar": 19,
+          "close": "108",
+          "drawdown": "0",
+          "nav": "11555.07466707400052768250177",
+          "peak": "11555.07466707400052768250177",
+          "position": "2.0",
+          "timestamp": "2024-03-05T19:00:00Z"
+        },
+        {
+          "bar": 20,
+          "close": "109",
+          "drawdown": "0",
+          "nav": "11769.05753127907461152847403",
+          "peak": "11769.05753127907461152847403",
+          "position": "2.0",
+          "timestamp": "2024-03-05T20:00:00Z"
+        },
+        {
+          "bar": 21,
+          "close": "110",
+          "drawdown": "0",
+          "nav": "11985.00354102731451265743686",
+          "peak": "11985.00354102731451265743686",
+          "position": "2.0",
+          "timestamp": "2024-03-05T21:00:00Z"
+        },
+        {
+          "bar": 22,
+          "close": "111",
+          "drawdown": "0",
+          "nav": "12202.91269631872023106939026",
+          "peak": "12202.91269631872023106939026",
+          "position": "2.0",
+          "timestamp": "2024-03-05T22:00:00Z"
+        },
+        {
+          "bar": 23,
+          "close": "112",
+          "drawdown": "0",
+          "nav": "12422.78499715329176676433423",
+          "peak": "12422.78499715329176676433423",
+          "position": "2.0",
+          "timestamp": "2024-03-05T23:00:00Z"
         }
       ],
       "role": "candidate",
@@ -325,10 +918,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:e8d48498577cdf76e12bf253f42aa446cd167b0d3da101da7b8bb77624d7a1c1",
-      "bars": 12,
+      "artifact_hash": "sha256:3f9584f0a239f590f6bd263b760b451525c4d08a6e04701dd11ac5ddc2fe8fa8",
+      "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:1e37496c11112d099f7098fb7820ff83d1e921d5f491abbfacbdaa1fd86b7ae4",
+      "input_hash": "sha256:053b1f99c2c9295d801fddb837af63c446c25ecfcf6ca9dbe00a47e08cd3c7d5",
       "points": [
         {
           "bar": 0,
@@ -437,6 +1030,114 @@
           "peak": "10050.25094338295957398934974",
           "position": "0.5",
           "timestamp": "2024-08-01T11:00:00Z"
+        },
+        {
+          "bar": 12,
+          "close": "100",
+          "drawdown": "0.002487562189054726368159204252",
+          "nav": "10025.25031914568853027295832",
+          "peak": "10050.25094338295957398934974",
+          "position": "0.5",
+          "timestamp": "2024-08-01T12:00:00Z"
+        },
+        {
+          "bar": 13,
+          "close": "99.5",
+          "drawdown": "0.004981343283582089552238806660",
+          "nav": "10000.18719334782430894727592",
+          "peak": "10050.25094338295957398934974",
+          "position": "0.5",
+          "timestamp": "2024-08-01T13:00:00Z"
+        },
+        {
+          "bar": 14,
+          "close": "100",
+          "drawdown": "0.002481296407410185254631366020",
+          "nav": "10025.31329182357261123106305",
+          "peak": "10050.25094338295957398934974",
+          "position": "0.5",
+          "timestamp": "2024-08-01T14:00:00Z"
+        },
+        {
+          "bar": 15,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10050.37657505313154275914071",
+          "peak": "10050.37657505313154275914071",
+          "position": "0.5",
+          "timestamp": "2024-08-01T15:00:00Z"
+        },
+        {
+          "bar": 16,
+          "close": "100",
+          "drawdown": "0.002487562189054726368159203740",
+          "nav": "10025.37563829926803145874484",
+          "peak": "10050.37657505313154275914071",
+          "position": "0.5",
+          "timestamp": "2024-08-01T16:00:00Z"
+        },
+        {
+          "bar": 17,
+          "close": "99.5",
+          "drawdown": "0.004981343283582089552238805522",
+          "nav": "10000.31219920351986138009798",
+          "peak": "10050.37657505313154275914071",
+          "position": "0.5",
+          "timestamp": "2024-08-01T17:00:00Z"
+        },
+        {
+          "bar": 18,
+          "close": "100",
+          "drawdown": "0.002481296407410185254631365245",
+          "nav": "10025.43861176433272535341481",
+          "peak": "10050.37657505313154275914071",
+          "position": "0.5",
+          "timestamp": "2024-08-01T18:00:00Z"
+        },
+        {
+          "bar": 19,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10050.50220829374355716679835",
+          "peak": "10050.50220829374355716679835",
+          "position": "0.5",
+          "timestamp": "2024-08-01T19:00:00Z"
+        },
+        {
+          "bar": 20,
+          "close": "100",
+          "drawdown": "0.002487562189054726368159203626",
+          "nav": "10025.50095901938101100469189",
+          "peak": "10050.50220829374355716679835",
+          "position": "0.5",
+          "timestamp": "2024-08-01T20:00:00Z"
+        },
+        {
+          "bar": 21,
+          "close": "99.5",
+          "drawdown": "0.004981343283582089552238805644",
+          "nav": "10000.43720662183255847718016",
+          "peak": "10050.50220829374355716679835",
+          "position": "0.5",
+          "timestamp": "2024-08-01T21:00:00Z"
+        },
+        {
+          "bar": 22,
+          "close": "100",
+          "drawdown": "0.002481296407410185254631364873",
+          "nav": "10025.56393327163615787033891",
+          "peak": "10050.50220829374355716679835",
+          "position": "0.5",
+          "timestamp": "2024-08-01T22:00:00Z"
+        },
+        {
+          "bar": 23,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10050.62784310481524826501476",
+          "peak": "10050.62784310481524826501476",
+          "position": "0.5",
+          "timestamp": "2024-08-01T23:00:00Z"
         }
       ],
       "role": "baseline",
@@ -444,10 +1145,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:f0d4dc5863b0a33270a4df424e15d7abc97d02af678e9ec41268948b3784d6c8",
-      "bars": 12,
+      "artifact_hash": "sha256:0579bd4b523585094f214ff8e2298c82a4c975e01efb1d328d8c075336c9376f",
+      "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:73cfb0eaead713ff4e02f70168df09d363697491e132cc2307c7e19af397d3c6",
+      "input_hash": "sha256:8c9be46e95e15f980f5aacd8fef866eb756e80308bb4d2ddbe0eb10bf3db2ada",
       "points": [
         {
           "bar": 0,
@@ -556,6 +1257,114 @@
           "peak": "10100.0000",
           "position": "2.0",
           "timestamp": "2024-08-01T11:00:00Z"
+        },
+        {
+          "bar": 12,
+          "close": "100",
+          "drawdown": "0.01019749516175094675874359614",
+          "nav": "9997.005298866315437736689679",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T12:00:00Z"
+        },
+        {
+          "bar": 13,
+          "close": "99.5",
+          "drawdown": "0.02009552021013343729115616020",
+          "nav": "9897.035245877652283359322782",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T13:00:00Z"
+        },
+        {
+          "bar": 14,
+          "close": "100",
+          "drawdown": "0.01024723398108955223880597129",
+          "nav": "9996.502936790995522388059690",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T14:00:00Z"
+        },
+        {
+          "bar": 15,
+          "close": "100.5",
+          "drawdown": "0.0003497063209004477611940306931",
+          "nav": "10096.46796615890547761194029",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T15:00:00Z"
+        },
+        {
+          "bar": 16,
+          "close": "100",
+          "drawdown": "0.01029647541223477166406772188",
+          "nav": "9996.005598336428806192916009",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T16:00:00Z"
+        },
+        {
+          "bar": 17,
+          "close": "99.5",
+          "drawdown": "0.02019351065811242394742704465",
+          "nav": "9896.045542353064518130986849",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T17:00:00Z"
+        },
+        {
+          "bar": 18,
+          "close": "100",
+          "drawdown": "0.01034620925769144328358209069",
+          "nav": "9995.503286497316422835820884",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T18:00:00Z"
+        },
+        {
+          "bar": 19,
+          "close": "100.5",
+          "drawdown": "0.0004496713502683577164179118812",
+          "nav": "10095.45831936228958706417909",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T19:00:00Z"
+        },
+        {
+          "bar": 20,
+          "close": "100",
+          "drawdown": "0.01039544576469354818690131574",
+          "nav": "9995.005997776595163312296711",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T20:00:00Z"
+        },
+        {
+          "bar": 21,
+          "close": "99.5",
+          "drawdown": "0.02029149130704661270503230257",
+          "nav": "9895.055937798829211679173744",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T21:00:00Z"
+        },
+        {
+          "bar": 22,
+          "close": "100",
+          "drawdown": "0.01044517463676567413925373317",
+          "nav": "9994.503736168666691193537295",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T22:00:00Z"
+        },
+        {
+          "bar": 23,
+          "close": "100.5",
+          "drawdown": "0.0005496263831333308806462702970",
+          "nav": "10094.44877353035335810547267",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T23:00:00Z"
         }
       ],
       "role": "candidate",
@@ -563,5 +1372,6 @@
       "trade_count": 1
     }
   ],
+  "verification_level": "replayed",
   "version": "redline.report.v1"
 }

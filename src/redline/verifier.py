@@ -167,22 +167,55 @@ def verify(
     )
 
 
-def verify_proof(*, receipt_path: Path, proof_id: str, proofs_dir: Path | None = None) -> ProofVerification:
+def verify_proof(
+    *,
+    receipt_path: Path,
+    proof_id: str,
+    proofs_dir: Path | None = None,
+    package: Path | None = None,
+    suite_path: Path | None = None,
+    spec_path: Path | None = None,
+) -> ProofVerification:
     try:
         receipt = load_receipt(receipt_path)
     except Exception:
         return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.PARSE_ERROR)
-    for proof in receipt.proofs:
-        if proof.proof_id == proof_id:
-            proof_path = (proofs_dir or receipt_path.parent / "proofs") / f"{proof_id.replace(':', '_')}.json"
-            try:
-                external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
-            except Exception:
-                return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
-            if external != proof:
-                return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
-            return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=proof.artifact_hash)
-    return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if compute_receipt_hash(receipt) != receipt.receipt_hash:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if _receipt_binding_error(receipt) is not None:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    receipt_proof = next((proof for proof in receipt.proofs if proof.proof_id == proof_id), None)
+    if receipt_proof is None:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    proof_path = (proofs_dir or receipt_path.parent / "proofs") / f"{proof_id.replace(':', '_')}.json"
+    try:
+        external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
+    except Exception:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if external != receipt_proof:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if package is not None:
+        if suite_path is None or spec_path is None:
+            return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.DATA_MISSING)
+        try:
+            from redline.runner import run_redline
+
+            rerun = run_redline(
+                package_dir=package,
+                baseline=receipt.baseline.package_name,
+                candidate=receipt.candidate.package_name,
+                suite_path=suite_path,
+                spec_path=spec_path,
+                out_dir=None,
+                edit_provenance=receipt.edit_provenance,
+            )
+        except Exception:
+            return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.ENGINE_FAILURE)
+        rerun_proofs = rerun.receipt.proofs if rerun.receipt is not None else rerun.proofs
+        rerun_proof = next((proof for proof in rerun_proofs if proof.proof_id == proof_id), None)
+        if rerun_proof != receipt_proof:
+            return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=receipt_proof.artifact_hash)
 
 
 def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
@@ -267,6 +300,7 @@ def _replay_error(*, receipt: Receipt, package: Path, suite_path: Path, spec_pat
             suite_path=suite_path,
             spec_path=spec_path,
             out_dir=None,
+            edit_provenance=receipt.edit_provenance,
         )
     except Exception:
         return ReasonCode.ENGINE_FAILURE
@@ -344,11 +378,8 @@ def _ledger_error(*, receipt: Receipt, ledger_path: Path) -> ReasonCode | None:
 def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode | None:
     if not proofs_dir.exists():
         return ReasonCode.RECEIPT_MISMATCH
-    receipt_proofs = {proof.proof_id: proof for proof in receipt.proofs}
-    for proof_id in receipt.decision.required_proof_ids:
-        proof = receipt_proofs.get(proof_id)
-        if proof is None:
-            return ReasonCode.RECEIPT_MISMATCH
+    for proof in receipt.proofs:
+        proof_id = proof.proof_id
         proof_path = proofs_dir / f"{proof_id.replace(':', '_')}.json"
         try:
             external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))

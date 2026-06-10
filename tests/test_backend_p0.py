@@ -29,6 +29,7 @@ from redline.runner import load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import SponsorState, validate_sponsor_evidence_shape
 from redline.mcp_server import redline_check_receipt
+from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html
 from redline.verifier import verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +42,29 @@ def test_required_proofs_covers_all_statuses() -> None:
     assert set(REQUIRED_PROOFS) == set(Status)
     assert ProofKind.DECISION in REQUIRED_PROOFS[Status.PASS]
     assert ProofKind.DECISION in REQUIRED_PROOFS[Status.WITHHELD]
+
+
+def test_spec_and_suite_versions_are_locked(tmp_path: Path) -> None:
+    spec_data = json.loads(SPEC.read_text())
+    spec_data["version"] = "redline.spec.v999"
+    bad_spec = tmp_path / "bad-spec.json"
+    bad_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    try:
+        compile_spec(bad_spec)
+    except Exception:
+        pass
+    else:
+        raise AssertionError("unsupported spec version must not validate")
+    suite_data = json.loads(SUITE.read_text())
+    suite_data["version"] = "redline.suite.v999"
+    bad_suite = tmp_path / "bad-suite.json"
+    bad_suite.write_text(json.dumps(suite_data), encoding="utf-8")
+    try:
+        load_suite(bad_suite)
+    except Exception:
+        pass
+    else:
+        raise AssertionError("unsupported suite version must not validate")
 
 
 def test_canonical_number_vectors_and_float_rejection() -> None:
@@ -76,6 +100,58 @@ def test_bad_candidate_withheld_and_good_candidate_pass(tmp_path: Path) -> None:
     assert good.envelope.status == Status.PASS
     assert good.receipt is not None
     assert good.receipt.report.report_hash == good.report_json["report_hash"]
+    assert good.report_json["proofs"]
+    assert good.report_json["edit_provenance"]["diff_hash"] == good.receipt.edit_provenance.diff_hash
+
+
+def test_suite_has_two_24_bar_scenarios_and_three_p0_probes() -> None:
+    suite = load_suite(SUITE)
+    spec = compile_spec(SPEC)
+    assert len(suite.scenarios) == 2
+    assert {probe.type for probe in spec.probes} == {ProbeType.MAX_DRAWDOWN, ProbeType.NO_ENTRY_WHEN, ProbeType.TRADE_BUDGET}
+    for scenario in suite.scenarios:
+        with Path(scenario.path).open(encoding="utf-8") as fh:
+            assert len([line for line in fh if line.strip()]) == 25
+
+
+def test_no_entry_when_probe_catches_early_crash_entry(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.receipt is not None
+    failures = [
+        assertion
+        for proof in artifacts.receipt.proofs
+        for assertion in proof.assertions
+        if assertion.metric == "no_entry_when" and not assertion.holds
+    ]
+    assert failures
+    assert failures[0].scenario_id == "btc-crash-2024-03-05"
+
+
+def test_baseline_breach_rejects_without_receipt_but_keeps_decision_proof(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    (package / "baseline" / "config.json").write_text('{"entry_bar": 1, "exit_bar": 99, "leverage": "2.0"}\n', encoding="utf-8")
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.BASELINE_BREACHES
+    assert artifacts.receipt is None
+    decision_proofs = [proof for proof in artifacts.proofs if proof.kind == ProofKind.DECISION]
+    assert len(decision_proofs) == 1
+    assert (tmp_path / "run" / "proofs" / f"{decision_proofs[0].proof_id.replace(':', '_')}.json").exists()
+    assert not (tmp_path / "run" / "receipt.json").exists()
+
+
+def test_advisory_probe_does_not_block_verdict(tmp_path: Path) -> None:
+    spec_data = json.loads(SPEC.read_text())
+    for probe in spec_data["probes"]:
+        if probe["type"] == "max_drawdown":
+            probe["params"]["max_drawdown"] = "0.000001"
+            probe["block"] = False
+    advisory_spec = tmp_path / "advisory-spec.json"
+    advisory_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=advisory_spec, out_dir=tmp_path / "run")
+    assert artifacts.envelope.status == Status.PASS
+    assert artifacts.receipt is not None
 
 
 def test_receipt_tamper_rejects(tmp_path: Path) -> None:
@@ -215,6 +291,18 @@ def test_replayed_requires_required_proof_sidecars(tmp_path: Path) -> None:
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
+def test_replayed_requires_all_proof_sidecars(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    probe_id = next(proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.PROBE)
+    (tmp_path / "run" / "proofs" / f"{probe_id.replace(':', '_')}.json").unlink()
+    result = verify(receipt_path=tmp_path / "run" / "receipt.json", package=package, suite_path=SUITE, spec_path=SPEC, level=VerificationLevel.REPLAYED)
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
 def test_receipt_version_is_locked(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
@@ -300,6 +388,13 @@ def test_sandbox_file_escape_rejects(tmp_path: Path) -> None:
 
 def test_sandbox_read_root_bypass_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_read_bypass", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_lookahead_scenario_file_read_rejects(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_lookahead", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.envelope.status == Status.REJECT
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
     assert artifacts.receipt is None
@@ -439,12 +534,105 @@ def test_verify_proof_finds_proof(tmp_path: Path) -> None:
     assert result.status == "proof_verified"
 
 
+def test_verify_proof_rejects_forged_receipt_proof(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.receipt is not None
+    receipt_path = tmp_path / "receipt.json"
+    data = json.loads(receipt_path.read_text())
+    package_proof = next(proof for proof in data["proofs"] if proof["kind"] == "package_canonical")
+    package_proof["artifact_hash"] = "sha256:" + "0" * 64
+    proof_path = tmp_path / "proofs" / f"{package_proof['proof_id'].replace(':', '_')}.json"
+    proof_path.write_text(json.dumps(package_proof), encoding="utf-8")
+    receipt_path.write_text(json.dumps(data), encoding="utf-8")
+    result = verify_proof(receipt_path=receipt_path, proof_id=package_proof["proof_id"])
+    assert result.status == "proof_mismatch"
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    proof_id = next(proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.REPLAY)
+    result = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
+    assert result.status == "proof_verified"
+    (package / "candidate_good" / "config.json").write_text('{"entry_bar": 1, "exit_bar": 99, "leverage": "2.0"}\n', encoding="utf-8")
+    mismatch = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
+    assert mismatch.status == "proof_mismatch"
+    assert mismatch.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
 def test_mcp_rerun_uses_default_suite_and_spec(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
     result = redline_check_receipt(str(tmp_path / "receipt.json"), pkg_path=str(PACKAGE), rerun=True)
     assert result["status"] == VerificationStatus.VERIFIED.value
     assert result["verification_level"] == VerificationLevel.REPLAYED.value
+
+
+def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> None:
+    imported = import_package(PACKAGE)
+    assert imported.identity_hash.startswith("sha256:")
+    assert "candidate_good/strategy.py" in imported.files
+    text_spec = tmp_path / "redline.txt"
+    text_spec.write_text("Max drawdown <= 8%; no entry before bar 3; trade budget 20.", encoding="utf-8")
+    compiled = compile_spec(text_spec)
+    assert [probe.type for probe in compiled.probes] == [ProbeType.MAX_DRAWDOWN, ProbeType.NO_ENTRY_WHEN, ProbeType.TRADE_BUDGET]
+    prompt_log = tmp_path / "prompt.txt"
+    prompt_log.write_text("make the strategy more responsive", encoding="utf-8")
+    provenance = capture_edit_provenance(tool="fixture-agent", prompt_log=prompt_log, baseline=PACKAGE / "baseline", candidate=PACKAGE / "candidate_good")
+    artifacts = run_redline(
+        package_dir=PACKAGE,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+        edit_provenance=provenance,
+    )
+    assert artifacts.receipt is not None
+    assert artifacts.receipt.edit_provenance == provenance
+
+
+def test_publish_preflight_writes_annotation_for_pass_and_blocks_withheld(tmp_path: Path) -> None:
+    good = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "good")
+    assert good.receipt is not None
+    good_result = publish_preflight(
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-good",
+    )
+    assert good_result.ok is True
+    assert (tmp_path / "publish-good" / "redline-annotation.json").exists()
+    bad = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "bad")
+    assert bad.receipt is not None
+    bad_result = publish_preflight(
+        receipt_path=tmp_path / "bad" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-bad",
+    )
+    assert bad_result.ok is False
+    assert bad_result.state == "LOCAL_PASS_REQUIRED"
+    assert bad_result.reason_code == ReasonCode.NEW_BLOCK_BREACH
+
+
+def test_report_html_is_static_escaped_render(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    report_path = tmp_path / "run" / "report.json"
+    data = json.loads(report_path.read_text())
+    data["strength_summary"] = "<script>alert(1)</script>"
+    report_path.write_text(json.dumps(data), encoding="utf-8")
+    out = tmp_path / "report.html"
+    render_report_html(report_path, out)
+    html = out.read_text(encoding="utf-8")
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
 
 def test_sponsor_evidence_verifier() -> None:
@@ -468,8 +656,11 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
     export_schemas(tmp_path)
     expected = {
         "decision-envelope.v1.schema.json",
+        "edit-provenance.v1.schema.json",
+        "package-import.v1.schema.json",
         "proof.v1.schema.json",
         "proof-verification.v1.schema.json",
+        "publish-preflight.v1.schema.json",
         "receipt.v3.2.schema.json",
         "report.v1.schema.json",
         "sponsor-readback-evidence.v1.schema.json",

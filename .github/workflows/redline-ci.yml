@@ -1,0 +1,29 @@
+name: Redline CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --extra dev
+      - run: uv run --extra dev pytest
+      - run: uv run redline export-schemas --out /tmp/redline-schemas
+      - run: diff -ru schemas /tmp/redline-schemas
+      - run: uv run redline make-demo
+      - name: Replay pass demo
+        run: |
+          set +e
+          uv run redline check artifacts/demo/pass/receipt.json --package fixtures/demo_pack --rerun --json
+          code=$?
+          test "$code" -eq 0 -o "$code" -eq 10
+      - name: Replay withheld demo
+        run: |
+          set +e
+          uv run redline check artifacts/demo/withheld/receipt.json --package fixtures/demo_pack --rerun --json
+          code=$?
+          test "$code" -eq 3

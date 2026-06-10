@@ -1,48 +1,48 @@
 {
-  "proof_id": "proof:replay_wellformed:cb40391baf812adc052a058a",
+  "proof_id": "proof:replay_wellformed:6c1df9b834122230a053526f",
   "phase": "run",
   "kind": "replay_wellformed",
   "verdict_bearing": true,
-  "inputs_hash": "sha256:fc83e697476c5c6490f02f0f54ee58811d05354a4b34fd00ff155f4341b96ced",
-  "artifact_hash": "sha256:cb40391baf812adc052a058ace39e4741dd14d2ddaea96207b295f642c4012d6",
+  "inputs_hash": "sha256:e80eda1661d5c8325e36d2cf44a62727987a486d04617b9275d0b24665203d9b",
+  "artifact_hash": "sha256:6c1df9b834122230a053526fe6cc45179a7cab042a3f953a1f3ca6b31d6d7cd7",
   "assertions": [
     {
       "metric": "replay_wellformed",
       "op": "==",
-      "threshold": "12",
-      "observed": "12",
+      "threshold": "24",
+      "observed": "24",
       "scenario_id": "btc-crash-2024-03-05",
-      "bar": 11,
+      "bar": 23,
       "holds": true
     },
     {
       "metric": "replay_wellformed",
       "op": "==",
-      "threshold": "12",
-      "observed": "12",
+      "threshold": "24",
+      "observed": "24",
       "scenario_id": "btc-crash-2024-03-05",
-      "bar": 11,
+      "bar": 23,
       "holds": true
     },
     {
       "metric": "replay_wellformed",
       "op": "==",
-      "threshold": "12",
-      "observed": "12",
+      "threshold": "24",
+      "observed": "24",
       "scenario_id": "btc-chop-2024-08",
-      "bar": 11,
+      "bar": 23,
       "holds": true
     },
     {
       "metric": "replay_wellformed",
       "op": "==",
-      "threshold": "12",
-      "observed": "12",
+      "threshold": "24",
+      "observed": "24",
       "scenario_id": "btc-chop-2024-08",
-      "bar": 11,
+      "bar": 23,
       "holds": true
     }
   ],
-  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:cb40391baf812adc052a058a",
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f",
   "meta": {}
 }

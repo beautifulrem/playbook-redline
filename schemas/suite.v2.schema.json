@@ -51,6 +51,7 @@
       "title": "Suite Lock Hash"
     },
     "version": {
+      "const": "redline.suite.v2",
       "default": "redline.suite.v2",
       "title": "Version",
       "type": "string"

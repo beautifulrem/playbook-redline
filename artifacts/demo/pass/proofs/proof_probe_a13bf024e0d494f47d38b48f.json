@@ -1,0 +1,21 @@
+{
+  "proof_id": "proof:probe:a13bf024e0d494f47d38b48f",
+  "phase": "probe",
+  "kind": "probe",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:f64b2947296784cd46902d3d0716d8e9e2b0505bc5b7e43ae113512958902a35",
+  "artifact_hash": "sha256:a13bf024e0d494f47d38b48fac208e01d294596e45abe6ee90dc13c77cade633",
+  "assertions": [
+    {
+      "metric": "no_entry_when",
+      "op": "<=",
+      "threshold": "0",
+      "observed": "0",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 0,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f",
+  "meta": {}
+}

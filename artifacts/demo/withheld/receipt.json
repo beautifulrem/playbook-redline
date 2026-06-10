@@ -1,8 +1,8 @@
 {
   "version": "redline.receipt.v3.2",
   "package": {
-    "identity_hash": "sha256:639717a4fcb034fda49346785d98065f91ce9e167ffb2ae80828f23be68637a5",
-    "manifest_hash": "sha256:639717a4fcb034fda49346785d98065f91ce9e167ffb2ae80828f23be68637a5",
+    "identity_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
+    "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
     "canonical_tar_rules": "redline.v9.canonical-tree"
   },
   "edit_provenance": {
@@ -10,7 +10,7 @@
     "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
     "diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
     "locked_by": "author",
-    "captured_at": "2026-06-10T18:39:29Z"
+    "captured_at": "2026-06-10T18:58:52Z"
   },
   "baseline": {
     "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
@@ -25,7 +25,7 @@
     "package_name": "candidate_bad"
   },
   "spec": {
-    "spec_hash": "sha256:fbb0609c303044cf00403afb3499bf08472a6fb15ffbd1af64fbae5893c61cb9",
+    "spec_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
     "source_path": "fixtures/specs/redline_spec.json",
     "compiler": "json",
     "model": null,
@@ -42,8 +42,8 @@
   },
   "runner": {
     "engine": "deterministic",
-    "engine_source_tree_hash": "sha256:7a72249ce13ebe8cba18d620243f2a1455dff16747044b39b1b073be8b889f23",
-    "runner_lock_hash": "sha256:8c92fa6ee094cfdad41e11a4ab228348bf4dc3b5625ac8dedc8ff1d2599497de",
+    "engine_source_tree_hash": "sha256:c79770870ee8bd21f98b5fd62e37347df5134f1798777bd1fbed26f858402dc7",
+    "runner_lock_hash": "sha256:30ccdbe040bbd44104fa7588f68afce24a572ea3a94a3e10d91992890296d36b",
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
@@ -57,9 +57,18 @@
         "scenario_id": "btc-crash-2024-03-05",
         "bar": 3,
         "holds": false
+      },
+      {
+        "metric": "no_entry_when",
+        "op": "<=",
+        "threshold": "0",
+        "observed": "2.00000000",
+        "scenario_id": "btc-crash-2024-03-05",
+        "bar": 1,
+        "holds": false
       }
     ],
-    "result_hash": "sha256:ba960d59823aed359b1fd4412209135c093a9cd7a028c69076da30fcaa460864"
+    "result_hash": "sha256:b08247f915dc3333b38d6aac4774ff31aa49ae8ccb8cdfb30e4719fe95b6c33a"
   },
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",
@@ -70,11 +79,19 @@
       ],
       [
         "btc-crash-2024-03-05",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-crash-2024-03-05",
         "trade_budget"
       ],
       [
         "btc-chop-2024-08",
         "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "no_entry_when_crash"
       ],
       [
         "btc-chop-2024-08",
@@ -88,121 +105,125 @@
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids_source": "REQUIRED_PROOFS[status]",
     "required_proof_ids": [
-      "proof:coverage:9c1d66ec7d424f574b56330b",
-      "proof:decision:f8d03e0a21a873d73e6958b4",
-      "proof:package_canonical:54b2e97564c1ff5504651dd3",
-      "proof:probe:146e7d8dee0ed2a684b541bd",
-      "proof:probe:1e45bf22c63aa9fb2e110ad6",
-      "proof:probe:50779d37ab95b560da66d8c7",
-      "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43",
-      "proof:replay_wellformed:cb40391baf812adc052a058a",
-      "proof:spec_compile:fbb0609c303044cf00403afb"
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:ac37bb9b81789b609465e688",
+      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:probe:1ea0185c616b3d37f783091d",
+      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:793a7818c323072d18bcf8d8"
     ],
     "satisfied_proof_ids": [
-      "proof:coverage:9c1d66ec7d424f574b56330b",
-      "proof:decision:f8d03e0a21a873d73e6958b4",
-      "proof:package_canonical:54b2e97564c1ff5504651dd3",
-      "proof:probe:146e7d8dee0ed2a684b541bd",
-      "proof:probe:1e45bf22c63aa9fb2e110ad6",
-      "proof:probe:50779d37ab95b560da66d8c7",
-      "proof:probe:79df280e8eaed5f480f3de58",
-      "proof:replay:26fb5b3971fa43e1bd854c43",
-      "proof:replay_wellformed:cb40391baf812adc052a058a",
-      "proof:spec_compile:fbb0609c303044cf00403afb"
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:ac37bb9b81789b609465e688",
+      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:probe:1ea0185c616b3d37f783091d",
+      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:793a7818c323072d18bcf8d8"
     ],
     "verdict_source": "deterministic_probe",
     "llm_used_for_verdict": false
   },
   "proofs": [
     {
-      "proof_id": "proof:package_canonical:54b2e97564c1ff5504651dd3",
+      "proof_id": "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
       "phase": "import",
       "kind": "package_canonical",
       "verdict_bearing": true,
       "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
-      "artifact_hash": "sha256:54b2e97564c1ff5504651dd326e0c9bff61de9a73c517971523cf7fdfa1a35c8",
+      "artifact_hash": "sha256:4cd04e9bfa40c96d2f823de9fe36cd405e48b48dddd3cece1f4f89a056f7f01d",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:54b2e97564c1ff5504651dd3",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:4cd04e9bfa40c96d2f823de9",
       "meta": {}
     },
     {
-      "proof_id": "proof:spec_compile:fbb0609c303044cf00403afb",
+      "proof_id": "proof:spec_compile:793a7818c323072d18bcf8d8",
       "phase": "compile",
       "kind": "spec_compile",
       "verdict_bearing": true,
       "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
-      "artifact_hash": "sha256:fbb0609c303044cf00403afb3499bf08472a6fb15ffbd1af64fbae5893c61cb9",
+      "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:fbb0609c303044cf00403afb",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8",
       "meta": {}
     },
     {
-      "proof_id": "proof:replay:26fb5b3971fa43e1bd854c43",
+      "proof_id": "proof:replay:c149d9a88c7c8e1a3d333339",
       "phase": "run",
       "kind": "replay",
       "verdict_bearing": true,
       "inputs_hash": "sha256:c18ded2d2ef19549a60e88e86639037ffa29d8b816a31cb594d4c15e46e31ec6",
-      "artifact_hash": "sha256:26fb5b3971fa43e1bd854c43868001fff7cb8f394750b7fd88a9547bf025fe18",
+      "artifact_hash": "sha256:c149d9a88c7c8e1a3d333339f8012aaf47f78a1d87da7128a85cd6505553b40f",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:26fb5b3971fa43e1bd854c43",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:c149d9a88c7c8e1a3d333339",
       "meta": {}
     },
     {
-      "proof_id": "proof:replay_wellformed:cb40391baf812adc052a058a",
+      "proof_id": "proof:replay_wellformed:6c1df9b834122230a053526f",
       "phase": "run",
       "kind": "replay_wellformed",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:fc83e697476c5c6490f02f0f54ee58811d05354a4b34fd00ff155f4341b96ced",
-      "artifact_hash": "sha256:cb40391baf812adc052a058ace39e4741dd14d2ddaea96207b295f642c4012d6",
+      "inputs_hash": "sha256:23c3d55fe162c06c2a8492af17ec1c0bd5ef804f43caf74fb5ff1be8ba9f18fe",
+      "artifact_hash": "sha256:6c1df9b834122230a053526fe6cc45179a7cab042a3f953a1f3ca6b31d6d7cd7",
       "assertions": [
         {
           "metric": "replay_wellformed",
           "op": "==",
-          "threshold": "12",
-          "observed": "12",
+          "threshold": "24",
+          "observed": "24",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         },
         {
           "metric": "replay_wellformed",
           "op": "==",
-          "threshold": "12",
-          "observed": "12",
+          "threshold": "24",
+          "observed": "24",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         },
         {
           "metric": "replay_wellformed",
           "op": "==",
-          "threshold": "12",
-          "observed": "12",
+          "threshold": "24",
+          "observed": "24",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         },
         {
           "metric": "replay_wellformed",
           "op": "==",
-          "threshold": "12",
-          "observed": "12",
+          "threshold": "24",
+          "observed": "24",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:cb40391baf812adc052a058a",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f",
       "meta": {}
     },
     {
-      "proof_id": "proof:probe:146e7d8dee0ed2a684b541bd",
+      "proof_id": "proof:probe:b5785a8f2f863c305e84df47",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
-      "artifact_hash": "sha256:146e7d8dee0ed2a684b541bd99f00dd8eb7e62d9d5b46ca85a28a857350b72c2",
+      "artifact_hash": "sha256:b5785a8f2f863c305e84df47806fb56f5916db50c287f3e3100a5748e53236ac",
       "assertions": [
         {
           "metric": "max_drawdown",
@@ -214,16 +235,37 @@
           "holds": false
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:146e7d8dee0ed2a684b541bd",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b5785a8f2f863c305e84df47",
       "meta": {}
     },
     {
-      "proof_id": "proof:probe:1e45bf22c63aa9fb2e110ad6",
+      "proof_id": "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
+      "artifact_hash": "sha256:2b0b31d7e8e89665ae2fab01a16fbe72311e839c048e6d929ac08f01a8cce469",
+      "assertions": [
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "2.00000000",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 1,
+          "holds": false
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:2b0b31d7e8e89665ae2fab01",
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:probe:b3e8d95ec8b37d9651c0dde7",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:cbb0ac11c03eb69951c8a01f550a31939b2fbb8d4678ebe8025be0a0fe5b2982",
-      "artifact_hash": "sha256:1e45bf22c63aa9fb2e110ad6b4f7cbfedd394a6f6222baa8fbee9e4d2132a91e",
+      "artifact_hash": "sha256:b3e8d95ec8b37d9651c0dde76a346dbb84fb8d254d027d1b8e8a2f810ed3fe25",
       "assertions": [
         {
           "metric": "trade_budget",
@@ -231,41 +273,62 @@
           "threshold": "20.00000000",
           "observed": "1.00000000",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1e45bf22c63aa9fb2e110ad6",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7",
       "meta": {}
     },
     {
-      "proof_id": "proof:probe:50779d37ab95b560da66d8c7",
+      "proof_id": "proof:probe:1ea0185c616b3d37f783091d",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
-      "artifact_hash": "sha256:50779d37ab95b560da66d8c71a441015ec327caba2db99ef44c54eeca9bdc246",
+      "artifact_hash": "sha256:1ea0185c616b3d37f783091d68006833acaa0398af0563b14b0ab0cfd927e85a",
       "assertions": [
         {
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0.01994876",
+          "observed": "0.02029149",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 7,
+          "bar": 21,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:50779d37ab95b560da66d8c7",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ea0185c616b3d37f783091d",
       "meta": {}
     },
     {
-      "proof_id": "proof:probe:79df280e8eaed5f480f3de58",
+      "proof_id": "proof:probe:a13bf024e0d494f47d38b48f",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:f64b2947296784cd46902d3d0716d8e9e2b0505bc5b7e43ae113512958902a35",
+      "artifact_hash": "sha256:a13bf024e0d494f47d38b48fac208e01d294596e45abe6ee90dc13c77cade633",
+      "assertions": [
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 0,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f",
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:probe:c3ad8af9ce3ea6a163703aee",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:c549f70424b2bdc144ae5416b387cb50d50e28651b19e571e6a72a6c34d3b89c",
-      "artifact_hash": "sha256:79df280e8eaed5f480f3de58b973f8b50650c7f05d0177960a44fa8dd0c18b54",
+      "artifact_hash": "sha256:c3ad8af9ce3ea6a163703aee9be209e0daa44981ecc32f8144052ccd67b82d88",
       "assertions": [
         {
           "metric": "trade_budget",
@@ -273,22 +336,22 @@
           "threshold": "20.00000000",
           "observed": "1.00000000",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:79df280e8eaed5f480f3de58",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee",
       "meta": {}
     },
     {
-      "proof_id": "proof:coverage:9c1d66ec7d424f574b56330b",
+      "proof_id": "proof:coverage:07629775749a0c50afc55033",
       "phase": "decide",
       "kind": "coverage",
       "verdict_bearing": true,
       "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
-      "artifact_hash": "sha256:9c1d66ec7d424f574b56330b77f6ae113826313f888414c76729162ebf0d9cd0",
+      "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:9c1d66ec7d424f574b56330b",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033",
       "meta": {}
     },
     {
@@ -300,12 +363,57 @@
       "artifact_hash": "sha256:6dbf4d64bed1fe7aa8537e993317cf215c8079df048367775063ed51983855a3",
       "assertions": [
         {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        },
+        {
           "metric": "trade_budget",
           "op": "<=",
           "threshold": "20.00000000",
           "observed": "1.00000000",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 11,
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0.00498134",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 13,
+          "holds": true
+        },
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
           "holds": true
         }
       ],
@@ -313,12 +421,12 @@
       "meta": {}
     },
     {
-      "proof_id": "proof:candidate_absolute:557b83d0280b056d654ca950",
+      "proof_id": "proof:candidate_absolute:8670b636e72e32d864f7e227",
       "phase": "probe",
       "kind": "candidate_absolute",
       "verdict_bearing": true,
       "inputs_hash": "sha256:06d5ec40d25d7d4293d9eb75a7ae32e77b0aaa0472d04cab55e0eac9b8fd7ed1",
-      "artifact_hash": "sha256:557b83d0280b056d654ca950561e2c0d8eb35e2b24bd3c8536c5a8e7dba4d35c",
+      "artifact_hash": "sha256:8670b636e72e32d864f7e227a102f89cc479c21d70fcd4d2a823aebfd186c825",
       "assertions": [
         {
           "metric": "max_drawdown",
@@ -335,16 +443,16 @@
           "threshold": "20.00000000",
           "observed": "1.00000000",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         },
         {
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0.01994876",
+          "observed": "0.02029149",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 7,
+          "bar": 21,
           "holds": true
         },
         {
@@ -353,22 +461,22 @@
           "threshold": "20.00000000",
           "observed": "1.00000000",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 11,
+          "bar": 23,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:557b83d0280b056d654ca950",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:8670b636e72e32d864f7e227",
       "meta": {}
     },
     {
-      "proof_id": "proof:decision:f8d03e0a21a873d73e6958b4",
+      "proof_id": "proof:decision:ac37bb9b81789b609465e688",
       "phase": "decide",
       "kind": "decision",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:9c9314d0201f8e367780f03f3a7e4fcbd4f63be135c8d3a65533b2401955aa3f",
-      "artifact_hash": "sha256:2cd14f2adea0507880cfc0de2d28c14aaf8c797ffe517d14aead7bea3c849765",
+      "inputs_hash": "sha256:ba1240931b909bc825f0e676d87a1d7f5b9ac19a7b4afe33b038bfc62e1a4dc9",
+      "artifact_hash": "sha256:abc6755c991b3bd7445d8136c12a3724ef73aa948b63177c88625ec467ae83ca",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:f8d03e0a21a873d73e6958b4",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:ac37bb9b81789b609465e688",
       "meta": {}
     }
   ],
@@ -388,9 +496,9 @@
     },
     "llm_in_verdict": false
   },
-  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0.01994876; max_drawdown <= 0.08000000 observed 0.17663366; replay_wellformed == 12 observed 12; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
+  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:3379a1d538d29b912ed5eb809806e05a1d85817f2c8d1f71600968d0450f6c0e",
+    "report_hash": "sha256:64c3c0262d08047d92873c94399e77a23fa7643dee8f4964e3db920370e2854a",
     "attribution_report_hash": null
   },
   "publish": {
@@ -403,5 +511,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:03a7163be30778e254ad92888f82397eb3d24c7ee822e4466f015f2c8ea286c9"
+  "receipt_hash": "sha256:c0e58c27a26041ec61ec635f17a609b83b61a2e31489215f5a1f31afbd554c4b"
 }

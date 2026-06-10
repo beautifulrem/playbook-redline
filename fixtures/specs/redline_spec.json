@@ -12,6 +12,16 @@
       "block": true
     },
     {
+      "id": "no_entry_when_crash",
+      "type": "no_entry_when",
+      "params": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "before_bar": "3",
+        "max_abs_position": "0"
+      },
+      "block": true
+    },
+    {
       "id": "trade_budget",
       "type": "trade_budget",
       "params": {
@@ -21,4 +31,3 @@
     }
   ]
 }
-

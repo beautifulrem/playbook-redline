@@ -1,5 +1,56 @@
 {
   "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "title": "Bar",
+          "type": "integer"
+        },
+        "holds": {
+          "title": "Holds",
+          "type": "boolean"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "observed": {
+          "title": "Observed",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "<=",
+            "<",
+            ">=",
+            ">",
+            "=="
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "threshold": {
+          "title": "Threshold",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "op",
+        "threshold",
+        "observed",
+        "scenario_id",
+        "bar",
+        "holds"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
     "Capabilities": {
       "additionalProperties": false,
       "properties": {
@@ -111,6 +162,7 @@
           "$ref": "#/$defs/CoverageManifest"
         },
         "envelope_version": {
+          "const": "redline.decision.v1",
           "default": "redline.decision.v1",
           "title": "Envelope Version",
           "type": "string"
@@ -146,6 +198,195 @@
         "capabilities"
       ],
       "title": "DecisionEnvelope",
+      "type": "object"
+    },
+    "EditProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "title": "Captured At",
+          "type": "string"
+        },
+        "diff_hash": {
+          "title": "Diff Hash",
+          "type": "string"
+        },
+        "locked_by": {
+          "default": "author",
+          "title": "Locked By",
+          "type": "string"
+        },
+        "prompt_digest": {
+          "title": "Prompt Digest",
+          "type": "string"
+        },
+        "tool": {
+          "default": "fixture",
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt_digest",
+        "diff_hash",
+        "captured_at"
+      ],
+      "title": "EditProvenance",
+      "type": "object"
+    },
+    "Proof": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_hash": {
+          "title": "Artifact Hash",
+          "type": "string"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "title": "Assertions",
+          "type": "array"
+        },
+        "inputs_hash": {
+          "title": "Inputs Hash",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProofKind"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "title": "Meta",
+          "type": "object"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "proof_id": {
+          "title": "Proof Id",
+          "type": "string"
+        },
+        "reproduce": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reproduce"
+        },
+        "verdict_bearing": {
+          "title": "Verdict Bearing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "proof_id",
+        "phase",
+        "kind",
+        "verdict_bearing",
+        "inputs_hash",
+        "artifact_hash"
+      ],
+      "title": "Proof",
+      "type": "object"
+    },
+    "ProofKind": {
+      "enum": [
+        "package_canonical",
+        "edit_provenance",
+        "spec_compile",
+        "baseline_calibration",
+        "replay",
+        "replay_wellformed",
+        "probe",
+        "coverage",
+        "candidate_absolute",
+        "decision",
+        "sponsor_readback",
+        "verification"
+      ],
+      "title": "ProofKind",
+      "type": "string"
+    },
+    "PublishInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "attempted": {
+          "default": false,
+          "title": "Attempted",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "run_id is platform execution evidence, not local-equivalence proof",
+          "title": "Note",
+          "type": "string"
+        },
+        "readback_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Readback Hash"
+        },
+        "run_evidence_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Evidence Hash"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "sponsor_status": {
+          "default": "not_attempted",
+          "title": "Sponsor Status",
+          "type": "string"
+        },
+        "stop_before_final_publish": {
+          "default": true,
+          "title": "Stop Before Final Publish",
+          "type": "boolean"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Id"
+        }
+      },
+      "title": "PublishInfo",
       "type": "object"
     },
     "ReasonCode": {
@@ -331,10 +572,36 @@
       ],
       "title": "Status",
       "type": "string"
+    },
+    "VerificationLevel": {
+      "enum": [
+        "hash_only",
+        "replayed"
+      ],
+      "title": "VerificationLevel",
+      "type": "string"
     }
   },
   "additionalProperties": false,
   "properties": {
+    "coverage_missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Coverage Missing",
+      "type": "array"
+    },
+    "edit_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EditProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "envelope": {
       "$ref": "#/$defs/DecisionEnvelope"
     },
@@ -344,6 +611,24 @@
       },
       "title": "Proof Ids",
       "type": "array"
+    },
+    "proofs": {
+      "items": {
+        "$ref": "#/$defs/Proof"
+      },
+      "title": "Proofs",
+      "type": "array"
+    },
+    "publish": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PublishInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "receipt_hash": {
       "anyOf": [
@@ -372,6 +657,17 @@
       },
       "title": "Traces",
       "type": "array"
+    },
+    "verification_level": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerificationLevel"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "version": {
       "const": "redline.report.v1",

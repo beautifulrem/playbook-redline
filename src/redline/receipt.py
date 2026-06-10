@@ -74,6 +74,7 @@ def issue_receipt(
     engine_source_tree_hash: str,
     runner_lock_hash: str,
     report_hash: str = "sha256:pending",
+    edit_provenance: EditProvenance | None = None,
 ) -> Receipt | None:
     if envelope.status not in {Status.PASS, Status.WITHHELD}:
         return None
@@ -87,7 +88,8 @@ def issue_receipt(
     result_status = "pass" if envelope.status == Status.PASS else "withheld"
     receipt = Receipt(
         package=PackageInfo(identity_hash=package_hash, manifest_hash=package_hash),
-        edit_provenance=EditProvenance(
+        edit_provenance=edit_provenance
+        or EditProvenance(
             prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
             diff_hash=hash_obj({"baseline": baseline_hash, "candidate": candidate_hash}),
             captured_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),

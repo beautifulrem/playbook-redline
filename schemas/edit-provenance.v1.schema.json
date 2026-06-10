@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "captured_at": {
+      "title": "Captured At",
+      "type": "string"
+    },
+    "diff_hash": {
+      "title": "Diff Hash",
+      "type": "string"
+    },
+    "locked_by": {
+      "default": "author",
+      "title": "Locked By",
+      "type": "string"
+    },
+    "prompt_digest": {
+      "title": "Prompt Digest",
+      "type": "string"
+    },
+    "tool": {
+      "default": "fixture",
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "prompt_digest",
+    "diff_hash",
+    "captured_at"
+  ],
+  "title": "EditProvenance",
+  "type": "object"
+}

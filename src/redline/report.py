@@ -14,6 +14,11 @@ def to_report(*, envelope: DecisionEnvelope, receipt: Receipt | None, traces: li
         "strength_summary": receipt.strength_summary if receipt else "",
         "traces": [trace.model_dump(mode="json") for trace in traces],
         "proof_ids": [proof.proof_id for proof in receipt.proofs] if receipt else [],
+        "proofs": [proof.model_dump(mode="json") for proof in receipt.proofs] if receipt else [],
+        "edit_provenance": receipt.edit_provenance.model_dump(mode="json") if receipt else None,
+        "publish": receipt.publish.model_dump(mode="json") if receipt else None,
+        "coverage_missing": receipt.coverage.missing if receipt else envelope.coverage.missing,
+        "verification_level": "replayed" if receipt else None,
     }
     hash_payload = {**report, "receipt_hash": None}
     report["report_hash"] = hash_obj(hash_payload)

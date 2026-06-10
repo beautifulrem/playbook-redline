@@ -1,21 +1,21 @@
 {
-  "proof_id": "proof:probe:146e7d8dee0ed2a684b541bd",
+  "proof_id": "proof:probe:0b22c22a0727d2c30c2de30e",
   "phase": "probe",
   "kind": "probe",
   "verdict_bearing": true,
   "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
-  "artifact_hash": "sha256:146e7d8dee0ed2a684b541bd99f00dd8eb7e62d9d5b46ca85a28a857350b72c2",
+  "artifact_hash": "sha256:0b22c22a0727d2c30c2de30ee1d17e304d912f57873c2f9031e2a5568ceeeee7",
   "assertions": [
     {
       "metric": "max_drawdown",
       "op": "<=",
       "threshold": "0.08000000",
-      "observed": "0.17663366",
+      "observed": "0",
       "scenario_id": "btc-crash-2024-03-05",
-      "bar": 3,
-      "holds": false
+      "bar": 0,
+      "holds": true
     }
   ],
-  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:146e7d8dee0ed2a684b541bd",
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:0b22c22a0727d2c30c2de30e",
   "meta": {}
 }
