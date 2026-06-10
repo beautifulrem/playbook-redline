@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "ProbeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "default": true,
+          "title": "Block",
+          "type": "boolean"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Params",
+          "type": "object"
+        },
+        "type": {
+          "$ref": "#/$defs/ProbeType"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "params"
+      ],
+      "title": "ProbeSpec",
+      "type": "object"
+    },
+    "ProbeType": {
+      "enum": [
+        "max_drawdown",
+        "trade_budget"
+      ],
+      "title": "ProbeType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "compiler": {
+      "default": "json",
+      "title": "Compiler",
+      "type": "string"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "probes": {
+      "items": {
+        "$ref": "#/$defs/ProbeSpec"
+      },
+      "title": "Probes",
+      "type": "array"
+    },
+    "spec_id": {
+      "title": "Spec Id",
+      "type": "string"
+    },
+    "tool_schema_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tool Schema Hash"
+    },
+    "version": {
+      "default": "redline.spec.v2.1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "spec_id",
+    "probes"
+  ],
+  "title": "RedlineSpec",
+  "type": "object"
+}

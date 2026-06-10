@@ -1,0 +1,17 @@
+{
+  "version": "redline.suite.v2",
+  "suite_id": "anchored-crash-v2",
+  "scenarios": [
+    {
+      "id": "btc-crash-2024-03-05",
+      "path": "btc_crash.csv",
+      "timeframe": "1h"
+    },
+    {
+      "id": "btc-chop-2024-08",
+      "path": "btc_chop.csv",
+      "timeframe": "1h"
+    }
+  ]
+}
+

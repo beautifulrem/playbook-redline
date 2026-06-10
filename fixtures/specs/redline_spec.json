@@ -1,0 +1,24 @@
+{
+  "version": "redline.spec.v2.1",
+  "spec_id": "demo-redline-spec",
+  "compiler": "json",
+  "probes": [
+    {
+      "id": "drawdown_limit",
+      "type": "max_drawdown",
+      "params": {
+        "max_drawdown": "0.08"
+      },
+      "block": true
+    },
+    {
+      "id": "trade_budget",
+      "type": "trade_budget",
+      "params": {
+        "max_trades": "20"
+      },
+      "block": true
+    }
+  ]
+}
+

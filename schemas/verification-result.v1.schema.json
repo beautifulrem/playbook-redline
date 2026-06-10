@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "ChainStatus": {
+      "enum": [
+        "chained",
+        "genesis",
+        "unchained"
+      ],
+      "title": "ChainStatus",
+      "type": "string"
+    },
+    "ReasonCode": {
+      "enum": [
+        "PASS",
+        "NEW_BLOCK_BREACH",
+        "RECEIPT_MISMATCH",
+        "BASELINE_UNCHAINED",
+        "BASELINE_GENESIS",
+        "COVERAGE_INCOMPLETE",
+        "PROBE_ERROR",
+        "ENGINE_FAILURE",
+        "DATA_MISSING",
+        "CALIBRATION_FAILED",
+        "BASELINE_BREACHES",
+        "BASELINE_UNRUNNABLE",
+        "NONFINITE_VALUE",
+        "ENGINE_IDENTITY_MISMATCH",
+        "CANDIDATE_SANDBOX_VIOLATION",
+        "VERDICT_PATH_VIOLATION",
+        "RECEIPT_BINDING_FAILED",
+        "SPONSOR_READBACK_MISMATCH",
+        "UNVERIFIED_NO_VERDICT",
+        "FILE_NOT_FOUND",
+        "PARSE_ERROR",
+        "SCHEMA_INVALID",
+        "VERSION_UNSUPPORTED"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "VerificationLevel": {
+      "enum": [
+        "hash_only",
+        "replayed"
+      ],
+      "title": "VerificationLevel",
+      "type": "string"
+    },
+    "VerificationStatus": {
+      "enum": [
+        "verified",
+        "rejected",
+        "unverified_no_verdict",
+        "bad_input"
+      ],
+      "title": "VerificationStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "chain_status": {
+      "$ref": "#/$defs/ChainStatus",
+      "default": "genesis"
+    },
+    "edit_provenance_present": {
+      "default": false,
+      "title": "Edit Provenance Present",
+      "type": "boolean"
+    },
+    "missing_proof_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing Proof Ids",
+      "type": "array"
+    },
+    "proof_coverage": {
+      "default": "incomplete",
+      "enum": [
+        "complete",
+        "incomplete"
+      ],
+      "title": "Proof Coverage",
+      "type": "string"
+    },
+    "reason_code": {
+      "$ref": "#/$defs/ReasonCode"
+    },
+    "receipt_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Receipt Hash"
+    },
+    "schema_version": {
+      "default": "redline.verify.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/VerificationStatus"
+    },
+    "strength_summary": {
+      "default": "",
+      "title": "Strength Summary",
+      "type": "string"
+    },
+    "verification_level": {
+      "$ref": "#/$defs/VerificationLevel"
+    }
+  },
+  "required": [
+    "status",
+    "reason_code",
+    "verification_level"
+  ],
+  "title": "VerificationResult",
+  "type": "object"
+}

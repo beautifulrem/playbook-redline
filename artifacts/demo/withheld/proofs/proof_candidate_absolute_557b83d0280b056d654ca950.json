@@ -1,0 +1,48 @@
+{
+  "proof_id": "proof:candidate_absolute:557b83d0280b056d654ca950",
+  "phase": "probe",
+  "kind": "candidate_absolute",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:ec12d7eae79d6881139d34545ab505a37214983cabac42240de52ded7ae8fd90",
+  "artifact_hash": "sha256:557b83d0280b056d654ca950561e2c0d8eb35e2b24bd3c8536c5a8e7dba4d35c",
+  "assertions": [
+    {
+      "metric": "max_drawdown",
+      "op": "<=",
+      "threshold": "0.08000000",
+      "observed": "0.17663366",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 3,
+      "holds": false
+    },
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 11,
+      "holds": true
+    },
+    {
+      "metric": "max_drawdown",
+      "op": "<=",
+      "threshold": "0.08000000",
+      "observed": "0.01994876",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 7,
+      "holds": true
+    },
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 11,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:candidate_absolute:557b83d0280b056d654ca950",
+  "meta": {}
+}

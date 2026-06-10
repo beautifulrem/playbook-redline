@@ -1,0 +1,48 @@
+{
+  "proof_id": "proof:replay_wellformed:cb40391baf812adc052a058a",
+  "phase": "run",
+  "kind": "replay_wellformed",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:fc83e697476c5c6490f02f0f54ee58811d05354a4b34fd00ff155f4341b96ced",
+  "artifact_hash": "sha256:cb40391baf812adc052a058ace39e4741dd14d2ddaea96207b295f642c4012d6",
+  "assertions": [
+    {
+      "metric": "replay_wellformed",
+      "op": "==",
+      "threshold": "12",
+      "observed": "12",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 11,
+      "holds": true
+    },
+    {
+      "metric": "replay_wellformed",
+      "op": "==",
+      "threshold": "12",
+      "observed": "12",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 11,
+      "holds": true
+    },
+    {
+      "metric": "replay_wellformed",
+      "op": "==",
+      "threshold": "12",
+      "observed": "12",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 11,
+      "holds": true
+    },
+    {
+      "metric": "replay_wellformed",
+      "op": "==",
+      "threshold": "12",
+      "observed": "12",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 11,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof artifacts/receipt.json --proof-id proof:replay_wellformed:cb40391baf812adc052a058a",
+  "meta": {}
+}

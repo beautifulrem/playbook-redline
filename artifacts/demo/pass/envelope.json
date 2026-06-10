@@ -1,0 +1,65 @@
+{
+  "envelope_version": "redline.decision.v1",
+  "status": "pass",
+  "reason_code": "BASELINE_GENESIS",
+  "chain_status": "genesis",
+  "required_proof_ids": [
+    "proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+    "proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
+    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:decision:6c1fbb2c5aec34de48187843",
+    "proof:package_canonical:9d8796de0b746e376ff758a8",
+    "proof:replay:1aa3f92794bfd7739a613487",
+    "proof:replay_wellformed:cb40391baf812adc052a058a",
+    "proof:spec_compile:fbb0609c303044cf00403afb"
+  ],
+  "satisfied_proof_ids": [
+    "proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+    "proof:candidate_absolute:4902f445109a15ea7b7e5c3d",
+    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:decision:6c1fbb2c5aec34de48187843",
+    "proof:package_canonical:9d8796de0b746e376ff758a8",
+    "proof:replay:1aa3f92794bfd7739a613487",
+    "proof:replay_wellformed:cb40391baf812adc052a058a",
+    "proof:spec_compile:fbb0609c303044cf00403afb"
+  ],
+  "coverage": {
+    "manifest": "suite.scenarios×spec.block_probes",
+    "cells": [
+      [
+        "btc-crash-2024-03-05",
+        "drawdown_limit"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "trade_budget"
+      ],
+      [
+        "btc-chop-2024-08",
+        "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "trade_budget"
+      ]
+    ],
+    "complete": true,
+    "missing": []
+  },
+  "capabilities": {
+    "engine": {
+      "mode": "deterministic",
+      "degraded": false
+    },
+    "scenario_count": 2,
+    "qwen_compile": {
+      "mode": "json-fallback",
+      "degraded": true
+    },
+    "sponsor_readback": {
+      "mode": "unavailable",
+      "degraded": true
+    },
+    "llm_in_verdict": false
+  }
+}

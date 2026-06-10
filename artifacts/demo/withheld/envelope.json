@@ -1,0 +1,61 @@
+{
+  "envelope_version": "redline.decision.v1",
+  "status": "withheld",
+  "reason_code": "NEW_BLOCK_BREACH",
+  "chain_status": "genesis",
+  "required_proof_ids": [
+    "proof:decision:d61e9afcd8a65698806d649c",
+    "proof:probe:146e7d8dee0ed2a684b541bd",
+    "proof:probe:1e45bf22c63aa9fb2e110ad6",
+    "proof:probe:50779d37ab95b560da66d8c7",
+    "proof:probe:79df280e8eaed5f480f3de58",
+    "proof:replay:26fb5b3971fa43e1bd854c43"
+  ],
+  "satisfied_proof_ids": [
+    "proof:decision:d61e9afcd8a65698806d649c",
+    "proof:probe:146e7d8dee0ed2a684b541bd",
+    "proof:probe:1e45bf22c63aa9fb2e110ad6",
+    "proof:probe:50779d37ab95b560da66d8c7",
+    "proof:probe:79df280e8eaed5f480f3de58",
+    "proof:replay:26fb5b3971fa43e1bd854c43"
+  ],
+  "coverage": {
+    "manifest": "suite.scenarios×spec.block_probes",
+    "cells": [
+      [
+        "btc-crash-2024-03-05",
+        "drawdown_limit"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "trade_budget"
+      ],
+      [
+        "btc-chop-2024-08",
+        "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "trade_budget"
+      ]
+    ],
+    "complete": true,
+    "missing": []
+  },
+  "capabilities": {
+    "engine": {
+      "mode": "deterministic",
+      "degraded": false
+    },
+    "scenario_count": 2,
+    "qwen_compile": {
+      "mode": "json-fallback",
+      "degraded": true
+    },
+    "sponsor_readback": {
+      "mode": "unavailable",
+      "degraded": true
+    },
+    "llm_in_verdict": false
+  }
+}

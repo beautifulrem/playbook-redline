@@ -1,0 +1,559 @@
+{
+  "envelope": {
+    "capabilities": {
+      "engine": {
+        "degraded": false,
+        "mode": "deterministic"
+      },
+      "llm_in_verdict": false,
+      "qwen_compile": {
+        "degraded": true,
+        "mode": "json-fallback"
+      },
+      "scenario_count": 2,
+      "sponsor_readback": {
+        "degraded": true,
+        "mode": "unavailable"
+      }
+    },
+    "chain_status": "genesis",
+    "coverage": {
+      "cells": [
+        [
+          "btc-crash-2024-03-05",
+          "drawdown_limit"
+        ],
+        [
+          "btc-crash-2024-03-05",
+          "trade_budget"
+        ],
+        [
+          "btc-chop-2024-08",
+          "drawdown_limit"
+        ],
+        [
+          "btc-chop-2024-08",
+          "trade_budget"
+        ]
+      ],
+      "complete": true,
+      "manifest": "suite.scenarios\u00d7spec.block_probes",
+      "missing": []
+    },
+    "envelope_version": "redline.decision.v1",
+    "reason_code": "NEW_BLOCK_BREACH",
+    "required_proof_ids": [
+      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:probe:146e7d8dee0ed2a684b541bd",
+      "proof:probe:1e45bf22c63aa9fb2e110ad6",
+      "proof:probe:50779d37ab95b560da66d8c7",
+      "proof:probe:79df280e8eaed5f480f3de58",
+      "proof:replay:26fb5b3971fa43e1bd854c43"
+    ],
+    "satisfied_proof_ids": [
+      "proof:decision:d61e9afcd8a65698806d649c",
+      "proof:probe:146e7d8dee0ed2a684b541bd",
+      "proof:probe:1e45bf22c63aa9fb2e110ad6",
+      "proof:probe:50779d37ab95b560da66d8c7",
+      "proof:probe:79df280e8eaed5f480f3de58",
+      "proof:replay:26fb5b3971fa43e1bd854c43"
+    ],
+    "status": "withheld"
+  },
+  "proof_ids": [
+    "proof:package_canonical:42ebccab7ba79d9c7d43bd93",
+    "proof:spec_compile:fbb0609c303044cf00403afb",
+    "proof:replay:26fb5b3971fa43e1bd854c43",
+    "proof:replay_wellformed:cb40391baf812adc052a058a",
+    "proof:probe:146e7d8dee0ed2a684b541bd",
+    "proof:probe:1e45bf22c63aa9fb2e110ad6",
+    "proof:probe:50779d37ab95b560da66d8c7",
+    "proof:probe:79df280e8eaed5f480f3de58",
+    "proof:coverage:9c1d66ec7d424f574b56330b",
+    "proof:baseline_calibration:3c1bc21b48f3d603b36cd548",
+    "proof:candidate_absolute:557b83d0280b056d654ca950",
+    "proof:decision:d61e9afcd8a65698806d649c"
+  ],
+  "receipt_hash": "sha256:7b6eafb9e0b244cc0a0048d148475511fddc3da865f4733d3434b26d29e95d14",
+  "report_hash": "sha256:b7d224702be0436b4a4ccf63ded9b216ffba4d208d103a9da7daafb743571bb5",
+  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0.01994876; max_drawdown <= 0.08000000 observed 0.17663366; replay_wellformed == 12 observed 12; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
+  "traces": [
+    {
+      "artifact_hash": "sha256:d609a3f66b5b1c5ba19c0c54b8b1b93ef0444f737770b6fd24ca83830c587d80",
+      "bars": 12,
+      "engine": "deterministic",
+      "input_hash": "sha256:55d493e72f07e6f7fa1ff4b44655e364084725c98fb5f48b20206e05a1371ba6",
+      "points": [
+        {
+          "bar": 0,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T00:00:00Z"
+        },
+        {
+          "bar": 1,
+          "close": "101",
+          "drawdown": "0.000",
+          "nav": "10000.000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T01:00:00Z"
+        },
+        {
+          "bar": 2,
+          "close": "100",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T02:00:00Z"
+        },
+        {
+          "bar": 3,
+          "close": "92",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T03:00:00Z"
+        },
+        {
+          "bar": 4,
+          "close": "93",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T04:00:00Z"
+        },
+        {
+          "bar": 5,
+          "close": "94",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T05:00:00Z"
+        },
+        {
+          "bar": 6,
+          "close": "95",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T06:00:00Z"
+        },
+        {
+          "bar": 7,
+          "close": "96",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T07:00:00Z"
+        },
+        {
+          "bar": 8,
+          "close": "97",
+          "drawdown": "0",
+          "nav": "10052.08333333333333333333333",
+          "peak": "10052.08333333333333333333333",
+          "position": "0.5",
+          "timestamp": "2024-03-05T08:00:00Z"
+        },
+        {
+          "bar": 9,
+          "close": "98",
+          "drawdown": "0",
+          "nav": "10103.89819587628865979381443",
+          "peak": "10103.89819587628865979381443",
+          "position": "0.5",
+          "timestamp": "2024-03-05T09:00:00Z"
+        },
+        {
+          "bar": 10,
+          "close": "99",
+          "drawdown": "0",
+          "nav": "10155.44869687565747948664001",
+          "peak": "10155.44869687565747948664001",
+          "position": "0.5",
+          "timestamp": "2024-03-05T10:00:00Z"
+        },
+        {
+          "bar": 11,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10206.73884180937292130222910",
+          "peak": "10206.73884180937292130222910",
+          "position": "0.5",
+          "timestamp": "2024-03-05T11:00:00Z"
+        }
+      ],
+      "role": "baseline",
+      "scenario_id": "btc-crash-2024-03-05",
+      "trade_count": 1
+    },
+    {
+      "artifact_hash": "sha256:5a0e0e80939801f8026c3c9302129d2e73fcc206ff94d8ab09f92630fb9bc91a",
+      "bars": 12,
+      "engine": "deterministic",
+      "input_hash": "sha256:6bb8374f1fa017f36f587cdf549a3c7b20e16169658b9184eea196ad770427ed",
+      "points": [
+        {
+          "bar": 0,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-03-05T00:00:00Z"
+        },
+        {
+          "bar": 1,
+          "close": "101",
+          "drawdown": "0",
+          "nav": "10200.000",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T01:00:00Z"
+        },
+        {
+          "bar": 2,
+          "close": "100",
+          "drawdown": "0.01980198019801980198019801980",
+          "nav": "9998.019801980198019801980198",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T02:00:00Z"
+        },
+        {
+          "bar": 3,
+          "close": "92",
+          "drawdown": "0.1766336633663366336633663367",
+          "nav": "8398.336633663366336633663366",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T03:00:00Z"
+        },
+        {
+          "bar": 4,
+          "close": "93",
+          "drawdown": "0.1587343951786482996125699526",
+          "nav": "8580.909169177787343951786483",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T04:00:00Z"
+        },
+        {
+          "bar": 5,
+          "close": "94",
+          "drawdown": "0.1406426617416299834752058657",
+          "nav": "8765.444850235374168552900170",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T05:00:00Z"
+        },
+        {
+          "bar": 6,
+          "close": "95",
+          "drawdown": "0.1223584630552816852512740758",
+          "nav": "8951.943676836126810437004427",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T06:00:00Z"
+        },
+        {
+          "bar": 7,
+          "close": "96",
+          "drawdown": "0.1038817991196034049407745823",
+          "nav": "9140.405648980045269604099261",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T07:00:00Z"
+        },
+        {
+          "bar": 8,
+          "close": "97",
+          "drawdown": "0.08521266993459514254370738637",
+          "nav": "9330.830766667129546054184659",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T08:00:00Z"
+        },
+        {
+          "bar": 9,
+          "close": "98",
+          "drawdown": "0.06635107550025689806007248745",
+          "nav": "9523.219029897379639787260628",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T09:00:00Z"
+        },
+        {
+          "bar": 10,
+          "close": "99",
+          "drawdown": "0.047297015816588671489869885",
+          "nav": "9717.570438670795550803327173",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T10:00:00Z"
+        },
+        {
+          "bar": 11,
+          "close": "100",
+          "drawdown": "0.02805049088359046283309957980",
+          "nav": "9913.884992987377279102384286",
+          "peak": "10200.000",
+          "position": "2.0",
+          "timestamp": "2024-03-05T11:00:00Z"
+        }
+      ],
+      "role": "candidate",
+      "scenario_id": "btc-crash-2024-03-05",
+      "trade_count": 1
+    },
+    {
+      "artifact_hash": "sha256:e8d48498577cdf76e12bf253f42aa446cd167b0d3da101da7b8bb77624d7a1c1",
+      "bars": 12,
+      "engine": "deterministic",
+      "input_hash": "sha256:1e37496c11112d099f7098fb7820ff83d1e921d5f491abbfacbdaa1fd86b7ae4",
+      "points": [
+        {
+          "bar": 0,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T00:00:00Z"
+        },
+        {
+          "bar": 1,
+          "close": "100.5",
+          "drawdown": "0.0000",
+          "nav": "10000.0000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T01:00:00Z"
+        },
+        {
+          "bar": 2,
+          "close": "100",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T02:00:00Z"
+        },
+        {
+          "bar": 3,
+          "close": "99.5",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T03:00:00Z"
+        },
+        {
+          "bar": 4,
+          "close": "100",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T04:00:00Z"
+        },
+        {
+          "bar": 5,
+          "close": "100.5",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T05:00:00Z"
+        },
+        {
+          "bar": 6,
+          "close": "100",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T06:00:00Z"
+        },
+        {
+          "bar": 7,
+          "close": "99.5",
+          "drawdown": "0E-23",
+          "nav": "10000.00000000000000000000000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T07:00:00Z"
+        },
+        {
+          "bar": 8,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10025.12562814070351758793970",
+          "peak": "10025.12562814070351758793970",
+          "position": "0.5",
+          "timestamp": "2024-08-01T08:00:00Z"
+        },
+        {
+          "bar": 9,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10050.18844221105527638190955",
+          "peak": "10050.18844221105527638190955",
+          "position": "0.5",
+          "timestamp": "2024-08-01T09:00:00Z"
+        },
+        {
+          "bar": 10,
+          "close": "100",
+          "drawdown": "0.002487562189054726368159203794",
+          "nav": "10025.18797344933623340583515",
+          "peak": "10050.18844221105527638190955",
+          "position": "0.5",
+          "timestamp": "2024-08-01T10:00:00Z"
+        },
+        {
+          "bar": 11,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10050.25094338295957398934974",
+          "peak": "10050.25094338295957398934974",
+          "position": "0.5",
+          "timestamp": "2024-08-01T11:00:00Z"
+        }
+      ],
+      "role": "baseline",
+      "scenario_id": "btc-chop-2024-08",
+      "trade_count": 1
+    },
+    {
+      "artifact_hash": "sha256:f0d4dc5863b0a33270a4df424e15d7abc97d02af678e9ec41268948b3784d6c8",
+      "bars": 12,
+      "engine": "deterministic",
+      "input_hash": "sha256:73cfb0eaead713ff4e02f70168df09d363697491e132cc2307c7e19af397d3c6",
+      "points": [
+        {
+          "bar": 0,
+          "close": "100",
+          "drawdown": "0",
+          "nav": "10000",
+          "peak": "10000",
+          "position": "0.0",
+          "timestamp": "2024-08-01T00:00:00Z"
+        },
+        {
+          "bar": 1,
+          "close": "100.5",
+          "drawdown": "0",
+          "nav": "10100.0000",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T01:00:00Z"
+        },
+        {
+          "bar": 2,
+          "close": "100",
+          "drawdown": "0.009950248756218905472636815941",
+          "nav": "9999.502487562189054726368159",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T02:00:00Z"
+        },
+        {
+          "bar": 3,
+          "close": "99.5",
+          "drawdown": "0.01985074626865671641791044782",
+          "nav": "9899.507462686567164179104477",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T03:00:00Z"
+        },
+        {
+          "bar": 4,
+          "close": "100",
+          "drawdown": "0.01000000000000000000000000050",
+          "nav": "9998.999999999999999999999995",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T04:00:00Z"
+        },
+        {
+          "bar": 5,
+          "close": "100.5",
+          "drawdown": "0.0001000000000000000000000009901",
+          "nav": "10098.98999999999999999999999",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T05:00:00Z"
+        },
+        {
+          "bar": 6,
+          "close": "100",
+          "drawdown": "0.01004925373134328358208955317",
+          "nav": "9998.502537313432835820895513",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T06:00:00Z"
+        },
+        {
+          "bar": 7,
+          "close": "99.5",
+          "drawdown": "0.01994876119402985074626865762",
+          "nav": "9898.517511940298507462686558",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T07:00:00Z"
+        },
+        {
+          "bar": 8,
+          "close": "100",
+          "drawdown": "0.01009900000000000000000000129",
+          "nav": "9998.000099999999999999999987",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T08:00:00Z"
+        },
+        {
+          "bar": 9,
+          "close": "100.5",
+          "drawdown": "0.0001999900000000000000000009901",
+          "nav": "10097.98010099999999999999999",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T09:00:00Z"
+        },
+        {
+          "bar": 10,
+          "close": "100",
+          "drawdown": "0.01014824880597014925373134426",
+          "nav": "9997.502687059701492537313423",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T10:00:00Z"
+        },
+        {
+          "bar": 11,
+          "close": "100.5",
+          "drawdown": "0.0002497312940298507462686574257",
+          "nav": "10097.47771393029850746268656",
+          "peak": "10100.0000",
+          "position": "2.0",
+          "timestamp": "2024-08-01T11:00:00Z"
+        }
+      ],
+      "role": "candidate",
+      "scenario_id": "btc-chop-2024-08",
+      "trade_count": 1
+    }
+  ],
+  "version": "redline.report.v1"
+}

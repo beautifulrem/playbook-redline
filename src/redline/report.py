@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from typing import Any
+
+from redline.canonical import hash_obj
+from redline.models import DecisionEnvelope, Receipt, ReplayTrace
+
+
+def to_report(*, envelope: DecisionEnvelope, receipt: Receipt | None, traces: list[ReplayTrace]) -> dict[str, Any]:
+    report = {
+        "version": "redline.report.v1",
+        "envelope": envelope.model_dump(mode="json"),
+        "receipt_hash": receipt.receipt_hash if receipt else None,
+        "strength_summary": receipt.strength_summary if receipt else "",
+        "traces": [trace.model_dump(mode="json") for trace in traces],
+        "proof_ids": [proof.proof_id for proof in receipt.proofs] if receipt else [],
+    }
+    report["report_hash"] = hash_obj(report)
+    return report
+
+
+def render_strength_summary(receipt: Receipt) -> str:
+    metrics: list[str] = []
+    for proof in receipt.proofs:
+        for assertion in proof.assertions:
+            metrics.append(f"{assertion.metric} {assertion.op} {assertion.threshold} observed {assertion.observed}")
+    scenario_count = len(receipt.suite.scenarios)
+    return f"tested: {'; '.join(sorted(set(metrics)))}; {scenario_count} anchored scenarios"
+

@@ -1,0 +1,14 @@
+.claude/
+.pytest_cache/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.DS_Store
+
+docs/
+proofs/
+
+artifacts/*
+!artifacts/demo/
+!artifacts/demo/**
