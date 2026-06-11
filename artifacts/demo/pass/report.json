@@ -1,7 +1,7 @@
 {
   "coverage_missing": [],
   "edit_provenance": {
-    "captured_at": "2026-06-11T06:26:21Z",
+    "captured_at": "2026-06-11T08:23:28Z",
     "diff_hash": "sha256:f53240af72989c573be6117b64dc1db4bc0e0ddf89579927fd8e40d73a693f55",
     "locked_by": "author",
     "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
@@ -16,7 +16,7 @@
       "llm_in_verdict": false,
       "qwen_compile": {
         "degraded": true,
-        "mode": "json-fallback"
+        "mode": "json"
       },
       "scenario_count": 2,
       "sponsor_readback": {
@@ -62,7 +62,7 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:c32b0885a7f8dcbf92babae6",
+      "proof:decision:41b3c95654bfea72fd8185b0",
       "proof:package_canonical:d626e536e38620bff850851f",
       "proof:replay:90796eb2f6174bc3f22ab72b",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -72,7 +72,7 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:c32b0885a7f8dcbf92babae6",
+      "proof:decision:41b3c95654bfea72fd8185b0",
       "proof:package_canonical:d626e536e38620bff850851f",
       "proof:replay:90796eb2f6174bc3f22ab72b",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -82,6 +82,7 @@
   },
   "proof_ids": [
     "proof:package_canonical:d626e536e38620bff850851f",
+    "proof:edit_provenance:6ae71f6c8af81403964dc343",
     "proof:spec_compile:793a7818c323072d18bcf8d8",
     "proof:replay:90796eb2f6174bc3f22ab72b",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -94,7 +95,7 @@
     "proof:coverage:07629775749a0c50afc55033",
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
-    "proof:decision:c32b0885a7f8dcbf92babae6"
+    "proof:decision:41b3c95654bfea72fd8185b0"
   ],
   "proofs": [
     {
@@ -109,11 +110,30 @@
       "verdict_bearing": true
     },
     {
+      "artifact_hash": "sha256:6ae71f6c8af81403964dc3432586160766a390324c25f5d5df878a2da150ce26",
+      "assertions": [],
+      "inputs_hash": "sha256:b95ce165fd002a1a08acaf02b04ec419e7ab89022ef6f581ef353cf7c51c403a",
+      "kind": "edit_provenance",
+      "meta": {
+        "binding": "package_pair",
+        "expected_diff_hash": "sha256:f53240af72989c573be6117b64dc1db4bc0e0ddf89579927fd8e40d73a693f55"
+      },
+      "phase": "capture-edit",
+      "proof_id": "proof:edit_provenance:6ae71f6c8af81403964dc343",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:6ae71f6c8af81403964dc343",
+      "verdict_bearing": false
+    },
+    {
       "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
       "assertions": [],
       "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
       "kind": "spec_compile",
-      "meta": {},
+      "meta": {
+        "compiler": "json",
+        "degraded": "true",
+        "model": "",
+        "tool_schema_hash": ""
+      },
       "phase": "compile",
       "proof_id": "proof:spec_compile:793a7818c323072d18bcf8d8",
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8",
@@ -430,14 +450,14 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:0525e62d5ea203cd0c5581f914e8c0300741012d7d3d9f5e7f7fd56ed1c67ce7",
+      "artifact_hash": "sha256:e67378a3a9c44b2578eeacfce59a721fdf2f6e541937fa8946387825bee3c954",
       "assertions": [],
-      "inputs_hash": "sha256:e7834d9c3c43e34b49776b27501dc106eef0d6375d24da1036477364d9823688",
+      "inputs_hash": "sha256:0e180cba0a2b45897360eaa53020e271bc0b16b446f27558efa8368c7d9e09ad",
       "kind": "decision",
       "meta": {},
       "phase": "decide",
-      "proof_id": "proof:decision:c32b0885a7f8dcbf92babae6",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:c32b0885a7f8dcbf92babae6",
+      "proof_id": "proof:decision:41b3c95654bfea72fd8185b0",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:41b3c95654bfea72fd8185b0",
       "verdict_bearing": true
     }
   ],
@@ -451,8 +471,8 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:6aef139fec5d412c7489bd7d41ccf5b7565f0e81574b336be7755dfec07bdfbb",
-  "report_hash": "sha256:0afda46ba313d293f0e59772af6df587767ef05893c0fc92f9c58f3ef6963567",
+  "receipt_hash": "sha256:5811dc20d0c930b619e5ef55db72a332a150dc2546776685005634cb80a2b7a6",
+  "report_hash": "sha256:1eb1dd032a2fd3a7a9bb5d2b29acf59e5ac8ef656735a6b6516f3737ef1579b7",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

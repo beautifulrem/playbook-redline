@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import importlib.util
 import json
@@ -17,6 +18,27 @@ from redline.models import Bar, ReasonCode
 
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
+_FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
+_FORBIDDEN_DYNAMIC_CALLS = {"__import__", "compile", "eval", "exec"}
+_FORBIDDEN_ENTROPY_ATTRS = {
+    "choice",
+    "choices",
+    "getrandbits",
+    "monotonic",
+    "perf_counter",
+    "process_time",
+    "randint",
+    "random",
+    "randrange",
+    "sleep",
+    "time",
+    "token_bytes",
+    "token_hex",
+    "token_urlsafe",
+    "uniform",
+    "urandom",
+    "uuid4",
+}
 
 
 def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
@@ -54,7 +76,12 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
             raise RuntimeError(f"{reason}:{event}")
         if event == "import" and args:
             module_name = str(args[0])
-            if module_name in {"_ctypes", "ctypes", "cffi"} or module_name.startswith(("ctypes.", "cffi.")):
+            module_root = module_name.split(".", 1)[0]
+            if (
+                module_root in _FORBIDDEN_ENTROPY_MODULES
+                or module_name in {"_ctypes", "ctypes", "cffi"}
+                or module_name.startswith(("ctypes.", "cffi."))
+            ):
                 raise RuntimeError(f"{reason}:import-{module_name}")
         if event == "open" and args:
             target = args[0]
@@ -73,6 +100,7 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
 
 
 def _load_strategy(strategy_path: Path) -> ModuleType:
+    _reject_entropy_sources(strategy_path)
     spec = importlib.util.spec_from_file_location("redline_candidate_strategy", strategy_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"{ReasonCode.PARSE_ERROR.value}:cannot load strategy")
@@ -81,6 +109,29 @@ def _load_strategy(strategy_path: Path) -> ModuleType:
     if not hasattr(module, "signal"):
         raise RuntimeError(f"{ReasonCode.SCHEMA_INVALID.value}:strategy missing signal()")
     return module
+
+
+def _reject_entropy_sources(strategy_path: Path) -> None:
+    reason = ReasonCode.CANDIDATE_SANDBOX_VIOLATION.value
+    try:
+        tree = ast.parse(strategy_path.read_text(encoding="utf-8"), filename=str(strategy_path))
+    except SyntaxError as exc:
+        raise RuntimeError(f"{ReasonCode.PARSE_ERROR.value}:cannot parse strategy") from exc
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module_root = alias.name.split(".", 1)[0]
+                if module_root in _FORBIDDEN_ENTROPY_MODULES:
+                    raise RuntimeError(f"{reason}:import-{module_root}")
+        elif isinstance(node, ast.ImportFrom):
+            module_root = (node.module or "").split(".", 1)[0]
+            if module_root in _FORBIDDEN_ENTROPY_MODULES:
+                raise RuntimeError(f"{reason}:import-{module_root}")
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_DYNAMIC_CALLS:
+                raise RuntimeError(f"{reason}:dynamic-code-{node.func.id}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
+                raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
 
 
 def _read_bars(path: Path) -> list[Bar]:

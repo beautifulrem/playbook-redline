@@ -121,6 +121,7 @@ class RedlineSpec(RedlineModel):
     spec_id: str
     probes: list[ProbeSpec]
     compiler: str = "json"
+    declared_intent: str | None = None
     model: str | None = None
     tool_schema_hash: str | None = None
 
@@ -129,6 +130,10 @@ class Scenario(RedlineModel):
     id: str
     path: str
     timeframe: str = "1h"
+    data_hash: str | None = None
+    bar_count: int | None = None
+    period_start: str | None = None
+    period_end: str | None = None
 
 
 class Suite(RedlineModel):
@@ -249,6 +254,7 @@ class PublishPreflightResult(RedlineModel):
     receipt_hash: str | None = None
     package_hash: str | None = None
     report_hash: str | None = None
+    package_archive_hash: str | None = None
     ledger_hash: str | None = None
     ledger_checkpoint_hash: str | None = None
     ledger_attestation_hash: str | None = None

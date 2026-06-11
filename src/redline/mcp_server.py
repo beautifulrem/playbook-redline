@@ -24,6 +24,10 @@ def redline_check_receipt(
     spec_path: str | None = None,
     report_path: str | None = None,
     ledger_path: str | None = None,
+    ledger_checkpoint_path: str | None = None,
+    ledger_attestation_path: str | None = None,
+    trust_policy_path: str | None = None,
+    baseline_receipt_path: str | None = None,
 ) -> dict:
     level = VerificationLevel.REPLAYED if rerun else VerificationLevel.HASH_ONLY
     if rerun:
@@ -41,6 +45,10 @@ def redline_check_receipt(
         spec_path=Path(spec_path) if spec_path else None,
         report_path=Path(report_path) if report_path else None,
         ledger_path=Path(ledger_path) if ledger_path else None,
+        ledger_checkpoint_path=Path(ledger_checkpoint_path) if ledger_checkpoint_path else None,
+        ledger_attestation_path=Path(ledger_attestation_path) if ledger_attestation_path else None,
+        trust_policy_path=Path(trust_policy_path) if trust_policy_path else None,
+        baseline_receipt_path=Path(baseline_receipt_path) if baseline_receipt_path else None,
     )
     return result.model_dump(mode="json")
 
@@ -92,6 +100,10 @@ def build_server():
         spec_path: str | None = None,
         report_path: str | None = None,
         ledger_path: str | None = None,
+        ledger_checkpoint_path: str | None = None,
+        ledger_attestation_path: str | None = None,
+        trust_policy_path: str | None = None,
+        baseline_receipt_path: str | None = None,
     ) -> dict:
         """Verify a Redline receipt without mutating package or platform state."""
 
@@ -103,6 +115,10 @@ def build_server():
             spec_path=spec_path,
             report_path=report_path,
             ledger_path=ledger_path,
+            ledger_checkpoint_path=ledger_checkpoint_path,
+            ledger_attestation_path=ledger_attestation_path,
+            trust_policy_path=trust_policy_path,
+            baseline_receipt_path=baseline_receipt_path,
         )
 
     return server

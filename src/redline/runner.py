@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -24,6 +26,7 @@ from redline.models import (
     Status,
     Suite,
     EditProvenance,
+    Capability,
     LedgerCheckpoint,
     LedgerCheckpointAttestation,
     TrustPolicy,
@@ -45,16 +48,39 @@ def load_suite(path: Path) -> Suite:
     with path.open(encoding="utf-8") as fh:
         payload = json.load(fh)
     suite = Suite.model_validate(payload)
-    if suite.suite_lock_hash is None:
-        suite = suite.model_copy(update={"suite_lock_hash": hash_obj(payload | {"suite_lock_hash": None})})
     base = path.parent
     scenarios: list[Scenario] = []
+    lock_scenarios: list[dict[str, object]] = []
     for scenario in suite.scenarios:
         scenario_path = Path(scenario.path)
         if not scenario_path.is_absolute():
             scenario_path = (base / scenario_path).resolve()
-        scenarios.append(scenario.model_copy(update={"path": str(scenario_path)}))
+        metadata = _scenario_file_metadata(scenario_path)
+        scenarios.append(scenario.model_copy(update={"path": str(scenario_path), **metadata}))
+        lock_scenarios.append({**scenario.model_dump(mode="json"), **metadata})
+    lock_payload = {
+        "version": suite.version,
+        "suite_id": suite.suite_id,
+        "scenarios": lock_scenarios,
+        "suite_lock_hash": None,
+    }
+    suite_lock_hash = hash_obj(lock_payload)
+    if suite.suite_lock_hash is not None and suite.suite_lock_hash != suite_lock_hash:
+        raise ValueError("suite_lock_hash mismatch")
+    suite = suite.model_copy(update={"suite_lock_hash": suite_lock_hash})
     return suite.model_copy(update={"scenarios": scenarios})
+
+
+def _scenario_file_metadata(path: Path) -> dict[str, object]:
+    with path.open(encoding="utf-8", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    timestamps = [row.get("timestamp", "") for row in rows if row.get("timestamp")]
+    return {
+        "data_hash": hash_file(path),
+        "bar_count": len(rows),
+        "period_start": timestamps[0] if timestamps else None,
+        "period_end": timestamps[-1] if timestamps else None,
+    }
 
 
 def run_redline(
@@ -68,6 +94,8 @@ def run_redline(
     edit_provenance: EditProvenance | None = None,
     baseline_receipt_path: Path | None = None,
     baseline_trust_policy_path: Path | None = None,
+    baseline_version_id: str | None = None,
+    candidate_version_id: str | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
     suite_path = suite_path.resolve()
@@ -80,6 +108,12 @@ def run_redline(
     package_hash = hash_tree(package_dir)
     baseline_hash = hash_tree(baseline_dir)
     candidate_hash = hash_tree(candidate_dir)
+    expected_edit_diff_hash = hash_obj({"baseline": baseline_hash, "candidate": candidate_hash})
+    effective_edit_provenance = edit_provenance or EditProvenance(
+        prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
+        diff_hash=expected_edit_diff_hash,
+        captured_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    )
     chain_status, baseline_receipt_hash, baseline_receipt_error = _baseline_chain(
         baseline_hash=baseline_hash,
         baseline_receipt_path=baseline_receipt_path,
@@ -94,16 +128,32 @@ def run_redline(
             verdict_bearing=True,
         ),
         _simple_proof(
+            kind=ProofKind.EDIT_PROVENANCE,
+            phase="capture-edit",
+            inputs={"baseline_hash": baseline_hash, "candidate_hash": candidate_hash},
+            artifact=effective_edit_provenance,
+            verdict_bearing=False,
+            meta={"expected_diff_hash": expected_edit_diff_hash, "binding": "package_pair"},
+        ),
+        _simple_proof(
             kind=ProofKind.SPEC_COMPILE,
             phase="compile",
             inputs={"spec_path": str(spec_path)},
             artifact=spec,
             verdict_bearing=True,
+            meta={
+                "compiler": spec.compiler,
+                "model": spec.model or "",
+                "tool_schema_hash": spec.tool_schema_hash or "",
+                "degraded": str(spec.compiler != "qwen").lower(),
+            },
         ),
     ]
     engine = DeterministicReplayEngine()
     traces: list[ReplayTrace] = []
     reject_reason: ReasonCode | None = baseline_receipt_error
+    if effective_edit_provenance.diff_hash != expected_edit_diff_hash:
+        reject_reason = ReasonCode.RECEIPT_BINDING_FAILED
     try:
         if reject_reason is None:
             for scenario in suite.scenarios:
@@ -231,6 +281,13 @@ def run_redline(
         coverage=coverage,
         context=DecisionContext(suite_id=suite.suite_id, spec_hash=spec_hash, chain_status=chain_status, reject_reason=reject_reason),
     )
+    envelope = envelope.model_copy(
+        update={
+            "capabilities": envelope.capabilities.model_copy(
+                update={"qwen_compile": Capability(mode=spec.compiler, degraded=spec.compiler != "qwen")}
+            )
+        }
+    )
     engine_hash = hash_tree(Path(__file__).resolve().parent / "engine_adapter")
     receipt = issue_receipt(
         envelope=envelope,
@@ -240,17 +297,22 @@ def run_redline(
         baseline_name=baseline,
         baseline_hash=baseline_hash,
         baseline_receipt_hash=baseline_receipt_hash,
+        baseline_version_id=baseline_version_id or f"fixture:{baseline}",
         candidate_name=candidate,
         candidate_hash=candidate_hash,
+        candidate_version_id=candidate_version_id or f"fixture:{candidate}",
         spec_hash=spec_hash,
         spec_source_path=_portable_path(spec_path),
+        spec_compiler=spec.compiler,
+        spec_model=spec.model,
+        spec_tool_schema_hash=spec.tool_schema_hash,
         suite_id=suite.suite_id,
         scenario_ids=[scenario.id for scenario in suite.scenarios],
         suite_lock_hash=suite.suite_lock_hash or hash_obj(suite),
         suite_source_path=_portable_path(suite_path),
         engine_source_tree_hash=engine_hash,
         runner_lock_hash=hash_obj({"engine": "deterministic", "engine_hash": engine_hash}),
-        edit_provenance=edit_provenance,
+        edit_provenance=effective_edit_provenance,
     )
     if receipt is None:
         decision_proof = make_decision_proof(envelope=envelope, proofs=proofs)
@@ -296,6 +358,7 @@ def _simple_proof(
     artifact: object,
     verdict_bearing: bool,
     assertions: list[Assertion] | None = None,
+    meta: dict[str, object] | None = None,
 ) -> Proof:
     inputs_hash = hash_obj(inputs)
     artifact_hash = hash_obj(artifact)
@@ -308,6 +371,7 @@ def _simple_proof(
         inputs_hash=inputs_hash,
         artifact_hash=artifact_hash,
         assertions=assertions or [],
+        meta=meta or {},
         reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id}",
     )
 
@@ -386,6 +450,14 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
         attestation = LedgerCheckpointAttestation.model_validate(json.loads(attestation_path.read_text(encoding="utf-8")))
     except Exception:
         return False
+    key_hash = hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
     matched = False
     previous_entry_hash = "sha256:genesis"
     entry_count = 0
@@ -404,6 +476,8 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
                     return False
                 previous_entry_hash = entry_hash
                 if entry.get("receipt_hash") == receipt.receipt_hash:
+                    if entry.get("key_hash") != key_hash or entry.get("status") != receipt.result.status:
+                        return False
                     matched = True
     except (OSError, json.JSONDecodeError):
         return False

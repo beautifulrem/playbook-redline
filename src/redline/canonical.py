@@ -5,7 +5,7 @@ import json
 from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN, localcontext
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from pydantic import BaseModel
 
@@ -78,9 +78,17 @@ def hash_file(path: Path) -> str:
 
 
 def hash_tree(path: Path) -> str:
+    entries = [{"path": rel, "hash": hash_file(file_path)} for rel, file_path in iter_canonical_files(path)]
+    return hash_obj(entries)
+
+
+def iter_canonical_files(path: Path) -> Iterator[tuple[str, Path]]:
     root = path.resolve()
-    entries: list[dict[str, str]] = []
-    for file_path in sorted(p for p in root.rglob("*") if p.is_file()):
+    for file_path in sorted(root.rglob("*")):
+        if file_path.is_symlink():
+            raise CanonicalizationError(f"symlink not allowed in package: {file_path}", ReasonCode.RECEIPT_BINDING_FAILED)
+        if not file_path.is_file():
+            continue
         rel = file_path.relative_to(root).as_posix()
         if (
             rel.startswith(".redline/")
@@ -90,5 +98,8 @@ def hash_tree(path: Path) -> str:
             or rel.endswith(".pyo")
         ):
             continue
-        entries.append({"path": rel, "hash": hash_file(file_path)})
-    return hash_obj(entries)
+        try:
+            file_path.resolve().relative_to(root)
+        except ValueError as exc:
+            raise CanonicalizationError(f"package file escapes root: {file_path}", ReasonCode.RECEIPT_BINDING_FAILED) from exc
+        yield rel, file_path

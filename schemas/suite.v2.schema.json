@@ -3,6 +3,30 @@
     "Scenario": {
       "additionalProperties": false,
       "properties": {
+        "bar_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bar Count"
+        },
+        "data_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Hash"
+        },
         "id": {
           "title": "Id",
           "type": "string"
@@ -10,6 +34,30 @@
         "path": {
           "title": "Path",
           "type": "string"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period End"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period Start"
         },
         "timeframe": {
           "default": "1h",

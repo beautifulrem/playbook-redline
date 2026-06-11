@@ -1,4 +1,5 @@
 .claude/
+.codegraph/
 .pytest_cache/
 .venv/
 __pycache__/
@@ -12,5 +13,9 @@ proofs/
 artifacts/*
 !artifacts/demo/
 !artifacts/demo/**
+artifacts/demo/.redline-demo-output
+artifacts/demo/envelope.json
+artifacts/demo/report.json
+artifacts/demo/proofs/
 !artifacts/sponsor/
 !artifacts/sponsor/**

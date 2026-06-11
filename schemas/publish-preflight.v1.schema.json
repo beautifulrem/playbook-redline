@@ -85,6 +85,18 @@
       "title": "Ok",
       "type": "boolean"
     },
+    "package_archive_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Package Archive Hash"
+    },
     "package_hash": {
       "anyOf": [
         {

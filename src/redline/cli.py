@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -13,7 +14,7 @@ from rich.table import Table
 from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
 from redline.runner import run_redline
 from redline.schemas import export_schemas as export_schema_files
-from redline.sponsor.bitget import validate_sponsor_evidence_shape
+from redline.sponsor.bitget import BitgetSponsorAdapter, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import verify, verify_proof
@@ -62,6 +63,8 @@ def run(
     edit_provenance: Optional[Path] = typer.Option(None, "--edit-provenance"),
     baseline_receipt: Optional[Path] = typer.Option(None, "--baseline-receipt"),
     baseline_trust_policy: Optional[Path] = typer.Option(None, "--baseline-trust-policy"),
+    baseline_version_id: Optional[str] = typer.Option(None, "--baseline-version-id"),
+    candidate_version_id: Optional[str] = typer.Option(None, "--candidate-version-id"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     provenance = _load_edit_provenance(edit_provenance) if edit_provenance is not None else None
@@ -75,6 +78,8 @@ def run(
         edit_provenance=provenance,
         baseline_receipt_path=baseline_receipt,
         baseline_trust_policy_path=baseline_trust_policy,
+        baseline_version_id=baseline_version_id,
+        candidate_version_id=candidate_version_id,
     )
     if json_out:
         console.print_json(data=artifacts.envelope.model_dump(mode="json"))
@@ -103,9 +108,12 @@ def import_cmd(
 def compile_cmd(
     source: Path,
     out: Optional[Path] = typer.Option(None, "--out"),
+    qwen: bool = typer.Option(False, "--qwen"),
+    qwen_model: Optional[str] = typer.Option(None, "--qwen-model"),
+    qwen_base_url: Optional[str] = typer.Option(None, "--qwen-base-url"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    spec = compile_spec(source)
+    spec = compile_spec(source, use_qwen=qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(spec.model_dump_json(indent=2) + "\n", encoding="utf-8")
@@ -147,8 +155,11 @@ def make_demo(
     spec: Path = Path("fixtures/specs/redline_spec.json"),
     out: Path = Path("artifacts/demo"),
 ) -> None:
-    if out.exists():
-        shutil.rmtree(out)
+    try:
+        _prepare_demo_out(out)
+    except ValueError as exc:
+        console.print(f"make-demo rejected: {exc}")
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING]) from exc
     bad = run_redline(package_dir=package, baseline="baseline", candidate="candidate_bad", suite_path=suite, spec_path=spec, out_dir=out / "withheld")
     good = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=suite, spec_path=spec, out_dir=out / "pass")
     table = Table("case", "status", "reason", "receipt")
@@ -345,6 +356,7 @@ def verify_annotation_cmd(
     ledger_checkpoint: Optional[Path] = typer.Option(None, "--ledger-checkpoint"),
     ledger_attestation: Optional[Path] = typer.Option(None, "--ledger-attestation"),
     trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
+    allow_demo_preview: bool = typer.Option(False, "--allow-demo-preview"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     result = verify_annotation(
@@ -355,6 +367,7 @@ def verify_annotation_cmd(
         ledger_checkpoint_path=ledger_checkpoint,
         ledger_attestation_path=ledger_attestation,
         trust_policy_path=trust_policy,
+        allow_demo_preview=allow_demo_preview,
     )
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
@@ -526,6 +539,40 @@ def verify_sponsor_evidence_cmd(
     raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH])
 
 
+@app.command("verify-sponsor-run")
+def verify_sponsor_run_cmd(
+    evidence: Path,
+    out_transcript: Path = typer.Option(Path("artifacts/sponsor/readback-transcript.jsonl"), "--out-transcript"),
+    base_url: str = typer.Option("https://api.bitget.com", "--base-url"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
+    secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")
+    passphrase = os.environ.get("REDLINE_BITGET_PASSPHRASE") or os.environ.get("BITGET_PASSPHRASE")
+    if access_key is None or secret_key is None or passphrase is None:
+        result = {
+            "ok": False,
+            "state": "BITGET_CREDENTIALS_REQUIRED",
+            "evidence": {},
+            "reason_code": ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED])
+    adapter = BitgetSponsorAdapter(
+        access_key=access_key,
+        secret_key=secret_key,
+        passphrase=passphrase,
+        transcript_path=out_transcript,
+        base_url=base_url,
+    )
+    result = verify_sponsor_readback_evidence(evidence_path=evidence, adapter=adapter)
+    if json_out:
+        console.print_json(data=result.model_dump(mode="json"))
+    else:
+        _print_envelope("verified" if result.ok else "rejected", (result.reason_code or ReasonCode.PASS).value, evidence)
+    raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH])
+
+
 @app.command("export-schemas")
 def export_schemas(out: Path = Path("schemas")) -> None:
     export_schema_files(out)
@@ -554,6 +601,32 @@ def _print_json_or_table(result: dict[str, object], json_out: bool, target: obje
         console.print_json(data=result)
     else:
         _print_envelope(str(result.get("state", "blocked")), str(result.get("reason_code", "")), target)
+
+
+def _prepare_demo_out(out: Path) -> None:
+    resolved = out.resolve()
+    cwd = Path.cwd().resolve()
+    artifacts_root = (cwd / "artifacts").resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    if resolved in {cwd, artifacts_root}:
+        raise ValueError("output path is too broad")
+    if not (_is_relative_to(resolved, artifacts_root) or _is_relative_to(resolved, temp_root)):
+        raise ValueError("output path must be under artifacts/ or the system temporary directory")
+    marker = resolved / ".redline-demo-output"
+    if resolved.exists():
+        if not marker.exists():
+            raise ValueError("refusing to delete a directory not created by redline make-demo")
+        shutil.rmtree(resolved)
+    resolved.mkdir(parents=True, exist_ok=True)
+    marker.write_text("redline make-demo output\n", encoding="utf-8")
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
 
 
 if __name__ == "__main__":

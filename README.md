@@ -121,14 +121,17 @@ a repository checkout for the complete demo.
 ## Verification Script
 
 ```bash
-scripts/verify-sponsor-run.sh
+scripts/verify-sponsor-run.sh artifacts/sponsor/demo-readback.json artifacts/demo/pass/receipt.json fixtures/demo_pack
 ```
 
 The script runs receipt verification in replayed mode with package binding.
-It also validates the bundled recorded sponsor-attestation JSON shape. That
-recorded file is not treated as live Bitget read-back proof. A nonzero
-`SPONSOR_EVIDENCE_UNVERIFIED` exit is expected until a live credentialed
-Bitget adapter is configured.
+It then calls `redline verify-sponsor-run`, which requires Bitget credentials and
+rechecks the recorded `run_id` through the sponsor read-back endpoint. The live
+read-back must match `status=completed`, `version_id`, and
+`metrics_output_hash`; otherwise it exits fail-closed. The bundled recorded
+file is not treated as live Bitget proof by itself, so
+`BITGET_CREDENTIALS_REQUIRED` / `SPONSOR_EVIDENCE_UNVERIFIED` is expected until
+real credentials are configured.
 
 `redline publish --execute` is a wrapper around the live sponsor adapter. It
 requires `REDLINE_BITGET_ACCESS_KEY`, `REDLINE_BITGET_SECRET_KEY`, and

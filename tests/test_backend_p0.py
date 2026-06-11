@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import shutil
+import tarfile
 from decimal import Decimal
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
 from typer.testing import CliRunner
 
-from redline.canonical import CanonicalizationError, canonical_number, hash_obj
+import redline.surfaces as surfaces_module
+
+from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree
 from redline.cli import app
 from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
@@ -33,9 +36,9 @@ from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash
 from redline.runner import load_suite, run_redline
 from redline.schemas import export_schemas
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.mcp_server import redline_check_receipt
-from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html, verify_annotation
+from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import verify, verify_proof
 
@@ -127,14 +130,96 @@ def test_bad_candidate_withheld_and_good_candidate_pass(tmp_path: Path) -> None:
     assert good.report_json["edit_provenance"]["diff_hash"] == good.receipt.edit_provenance.diff_hash
 
 
+def test_run_records_external_version_anchors(tmp_path: Path) -> None:
+    artifacts = run_redline(
+        package_dir=PACKAGE,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path,
+        baseline_version_id="git:main:baseline",
+        candidate_version_id="git:feature:candidate",
+    )
+    assert artifacts.receipt is not None
+    assert artifacts.receipt.baseline.baseline_version_id == "git:main:baseline"
+    assert artifacts.receipt.candidate.candidate_version_id == "git:feature:candidate"
+
+
 def test_suite_has_two_24_bar_scenarios_and_three_p0_probes() -> None:
     suite = load_suite(SUITE)
     spec = compile_spec(SPEC)
     assert len(suite.scenarios) == 2
+    assert suite.suite_lock_hash is not None
     assert {probe.type for probe in spec.probes} == {ProbeType.MAX_DRAWDOWN, ProbeType.NO_ENTRY_WHEN, ProbeType.TRADE_BUDGET}
     for scenario in suite.scenarios:
+        assert scenario.data_hash is not None
+        assert scenario.bar_count == 24
+        assert scenario.period_start is not None
+        assert scenario.period_end is not None
         with Path(scenario.path).open(encoding="utf-8") as fh:
             assert len([line for line in fh if line.strip()]) == 25
+
+
+def test_suite_lock_hash_covers_scenario_csv_content(tmp_path: Path) -> None:
+    shutil.copytree(SUITE.parent, tmp_path / "suites")
+    suite_path = tmp_path / "suites" / "demo_suite.json"
+    suite = load_suite(suite_path)
+    data = json.loads(suite_path.read_text())
+    data["suite_lock_hash"] = suite.suite_lock_hash
+    suite_path.write_text(json.dumps(data), encoding="utf-8")
+    assert load_suite(suite_path).suite_lock_hash == suite.suite_lock_hash
+    csv_path = tmp_path / "suites" / "btc_chop.csv"
+    csv_path.write_text(csv_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    try:
+        load_suite(suite_path)
+    except ValueError as exc:
+        assert "suite_lock_hash mismatch" in str(exc)
+    else:
+        raise AssertionError("suite lock must cover scenario data bytes")
+
+
+def test_package_canonicalization_rejects_symlink_escape(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    external = tmp_path / "outside-secret.txt"
+    external.write_text("do not package me", encoding="utf-8")
+    (package / "external-link.txt").symlink_to(external)
+    try:
+        hash_tree(package)
+    except CanonicalizationError as exc:
+        assert exc.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    else:
+        raise AssertionError("canonical package hashing must reject symlinks")
+    try:
+        make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+    except CanonicalizationError as exc:
+        assert exc.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    else:
+        raise AssertionError("package archives must share the canonical symlink policy")
+
+
+def test_candidate_entropy_source_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_random")
+    (package / "candidate_random" / "strategy.py").write_text(
+        "import random\n\n"
+        "def signal(bar, state, config):\n"
+        "    return random.choice([0, 1])\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_random",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
 
 
 def test_no_entry_when_probe_catches_early_crash_entry(tmp_path: Path) -> None:
@@ -630,6 +715,41 @@ def test_mcp_rerun_uses_default_suite_and_spec(monkeypatch, tmp_path: Path) -> N
     assert result["verification_level"] == VerificationLevel.REPLAYED.value
 
 
+def test_mcp_verifies_chained_receipt_with_trust_inputs(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="mcp-policy", key_id="mcp-key", public_key=public_key, issuer="mcp-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
+    assert baseline.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="mcp-policy", key_id="mcp-key", issuer="mcp-ci")
+    chained = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "chained",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert chained.receipt is not None
+    _sign_run_checkpoint(tmp_path / "chained", private_key, policy_id="mcp-policy", key_id="mcp-key", issuer="mcp-ci")
+    result = redline_check_receipt(
+        str(tmp_path / "chained" / "receipt.json"),
+        pkg_path=str(package),
+        rerun=True,
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert result["status"] == VerificationStatus.VERIFIED.value
+    assert result["reason_code"] == ReasonCode.PASS.value
+    assert result["chain_status"] == "chained"
+
+
 def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> None:
     imported = import_package(PACKAGE)
     assert imported.identity_hash.startswith("sha256:")
@@ -652,6 +772,70 @@ def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> 
     )
     assert artifacts.receipt is not None
     assert artifacts.receipt.edit_provenance == provenance
+
+
+def test_edit_provenance_diff_mismatch_rejects(tmp_path: Path) -> None:
+    prompt_log = tmp_path / "prompt.txt"
+    prompt_log.write_text("make the strategy more responsive", encoding="utf-8")
+    bad_provenance = capture_edit_provenance(
+        tool="fixture-agent",
+        prompt_log=prompt_log,
+        baseline=PACKAGE / "baseline",
+        candidate=PACKAGE / "candidate_bad",
+    )
+    artifacts = run_redline(
+        package_dir=PACKAGE,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+        edit_provenance=bad_provenance,
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    assert any(proof.kind == ProofKind.EDIT_PROVENANCE for proof in artifacts.proofs)
+
+
+def test_qwen_compile_path_records_locked_spec_metadata(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        payload = json.loads(body.decode("utf-8"))
+        assert payload["model"] == "qwen-test"
+        content = {
+            "version": "redline.spec.v2.1",
+            "spec_id": "qwen-compiled",
+            "probes": [
+                {"id": "drawdown_limit", "type": "max_drawdown", "params": {"max_drawdown": "0.07"}, "block": True},
+                {"id": "no_entry_when_crash", "type": "no_entry_when", "params": {"scenario_id": "btc-crash-2024-03-05", "before_bar": "4", "max_abs_position": "0"}, "block": True},
+                {"id": "trade_budget", "type": "trade_budget", "params": {"max_trades": "12"}, "block": True},
+            ],
+        }
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps(content)}}]}).encode()
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    assert compiled.compiler == "qwen"
+    assert compiled.model == "qwen-test"
+    assert compiled.declared_intent == text_spec.read_text(encoding="utf-8")
+    assert compiled.tool_schema_hash is not None
+    assert compiled.probes[0].params["max_drawdown"] == "0.07"
+
+
+def test_qwen_compile_discards_invalid_model_output(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        content = {"version": "redline.spec.v2.1", "spec_id": "bad", "probes": [{"id": "bad", "type": "unknown", "params": {}, "block": True}]}
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps(content)}}]}).encode()
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    assert compiled.compiler == "json-fallback"
+    assert compiled.declared_intent == text_spec.read_text(encoding="utf-8")
+    assert {probe.type for probe in compiled.probes} == {ProbeType.MAX_DRAWDOWN, ProbeType.NO_ENTRY_WHEN, ProbeType.TRADE_BUDGET}
 
 
 def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes_annotation(tmp_path: Path) -> None:
@@ -685,6 +869,16 @@ def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes
         package=PACKAGE,
         report_path=tmp_path / "good" / "report.json",
         ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+    )
+    assert annotation_verify.ok is False
+    assert annotation_verify.state == "DEMO_ANNOTATION_REQUIRES_ALLOW_FLAG"
+    annotation_verify = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        report_path=tmp_path / "good" / "report.json",
+        ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+        allow_demo_preview=True,
     )
     assert annotation_verify.ok is True
     assert annotation_verify.reason_code == ReasonCode.BASELINE_GENESIS
@@ -828,6 +1022,12 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     assert publish.ok is True
     assert publish.state == "ANNOTATED_PACKAGE_READY"
     assert publish.ledger_attestation_hash == attestation.attestation_hash
+    assert publish.package_archive_hash is not None
+    with tarfile.open(tmp_path / "publish" / "annotated-package.tar.gz", "r:gz") as tar:
+        assert ".redline/redline-annotation.json" in tar.getnames()
+        annotation_member = tar.extractfile(".redline/redline-annotation.json")
+        assert annotation_member is not None
+        assert json.loads(annotation_member.read().decode("utf-8"))["annotation_hash"] == publish.annotation_hash
     annotation_result = verify_annotation(
         annotation_path=tmp_path / "publish" / "redline-annotation.json",
         receipt_path=tmp_path / "chained" / "receipt.json",
@@ -1039,6 +1239,21 @@ def test_publish_execute_forbids_demo_baseline(tmp_path: Path) -> None:
     assert stdout["state"] == "DEMO_EXECUTE_FORBIDDEN"
 
 
+def test_make_demo_refuses_broad_or_unowned_output_paths(tmp_path: Path) -> None:
+    runner = CliRunner()
+    root_result = runner.invoke(app, ["make-demo", "--out", "."])
+    assert root_result.exit_code == 6
+    fixture_result = runner.invoke(app, ["make-demo", "--out", str(PACKAGE)])
+    assert fixture_result.exit_code == 6
+    sentinel_dir = tmp_path / "sentinel"
+    sentinel_dir.mkdir()
+    sentinel = sentinel_dir / "keep.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    sentinel_result = runner.invoke(app, ["make-demo", "--out", str(sentinel_dir)])
+    assert sentinel_result.exit_code == 6
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+
+
 def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
@@ -1156,6 +1371,196 @@ def test_sponsor_evidence_verifier() -> None:
     assert result.reason_code == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED
 
 
+def test_live_sponsor_readback_verifies_three_recorded_fields(tmp_path: Path) -> None:
+    metrics_output = {"status": "pass", "breaches": []}
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": hash_obj(metrics_output),
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": hash_obj(metrics_output),
+        "package_hash": "sha256:" + "1" * 64,
+        "package_archive_hash": "sha256:" + "2" * 64,
+        "source_kind": "recorded",
+        "proof_eligible": False,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        assert method == "GET"
+        assert "/api/v1/playbook/run?" in url
+        return 200, json.dumps(
+            {
+                "code": "00000",
+                "data": {
+                    "run_id": "run-live-1",
+                    "version_id": "version-live-1",
+                    "status": "completed",
+                    "metrics_output": metrics_output,
+                    "package_hash": evidence["package_hash"],
+                    "package_archive_hash": evidence["package_archive_hash"],
+                },
+            }
+        ).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    adapter.proof_eligible = True
+    result = verify_sponsor_readback_evidence(evidence_path=evidence_path, adapter=adapter)
+    assert result.ok is True
+    assert result.state == SponsorState.READBACK_VERIFIED
+    assert result.evidence["run_id"] == "run-live-1"
+    assert result.evidence["source_kind"] == "live"
+    assert result.evidence["package_hash"] == evidence["package_hash"]
+
+
+def test_live_sponsor_readback_requires_package_binding(tmp_path: Path) -> None:
+    metrics_output = {"status": "pass", "breaches": []}
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": hash_obj(metrics_output),
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": hash_obj(metrics_output),
+        "package_hash": "sha256:" + "1" * 64,
+        "package_archive_hash": "sha256:" + "2" * 64,
+        "source_kind": "recorded",
+        "proof_eligible": False,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 200, json.dumps(
+            {
+                "code": "00000",
+                "data": {
+                    "run_id": "run-live-1",
+                    "version_id": "version-live-1",
+                    "status": "completed",
+                    "metrics_output": metrics_output,
+                    "package_hash": "sha256:" + "9" * 64,
+                    "package_archive_hash": evidence["package_archive_hash"],
+                },
+            }
+        ).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    adapter.proof_eligible = True
+    result = verify_sponsor_readback_evidence(evidence_path=evidence_path, adapter=adapter)
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
+def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    publish = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        allow_demo_baseline_genesis=True,
+    )
+    assert publish.ok is True
+    observed_expected_hashes: list[str | None] = []
+
+    class FakeAdapter:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def upload(self, *, envelope, package_hash: str, package_archive: Path, idempotency_key: str | None = None):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.UPLOAD_ACCEPTED,
+                evidence={
+                    "version_id": "version-1",
+                    "draft_id": "draft-1",
+                    "package_hash": package_hash,
+                    "package_archive_hash": "sha256:" + "4" * 64,
+                },
+            )
+
+        def run(self, *, version_id: str):
+            return surfaces_module.SponsorStepResult(ok=True, state=SponsorState.RUN_STARTED, evidence={"run_id": "run-1"})
+
+        def readback(
+            self,
+            *,
+            run_id: str,
+            expected_version_id: str | None = None,
+            expected_metrics_output_hash: str | None = None,
+            expected_package_hash: str | None = None,
+            expected_package_archive_hash: str | None = None,
+        ):
+            observed_expected_hashes.append(expected_metrics_output_hash)
+            return surfaces_module.SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    "run_id": run_id,
+                    "version_id": expected_version_id or "",
+                    "status": "completed",
+                    "metrics_output_hash": "sha256:" + "9" * 64,
+                    "expected_metrics_output_hash": expected_metrics_output_hash or "",
+                    "package_hash": expected_package_hash or "",
+                    "package_archive_hash": expected_package_archive_hash or "",
+                    "transcript_hash": "sha256:" + "8" * 64,
+                },
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
+
+    monkeypatch.setattr(surfaces_module, "BitgetSponsorAdapter", FakeAdapter)
+    result = execute_sponsor_readback(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=PACKAGE,
+        out_dir=tmp_path / "publish",
+        access_key="access",
+        secret_key="secret",
+        passphrase="pass",
+    )
+    assert observed_expected_hashes == [artifacts.receipt.result.result_hash]
+    assert result.ok is False
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
+def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path) -> None:
+    for key in [
+        "REDLINE_BITGET_ACCESS_KEY",
+        "REDLINE_BITGET_SECRET_KEY",
+        "REDLINE_BITGET_PASSPHRASE",
+        "BITGET_ACCESS_KEY",
+        "BITGET_SECRET_KEY",
+        "BITGET_PASSPHRASE",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    result = CliRunner().invoke(app, ["verify-sponsor-run", str(ROOT / "artifacts/sponsor/demo-readback.json"), "--json"])
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "BITGET_CREDENTIALS_REQUIRED"
+
+
 def test_sponsor_evidence_mismatch_rejects(tmp_path: Path) -> None:
     path = tmp_path / "evidence.json"
     data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text())
@@ -1187,6 +1592,13 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
         "verification-result.v1.schema.json",
     }
     assert {path.name for path in tmp_path.iterdir()} == expected
+
+
+def test_checked_in_schemas_match_exported_models(tmp_path: Path) -> None:
+    export_schemas(tmp_path)
+    checked_in = ROOT / "schemas"
+    for exported in sorted(tmp_path.iterdir()):
+        assert (checked_in / exported.name).read_text(encoding="utf-8") == exported.read_text(encoding="utf-8")
 
 
 def test_generated_reports_validate_against_exported_schema(tmp_path: Path) -> None:

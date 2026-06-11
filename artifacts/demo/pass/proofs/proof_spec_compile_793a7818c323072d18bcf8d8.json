@@ -7,5 +7,10 @@
   "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
   "assertions": [],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8",
-  "meta": {}
+  "meta": {
+    "compiler": "json",
+    "model": "",
+    "tool_schema_hash": "",
+    "degraded": "true"
+  }
 }

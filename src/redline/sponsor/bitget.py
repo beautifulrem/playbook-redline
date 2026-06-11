@@ -17,7 +17,7 @@ from typing import Callable, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from redline.canonical import hash_obj, sha256_bytes
+from redline.canonical import hash_obj, iter_canonical_files, sha256_bytes
 from redline.models import DecisionEnvelope, ReasonCode, Status
 
 
@@ -57,9 +57,15 @@ class SponsorAdapter(Protocol):
     def publish(self, *, draft_id: str, bump_type: str = "patch") -> SponsorStepResult: ...
 
 
-def assert_local_pass(envelope: DecisionEnvelope, call_site: str) -> None:
+def assert_local_pass(envelope: DecisionEnvelope, call_site: str) -> SponsorStepResult | None:
     if envelope.status != Status.PASS:
-        raise RuntimeError(f"{ReasonCode.SPONSOR_READBACK_MISMATCH.value}: {call_site} requires local pass")
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.LOCAL_PASS_REQUIRED,
+            evidence={"call_site": call_site, "status": envelope.status.value},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    return None
 
 
 class SponsorReadbackEvidence(BaseModel):
@@ -128,6 +134,94 @@ def validate_sponsor_evidence_shape(path: Path) -> SponsorStepResult:
             "transcript_hash": evidence.transcript_hash,
         },
         reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+    )
+
+
+def verify_sponsor_readback_evidence(*, evidence_path: Path, adapter: SponsorAdapter) -> SponsorStepResult:
+    try:
+        evidence = SponsorReadbackEvidence.model_validate(json.loads(evidence_path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, ValidationError):
+        return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.SCHEMA_INVALID)
+    result = adapter.poll(run_id=evidence.run_id)
+    if not result.ok:
+        return result
+    observed = result.evidence
+    if observed.get("status") != "completed":
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"run_id": evidence.run_id, "status": observed.get("status", "")},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if observed.get("version_id") != evidence.expected_version_id:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"run_id": evidence.run_id, "version_id": observed.get("version_id", ""), "expected_version_id": evidence.expected_version_id},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if observed.get("metrics_output_hash") != evidence.expected_metrics_output_hash:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={
+                "run_id": evidence.run_id,
+                "metrics_output_hash": observed.get("metrics_output_hash", ""),
+                "expected_metrics_output_hash": evidence.expected_metrics_output_hash,
+            },
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if observed.get("run_id") not in {None, evidence.run_id}:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"run_id": observed.get("run_id", ""), "expected_run_id": evidence.run_id},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if getattr(adapter, "proof_eligible", False) and (
+        observed.get("package_hash") != evidence.package_hash
+        or observed.get("package_archive_hash") != evidence.package_archive_hash
+    ):
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={
+                "run_id": evidence.run_id,
+                "package_hash": observed.get("package_hash", ""),
+                "expected_package_hash": evidence.package_hash,
+                "package_archive_hash": observed.get("package_archive_hash", ""),
+                "expected_package_archive_hash": evidence.package_archive_hash,
+            },
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if not getattr(adapter, "proof_eligible", False):
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.RECORDED_ATTESTATION_VALID,
+            evidence={
+                "run_id": evidence.run_id,
+                "version_id": evidence.expected_version_id,
+                "metrics_output_hash": evidence.expected_metrics_output_hash,
+                "source_kind": observed.get("source_kind", evidence.source_kind),
+                "proof_eligible": "false",
+                "transcript_hash": observed.get("transcript_hash", evidence.transcript_hash),
+            },
+            reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+        )
+    return SponsorStepResult(
+        ok=True,
+        state=SponsorState.READBACK_VERIFIED,
+        evidence={
+            "run_id": evidence.run_id,
+            "version_id": evidence.expected_version_id,
+            "metrics_output_hash": evidence.expected_metrics_output_hash,
+            "package_hash": evidence.package_hash,
+            "package_archive_hash": evidence.package_archive_hash,
+            "source_kind": "live",
+            "proof_eligible": "true",
+            "checked_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "transcript_hash": observed.get("transcript_hash", evidence.transcript_hash),
+        },
     )
 
 
@@ -216,7 +310,9 @@ class BitgetSponsorAdapter:
         package_archive: Path,
         idempotency_key: str | None = None,
     ) -> SponsorStepResult:
-        assert_local_pass(envelope, "upload")
+        pass_error = assert_local_pass(envelope, "upload")
+        if pass_error is not None:
+            return pass_error
         package_archive_hash = sha256_bytes(package_archive.read_bytes())
         self._expected_package_hash = package_hash
         self._expected_package_archive_hash = package_archive_hash
@@ -256,6 +352,8 @@ class BitgetSponsorAdapter:
         if response_package_hash is not None and response_package_hash != package_hash:
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
         if response_archive_hash is not None and response_archive_hash != package_archive_hash:
+            return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
+        if self.proof_eligible and (response_package_hash != package_hash or response_archive_hash != package_archive_hash):
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
         return result
 
@@ -317,6 +415,20 @@ class BitgetSponsorAdapter:
                 ok=False,
                 state=SponsorState.MISMATCH,
                 evidence={**result.evidence, "expected_package_hash": expected_package_hash or "", "expected_package_archive_hash": expected_package_archive_hash or ""},
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
+        if self.proof_eligible and (
+            result.evidence.get("package_hash") != expected_package_hash
+            or result.evidence.get("package_archive_hash") != expected_package_archive_hash
+        ):
+            return SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    **result.evidence,
+                    "expected_package_hash": expected_package_hash,
+                    "expected_package_archive_hash": expected_package_archive_hash,
+                },
                 reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
             )
         evidence = {
@@ -478,17 +590,32 @@ class BitgetSponsorAdapter:
 
 
 def make_package_archive(*, package_dir: Path, out_path: Path) -> Path:
+    return _write_package_archive(package_dir=package_dir, out_path=out_path, annotation_path=None)
+
+
+def make_annotated_package_archive(*, package_dir: Path, annotation_path: Path, out_path: Path) -> Path:
+    return _write_package_archive(package_dir=package_dir, out_path=out_path, annotation_path=annotation_path)
+
+
+def _write_package_archive(*, package_dir: Path, out_path: Path, annotation_path: Path | None) -> Path:
     root = package_dir.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:
             with tarfile.open(fileobj=gz, mode="w") as tar:
-                for file_path in sorted(path for path in root.rglob("*") if path.is_file()):
-                    rel = file_path.relative_to(root).as_posix()
-                    if rel.startswith(".redline/") or "__pycache__" in file_path.parts or file_path.name.endswith((".pyc", ".pyo")):
-                        continue
+                for rel, file_path in iter_canonical_files(root):
                     data = file_path.read_bytes()
                     info = tarfile.TarInfo(rel)
+                    info.size = len(data)
+                    info.mtime = 0
+                    info.uid = 0
+                    info.gid = 0
+                    info.uname = ""
+                    info.gname = ""
+                    tar.addfile(info, io.BytesIO(data))
+                if annotation_path is not None:
+                    data = annotation_path.read_bytes()
+                    info = tarfile.TarInfo(".redline/redline-annotation.json")
                     info.size = len(data)
                     info.mtime = 0
                     info.uid = 0

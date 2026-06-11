@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import json
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -26,7 +25,9 @@ from redline.models import (
     VerificationLevel,
     VerificationStatus,
 )
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive
+from redline.canonical import sha256_bytes
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_annotated_package_archive, make_package_archive
+from redline.spec_compiler import LLMTransport, compile_text_spec
 from redline.verifier import load_receipt, verify
 
 
@@ -40,12 +41,28 @@ def import_package(path: Path) -> PackageImportResult:
     return PackageImportResult(path=str(root), identity_hash=hash_tree(root), files=files)
 
 
-def compile_spec(source_path: Path) -> RedlineSpec:
+def compile_spec(
+    source_path: Path,
+    *,
+    use_qwen: bool = False,
+    qwen_model: str | None = None,
+    qwen_base_url: str | None = None,
+    qwen_api_key: str | None = None,
+    qwen_transport: LLMTransport | None = None,
+) -> RedlineSpec:
     text = source_path.read_text(encoding="utf-8")
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
-        return _compile_text_spec(text, source_path=source_path)
+        return compile_text_spec(
+            text=text,
+            source_path=source_path,
+            use_qwen=use_qwen,
+            model=qwen_model,
+            base_url=qwen_base_url,
+            api_key=qwen_api_key,
+            transport=qwen_transport,
+        )
     return RedlineSpec.model_validate(payload)
 
 
@@ -204,11 +221,14 @@ def publish_preflight(
     annotation = annotation.model_copy(update={"annotation_hash": annotation_hash})
     annotation_path = out_dir / "redline-annotation.json"
     annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    package_archive = make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_dir / "annotated-package.tar.gz")
+    package_archive_hash = sha256_bytes(package_archive.read_bytes())
     return PublishPreflightResult(
         ok=True,
         state="DEMO_ANNOTATION_READY" if annotation.annotation_kind == "demo-preview" else "ANNOTATED_PACKAGE_READY",
         receipt_hash=result.receipt_hash,
         package_hash=package_hash,
+        package_archive_hash=package_archive_hash,
         report_hash=receipt.report.report_hash,
         ledger_hash=checkpoint.ledger_hash,
         ledger_checkpoint_hash=checkpoint.checkpoint_hash,
@@ -227,6 +247,7 @@ def verify_annotation(
     ledger_checkpoint_path: Path | None = None,
     ledger_attestation_path: Path | None = None,
     trust_policy_path: Path | None = None,
+    allow_demo_preview: bool = False,
 ) -> PublishPreflightResult:
     try:
         annotation = PackageAnnotation.model_validate(json.loads(annotation_path.read_text(encoding="utf-8")))
@@ -261,6 +282,18 @@ def verify_annotation(
         annotation.ledger_attestation_hash is None or annotation.trust_policy_id is None or annotation.trusted_ledger_key_id is None
     ):
         return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
+    if annotation.annotation_kind == "demo-preview" and not allow_demo_preview:
+        return PublishPreflightResult(
+            ok=False,
+            state="DEMO_ANNOTATION_REQUIRES_ALLOW_FLAG",
+            receipt_hash=annotation.receipt_hash,
+            package_hash=annotation.package_hash,
+            report_hash=annotation.report_hash,
+            ledger_hash=annotation.ledger_hash,
+            ledger_checkpoint_hash=annotation.ledger_checkpoint_hash,
+            annotation_hash=annotation.annotation_hash,
+            reason_code=ReasonCode.BASELINE_GENESIS,
+        )
     if annotation.ledger_attestation_hash is not None:
         if ledger_attestation_path is None or trust_policy_path is None:
             return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
@@ -304,7 +337,10 @@ def execute_sponsor_readback(
         coverage=receipt.coverage,
         capabilities=receipt.capabilities,
     )
-    archive = make_package_archive(package_dir=package, out_path=out_dir / "package.tar.gz")
+    annotation_path = out_dir / "redline-annotation.json"
+    if not annotation_path.exists():
+        return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.DATA_MISSING)
+    archive = make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_dir / "annotated-package.tar.gz")
     adapter = BitgetSponsorAdapter(access_key=access_key, secret_key=secret_key, passphrase=passphrase, transcript_path=out_dir / "sponsor-transcript.jsonl")
     upload = adapter.upload(envelope=envelope, package_hash=receipt.package.identity_hash, package_archive=archive)
     if not upload.ok:
@@ -404,38 +440,6 @@ def render_report_html(
 """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html_doc, encoding="utf-8")
-
-
-def _compile_text_spec(text: str, *, source_path: Path) -> RedlineSpec:
-    max_drawdown = _decimalish(_find_first(text, r"(?:max(?:imum)?[-_\s]*)?drawdown[^0-9.]*([0-9]+(?:\.[0-9]+)?%?)"), default="0.08")
-    max_trades = _decimalish(_find_first(text, r"(?:trade(?:s)?|turnover)[^0-9.]*([0-9]+(?:\.[0-9]+)?)"), default="20")
-    before_bar = _find_first(text, r"(?:no[-_\s]*entry|avoid[-_\s]*entry)[^0-9]*(?:bar)?[^0-9]*([0-9]+)") or "3"
-    return RedlineSpec(
-        spec_id=f"compiled-{source_path.stem}",
-        compiler="json-fallback",
-        probes=[
-            ProbeSpec(id="drawdown_limit", type=ProbeType.MAX_DRAWDOWN, params={"max_drawdown": max_drawdown}),
-            ProbeSpec(
-                id="no_entry_when_crash",
-                type=ProbeType.NO_ENTRY_WHEN,
-                params={"scenario_id": "btc-crash-2024-03-05", "before_bar": before_bar, "max_abs_position": "0"},
-            ),
-            ProbeSpec(id="trade_budget", type=ProbeType.TRADE_BUDGET, params={"max_trades": max_trades}),
-        ],
-    )
-
-
-def _find_first(text: str, pattern: str) -> str | None:
-    match = re.search(pattern, text, flags=re.IGNORECASE)
-    return match.group(1) if match else None
-
-
-def _decimalish(value: str | None, *, default: str) -> str:
-    if value is None:
-        return default
-    if value.endswith("%"):
-        return str(float(value[:-1]) / 100)
-    return value
 
 
 def _load_checkpoint(path: Path) -> LedgerCheckpoint | None:

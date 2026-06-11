@@ -48,6 +48,18 @@
       "title": "Compiler",
       "type": "string"
     },
+    "declared_intent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Declared Intent"
+    },
     "model": {
       "anyOf": [
         {
