@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from decimal import Decimal, InvalidOperation
@@ -125,7 +126,7 @@ def _qwen_spec_is_semantically_sane(spec: RedlineSpec) -> bool:
             if value is None or value < 0 or value != value.to_integral_value() or value > Decimal("1000"):
                 return False
         elif probe.type == ProbeType.NO_ENTRY_WHEN:
-            before_bar = _decimal_param(probe.params, "before_bar" if "before_bar" in probe.params else "bar_lt")
+            before_bar = _integer_param(probe.params, "before_bar" if "before_bar" in probe.params else "bar_lt")
             max_abs_position = _decimal_param(probe.params, "max_abs_position")
             if before_bar is None or before_bar < 0 or before_bar != before_bar.to_integral_value() or before_bar > Decimal("100000"):
                 return False
@@ -156,6 +157,13 @@ def _decimal_param(params: dict[str, str], key: str) -> Decimal | None:
     except (KeyError, InvalidOperation):
         return None
     return value if value.is_finite() else None
+
+
+def _integer_param(params: dict[str, str], key: str) -> Decimal | None:
+    raw = params.get(key)
+    if raw is None or re.fullmatch(r"[0-9]+", raw) is None:
+        return None
+    return Decimal(raw)
 
 
 def _compile_text_spec(text: str, *, source_path: Path) -> RedlineSpec:

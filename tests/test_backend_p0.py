@@ -814,6 +814,16 @@ def test_probe_parameter_semantics_are_schema_invalid(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         load_spec(bad_alias_spec)
 
+    spec_data = json.loads(SPEC.read_text())
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"].pop("before_bar", None)
+            probe["params"]["bar_lt"] = "3.0"
+    bad_decimal_alias_spec = tmp_path / "bad-decimal-alias-spec.json"
+    bad_decimal_alias_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(bad_decimal_alias_spec)
+
     text_spec = tmp_path / "unsafe-redline.txt"
     text_spec.write_text("Max drawdown <= 999%; no entry before bar 3; trade budget 20.", encoding="utf-8")
     with pytest.raises(ValidationError):
@@ -1693,6 +1703,27 @@ def test_qwen_compile_accepts_no_entry_bar_lt_alias(tmp_path: Path) -> None:
     assert compiled.compiler == "qwen"
     assert compiled.degraded_reason is None
     assert compiled.probes[1].params["bar_lt"] == "4"
+
+
+def test_qwen_compile_discards_decimal_bar_lt_alias(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        content = {
+            "version": "redline.spec.v2.1",
+            "spec_id": "qwen-compiled",
+            "probes": [
+                {"id": "drawdown_limit", "type": "max_drawdown", "params": {"max_drawdown": "0.07"}, "block": True},
+                {"id": "no_entry_when_crash", "type": "no_entry_when", "params": {"scenario_id": "btc-crash-2024-03-05", "bar_lt": "3.0", "max_abs_position": "0"}, "block": True},
+                {"id": "trade_budget", "type": "trade_budget", "params": {"max_trades": "12"}, "block": True},
+            ],
+        }
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps(content)}}]}).encode()
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    assert compiled.compiler == "json-fallback"
+    assert compiled.degraded_reason == "qwen_semantic_sanity_failed"
 
 
 def test_qwen_compile_discards_invalid_model_output(tmp_path: Path) -> None:
