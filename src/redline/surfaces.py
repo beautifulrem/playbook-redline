@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import html
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_file, hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.models import (
     ChainStatus,
     DecisionEnvelope,
@@ -24,6 +25,7 @@ from redline.models import (
     ReasonCode,
     RedlineSpec,
     ReportJson,
+    Status,
     VerificationLevel,
     VerificationStatus,
 )
@@ -119,6 +121,15 @@ def publish_preflight(
     report_path = report_path or receipt_path.parent / "report.json"
     ledger_checkpoint_path = ledger_checkpoint_path or receipt_path.parent / "issuance-ledger.checkpoint.json"
     ledger_attestation_path = ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json"
+    if out_dir.resolve() == package.resolve() or package.resolve() in out_dir.resolve().parents:
+        return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INSIDE_PACKAGE", reason_code=ReasonCode.RECEIPT_BINDING_FAILED)
+    try:
+        package_hash = hash_tree(package)
+    except FileNotFoundError:
+        return PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=ReasonCode.FILE_NOT_FOUND)
+    except (NotADirectoryError, CanonicalizationError) as exc:
+        reason = exc.reason_code if isinstance(exc, CanonicalizationError) else ReasonCode.FILE_NOT_FOUND
+        return PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=reason)
     result = verify(
         receipt_path=receipt_path,
         package=package,
@@ -132,7 +143,6 @@ def publish_preflight(
         baseline_receipt_path=baseline_receipt_path,
         level=VerificationLevel.REPLAYED,
     )
-    package_hash = hash_tree(package)
     if result.status != VerificationStatus.VERIFIED:
         if result.reason_code == ReasonCode.BASELINE_GENESIS and allow_demo_baseline_genesis:
             pass
@@ -278,6 +288,16 @@ def verify_annotation(
             receipt = load_receipt(receipt_path)
         except Exception:
             return PublishPreflightResult(ok=False, state="RECEIPT_INVALID", reason_code=ReasonCode.PARSE_ERROR)
+        verification = verify(
+            receipt_path=receipt_path,
+            report_path=report_path,
+            ledger_checkpoint_path=ledger_checkpoint_path,
+            ledger_attestation_path=ledger_attestation_path,
+            trust_policy_path=trust_policy_path,
+            level=VerificationLevel.HASH_ONLY,
+        )
+        if verification.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}:
+            return PublishPreflightResult(ok=False, state="ANNOTATION_RECEIPT_INVALID", reason_code=verification.reason_code)
         if annotation.receipt_hash != receipt.receipt_hash or annotation.report_hash != receipt.report.report_hash:
             return PublishPreflightResult(ok=False, state="ANNOTATION_BINDING_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
     if package is not None and annotation.package_hash != hash_tree(package):
@@ -292,6 +312,23 @@ def verify_annotation(
         annotation.ledger_attestation_hash is None or annotation.trust_policy_id is None or annotation.trusted_ledger_key_id is None
     ):
         return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
+    publish_receipt_not_pass = (
+        receipt.result.status != Status.PASS
+        or receipt.decision.reason_code != ReasonCode.PASS
+        or receipt.baseline.chain_status != ChainStatus.CHAINED
+    )
+    if annotation.annotation_kind == "publish-preflight" and publish_receipt_not_pass:
+        return PublishPreflightResult(
+            ok=False,
+            state="ANNOTATION_LOCAL_PASS_REQUIRED",
+            receipt_hash=annotation.receipt_hash,
+            package_hash=annotation.package_hash,
+            report_hash=annotation.report_hash,
+            ledger_hash=annotation.ledger_hash,
+            ledger_checkpoint_hash=annotation.ledger_checkpoint_hash,
+            annotation_hash=annotation.annotation_hash,
+            reason_code=receipt.decision.reason_code,
+        )
     if annotation.annotation_kind == "demo-preview" and not allow_demo_preview:
         return PublishPreflightResult(
             ok=False,
@@ -304,6 +341,13 @@ def verify_annotation(
             annotation_hash=annotation.annotation_hash,
             reason_code=ReasonCode.BASELINE_GENESIS,
         )
+    demo_receipt_mismatch = (
+        receipt.result.status != Status.PASS
+        or receipt.decision.reason_code != ReasonCode.BASELINE_GENESIS
+        or receipt.baseline.chain_status != ChainStatus.GENESIS
+    )
+    if annotation.annotation_kind == "demo-preview" and demo_receipt_mismatch:
+        return PublishPreflightResult(ok=False, state="ANNOTATION_DEMO_PREVIEW_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
     if annotation.ledger_attestation_hash is not None:
         if ledger_attestation_path is None or trust_policy_path is None:
             return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
@@ -336,6 +380,8 @@ def execute_sponsor_readback(
     secret_key: str,
     passphrase: str,
     final_publish: bool = False,
+    ledger_attestation_path: Path | None = None,
+    trust_policy_path: Path | None = None,
 ) -> SponsorStepResult:
     receipt = load_receipt(receipt_path)
     envelope = DecisionEnvelope(
@@ -360,6 +406,25 @@ def execute_sponsor_readback(
     annotation_path = out_dir / "redline-annotation.json"
     if not annotation_path.exists():
         return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.DATA_MISSING)
+    trust_policy_path = trust_policy_path or (
+        Path(os.environ["REDLINE_TRUST_POLICY"]) if os.environ.get("REDLINE_TRUST_POLICY") else None
+    )
+    annotation_result = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=receipt_path,
+        package=package,
+        report_path=receipt_path.parent / "report.json",
+        ledger_checkpoint_path=receipt_path.parent / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json",
+        trust_policy_path=trust_policy_path,
+    )
+    if not annotation_result.ok:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.LOCAL_PASS_REQUIRED,
+            evidence={"annotation_state": annotation_result.state},
+            reason_code=annotation_result.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
     archive = make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_dir / "annotated-package.tar.gz")
     adapter = BitgetSponsorAdapter(access_key=access_key, secret_key=secret_key, passphrase=passphrase, transcript_path=out_dir / "sponsor-transcript.jsonl")
     upload = adapter.upload(envelope=envelope, package_hash=receipt.package.identity_hash, package_archive=archive)

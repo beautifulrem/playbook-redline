@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 from typer.testing import CliRunner
 
 import redline.surfaces as surfaces_module
+import redline.receipt as receipt_module
 
 from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree
 from redline.cli import app
@@ -19,6 +20,7 @@ from redline.models import (
     CoverageManifest,
     DecisionContext,
     LedgerCheckpoint,
+    PackageAnnotation,
     ProbeOutcome,
     ProbeResult,
     ProbeType,
@@ -246,6 +248,29 @@ def test_candidate_entropy_source_is_sandbox_violation(tmp_path: Path) -> None:
         package_dir=package,
         baseline="baseline",
         candidate="candidate_random",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+
+
+def test_candidate_builtins_eval_bypass_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_eval_bypass")
+    (package / "candidate_eval_bypass" / "strategy.py").write_text(
+        "import builtins\n\n"
+        "def signal(bar, state, config):\n"
+        "    return builtins.__dict__['eval']('0')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_eval_bypass",
         suite_path=SUITE,
         spec_path=SPEC,
         out_dir=tmp_path / "run",
@@ -1051,6 +1076,56 @@ def test_import_compile_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None
     assert payload["schema_version"] == "redline.cli.error.v1"
     assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
 
+    symlink_package = tmp_path / "symlink-package"
+    shutil.copytree(PACKAGE, symlink_package)
+    (symlink_package / "external-link.txt").symlink_to("/etc/passwd")
+    symlink_import = runner.invoke(app, ["import", str(symlink_package), "--json"])
+    assert symlink_import.exit_code == 4
+    payload = json.loads(symlink_import.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+
+    missing_check_package = runner.invoke(
+        app,
+        [
+            "check",
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--package",
+            str(tmp_path / "missing-package"),
+            "--rerun",
+            "--json",
+        ],
+    )
+    assert missing_check_package.exit_code == 2
+    payload = json.loads(missing_check_package.stdout)
+    assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
+    missing_prompt = runner.invoke(app, ["capture-edit", "--prompt-log", str(tmp_path / "missing-prompt.txt"), "--json"])
+    assert missing_prompt.exit_code == 2
+    payload = json.loads(missing_prompt.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
+    prompt_log = tmp_path / "prompt.txt"
+    prompt_log.write_text("make it safer", encoding="utf-8")
+    missing_edit_role = runner.invoke(
+        app,
+        [
+            "capture-edit",
+            "--prompt-log",
+            str(prompt_log),
+            "--baseline",
+            str(tmp_path / "missing-baseline"),
+            "--candidate",
+            str(tmp_path / "missing-candidate"),
+            "--json",
+        ],
+    )
+    assert missing_edit_role.exit_code == 2
+    payload = json.loads(missing_edit_role.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
 
 def test_mcp_bad_inputs_return_specific_reason_codes(tmp_path: Path) -> None:
     imported = redline_import_playbook(str(tmp_path / "missing-package"))
@@ -1448,6 +1523,48 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     assert unpinned_policy_publish.state == "TRUST_POLICY_REQUIRED"
 
 
+def test_verify_annotation_rejects_withheld_publish_annotation(tmp_path: Path) -> None:
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="annotation-policy", key_id="annotation-key", public_key=public_key, issuer="annotation-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    withheld = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "withheld")
+    assert withheld.receipt is not None
+    attestation = _sign_run_checkpoint(tmp_path / "withheld", private_key, policy_id="annotation-policy", key_id="annotation-key", issuer="annotation-ci")
+    checkpoint = LedgerCheckpoint.model_validate(json.loads((tmp_path / "withheld" / "issuance-ledger.checkpoint.json").read_text()))
+    annotation = PackageAnnotation(
+        annotation_kind="publish-preflight",
+        receipt_path=str(tmp_path / "withheld" / "receipt.json"),
+        receipt_hash=withheld.receipt.receipt_hash,
+        report_hash=withheld.receipt.report.report_hash,
+        package_hash=hash_tree(PACKAGE),
+        ledger_hash=checkpoint.ledger_hash,
+        ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+        ledger_attestation_hash=attestation.attestation_hash,
+        strength_summary=withheld.receipt.strength_summary,
+        chain_status=withheld.receipt.baseline.chain_status,
+        verification_level=VerificationLevel.REPLAYED,
+        trust_policy_id=attestation.trust_policy_id,
+        trusted_ledger_key_id=attestation.key_id,
+        annotation_hash="",
+    )
+    annotation = annotation.model_copy(update={"annotation_hash": hash_obj(annotation)})
+    annotation_path = tmp_path / "forged-publish-annotation.json"
+    annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    result = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "withheld" / "receipt.json",
+        package=PACKAGE,
+        report_path=tmp_path / "withheld" / "report.json",
+        ledger_checkpoint_path=tmp_path / "withheld" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=tmp_path / "withheld" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+    )
+    assert result.ok is False
+    assert result.state == "ANNOTATION_LOCAL_PASS_REQUIRED"
+    assert result.reason_code == ReasonCode.NEW_BLOCK_BREACH
+
+
 def test_signed_checkpoint_rejects_wrong_public_key(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -1572,6 +1689,51 @@ def test_publish_execute_forbids_demo_baseline(tmp_path: Path) -> None:
     assert stdout["state"] == "DEMO_EXECUTE_FORBIDDEN"
 
 
+def test_publish_rejects_output_inside_package_and_symlink_package(tmp_path: Path) -> None:
+    runner = CliRunner()
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    inside_out = package / "publish"
+    inside = runner.invoke(
+        app,
+        [
+            "publish",
+            str(package),
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--out",
+            str(inside_out),
+            "--allow-demo-baseline-genesis",
+            "--json",
+        ],
+    )
+    assert inside.exit_code == 4
+    payload = json.loads(inside.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "OUTPUT_PATH_INSIDE_PACKAGE"
+    assert not inside_out.exists()
+
+    symlink_package = tmp_path / "symlink-package"
+    shutil.copytree(PACKAGE, symlink_package)
+    (symlink_package / "external-link.txt").symlink_to("/etc/passwd")
+    symlinked = runner.invoke(
+        app,
+        [
+            "publish",
+            str(symlink_package),
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--out",
+            str(tmp_path / "publish"),
+            "--allow-demo-baseline-genesis",
+            "--json",
+        ],
+    )
+    assert symlinked.exit_code == 4
+    payload = json.loads(symlinked.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "PACKAGE_INVALID"
+    assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+
+
 def test_make_demo_refuses_broad_or_unowned_output_paths(tmp_path: Path) -> None:
     runner = CliRunner()
     root_result = runner.invoke(app, ["make-demo", "--out", "."])
@@ -1596,9 +1758,38 @@ def test_make_demo_rejects_bad_package_without_receipts(tmp_path: Path) -> None:
     assert not (out_dir / "withheld" / "receipt.json").exists()
 
 
+def test_make_demo_allows_standard_tmp_path(tmp_path: Path) -> None:
+    runner = CliRunner()
+    out_dir = Path("/tmp") / f"redline-demo-{tmp_path.name}"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    try:
+        result = runner.invoke(app, ["make-demo", "--out", str(out_dir)])
+        assert result.exit_code == 0
+        assert (out_dir / "pass" / "receipt.json").exists()
+        assert (out_dir / "withheld" / "receipt.json").exists()
+    finally:
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
+
+
+def test_run_rejects_package_role_escape_without_receipt(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(PACKAGE / "candidate_good", tmp_path / "outside_candidate")
+    out_dir = tmp_path / "escaped-run"
+    result = CliRunner().invoke(app, ["run", str(package), "--candidate", "../outside_candidate", "--out", str(out_dir), "--json"])
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.DATA_MISSING.value
+    assert not (out_dir / "receipt.json").exists()
+
+
 def test_make_demo_rebuild_is_stable(tmp_path: Path) -> None:
     runner = CliRunner()
     out_dir = tmp_path / "demo"
+    other_out_dir = tmp_path / "demo-copy"
     first = runner.invoke(app, ["make-demo", "--out", str(out_dir)])
     assert first.exit_code == 0
     first_snapshot = {str(path.relative_to(out_dir)): path.read_bytes() for path in sorted(out_dir.rglob("*")) if path.is_file()}
@@ -1606,6 +1797,10 @@ def test_make_demo_rebuild_is_stable(tmp_path: Path) -> None:
     assert second.exit_code == 0
     second_snapshot = {str(path.relative_to(out_dir)): path.read_bytes() for path in sorted(out_dir.rglob("*")) if path.is_file()}
     assert second_snapshot == first_snapshot
+    third = runner.invoke(app, ["make-demo", "--out", str(other_out_dir)])
+    assert third.exit_code == 0
+    third_snapshot = {str(path.relative_to(other_out_dir)): path.read_bytes() for path in sorted(other_out_dir.rglob("*")) if path.is_file()}
+    assert third_snapshot == first_snapshot
 
 
 def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> None:
@@ -1935,6 +2130,8 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
         access_key="access",
         secret_key="secret",
         passphrase="pass",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
     )
     assert observed_expected_hashes == [artifacts.receipt.result.result_hash]
     assert result.ok is False
@@ -1944,6 +2141,65 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     proof = json.loads(sponsor_proofs[0].read_text())
     assert proof["kind"] == ProofKind.SPONSOR_READBACK.value
     assert proof["meta"]["receipt_hash"] == artifacts.receipt.receipt_hash
+
+
+def test_execute_sponsor_readback_rejects_tampered_receipt_before_adapter(monkeypatch, tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="sponsor-policy", key_id="sponsor-key", public_key=public_key, issuer="sponsor-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
+    assert baseline.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert artifacts.receipt is not None
+    _sign_run_checkpoint(tmp_path / "run", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    publish = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert publish.ok is True
+
+    class AdapterMustNotRun:
+        def __init__(self, **kwargs: object) -> None:
+            raise AssertionError("tampered receipt must be rejected before adapter creation")
+
+    monkeypatch.setattr(surfaces_module, "BitgetSponsorAdapter", AdapterMustNotRun)
+    tampered = json.loads((tmp_path / "run" / "receipt.json").read_text())
+    tampered["package"]["identity_hash"] = "sha256:" + "0" * 64
+    tampered["receipt_hash"] = "sha256:" + "0" * 64
+    (tmp_path / "run" / "receipt.json").write_text(json.dumps(tampered), encoding="utf-8")
+    result = execute_sponsor_readback(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        out_dir=tmp_path / "publish",
+        access_key="access",
+        secret_key="secret",
+        passphrase="pass",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+    )
+    assert result.ok is False
+    assert result.state == SponsorState.LOCAL_PASS_REQUIRED
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
 def test_execute_sponsor_readback_rejects_genesis_before_adapter(monkeypatch, tmp_path: Path) -> None:
@@ -2118,6 +2374,24 @@ def test_proof_reproduce_commands_are_valid_shape(tmp_path: Path) -> None:
         assert proof.reproduce is not None
         assert proof.reproduce.startswith("uv run redline verify-proof receipt.json --proof-id ")
         assert "--package <package> --suite <suite> --spec <spec>" in proof.reproduce
+
+
+def test_receipt_write_removes_receipt_when_ledger_write_fails(monkeypatch, tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
+    assert artifacts.receipt is not None
+
+    def fail_append(*args, **kwargs):
+        raise OSError("simulated ledger write failure")
+
+    monkeypatch.setattr(receipt_module, "_append_ledger", fail_append)
+    receipt_path = tmp_path / "receipt.json"
+    try:
+        atomic_write_receipt(receipt_path, artifacts.receipt, ledger_path=tmp_path / "issuance-ledger.jsonl")
+    except OSError:
+        pass
+    else:
+        raise AssertionError("ledger write failure must propagate")
+    assert not receipt_path.exists()
 
 
 def test_anti_reroll_ledger_rejects_conflicting_status(tmp_path: Path) -> None:

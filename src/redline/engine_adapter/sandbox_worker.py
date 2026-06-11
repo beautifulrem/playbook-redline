@@ -19,8 +19,21 @@ from redline.models import Bar, ReasonCode
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
 _FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
-_FORBIDDEN_STATIC_MODULES = {"os", *_FORBIDDEN_ENTROPY_MODULES}
-_FORBIDDEN_DYNAMIC_CALLS = {"__import__", "compile", "eval", "exec", "getattr"}
+_FORBIDDEN_STATIC_MODULES = {"builtins", "os", *_FORBIDDEN_ENTROPY_MODULES}
+_FORBIDDEN_DYNAMIC_CALLS = {
+    "__import__",
+    "compile",
+    "delattr",
+    "dir",
+    "eval",
+    "exec",
+    "getattr",
+    "globals",
+    "locals",
+    "setattr",
+    "type",
+    "vars",
+}
 _FORBIDDEN_FILE_READ_CALLS = {"open", "read_bytes", "read_text"}
 _FORBIDDEN_ENTROPY_ATTRS = {
     "choice",
@@ -140,6 +153,10 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:file-read-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
+            if isinstance(node.func, ast.Subscript):
+                raise RuntimeError(f"{reason}:dynamic-subscript-call")
+        elif isinstance(node, ast.Attribute) and node.attr.startswith("__") and node.attr.endswith("__"):
+            raise RuntimeError(f"{reason}:dynamic-dunder-{node.attr}")
         elif isinstance(node, ast.Name) and node.id == "__builtins__":
             raise RuntimeError(f"{reason}:dynamic-builtins")
 

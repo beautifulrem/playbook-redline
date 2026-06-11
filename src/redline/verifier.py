@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_file, hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.models import (
     DecisionEnvelope,
     LedgerCheckpoint,
@@ -161,6 +161,8 @@ def verify(
             )
         try:
             package_hash = hash_tree(package)
+        except CanonicalizationError as exc:
+            return _reject(receipt, exc.reason_code, level)
         except (OSError, ValueError):
             return _bad(ReasonCode.FILE_NOT_FOUND, level)
         if package_hash != receipt.package.identity_hash:

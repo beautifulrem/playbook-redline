@@ -152,6 +152,7 @@ def atomic_write_receipt(
     ledger_path: Path | None = None,
     checkpoint_path: Path | None = None,
     ledger_written_at: str | None = None,
+    ledger_path_label: str | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if ledger_path is not None:
@@ -165,12 +166,17 @@ def atomic_write_receipt(
         os.fsync(fh.fileno())
     os.replace(tmp, path)
     if ledger_path is not None:
-        _append_ledger(ledger_path, receipt, written_at=ledger_written_at)
-        create_ledger_checkpoint(
-            ledger_path=ledger_path,
-            checkpoint_path=checkpoint_path,
-            subject_receipt_hashes=[receipt.receipt_hash],
-        )
+        try:
+            _append_ledger(ledger_path, receipt, written_at=ledger_written_at)
+            create_ledger_checkpoint(
+                ledger_path=ledger_path,
+                checkpoint_path=checkpoint_path,
+                subject_receipt_hashes=[receipt.receipt_hash],
+                ledger_path_label=ledger_path_label,
+            )
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
 
 
 def create_ledger_checkpoint(
@@ -179,12 +185,13 @@ def create_ledger_checkpoint(
     checkpoint_path: Path | None = None,
     subject_receipt_hashes: list[str] | None = None,
     anchor_kind: Literal["local-artifact", "external-trust-root"] = "local-artifact",
+    ledger_path_label: str | None = None,
 ) -> LedgerCheckpoint:
     entries = _read_ledger_entries(ledger_path)
     ledger_tail_hash = entries[-1]["entry_hash"] if entries else "sha256:genesis"
     ledger_receipt_hashes = [entry["receipt_hash"] for entry in entries if isinstance(entry.get("receipt_hash"), str)]
     checkpoint = LedgerCheckpoint(
-        ledger_path=str(ledger_path),
+        ledger_path=ledger_path_label or str(ledger_path),
         ledger_hash=hash_file(ledger_path),
         ledger_tail_hash=ledger_tail_hash,
         ledger_entry_count=len(entries),

@@ -83,6 +83,21 @@ def _scenario_file_metadata(path: Path) -> dict[str, object]:
     }
 
 
+def resolve_package_role_dir(package_dir: Path, role: str) -> Path:
+    package_root = package_dir.resolve()
+    role_path = Path(role)
+    if not role or role_path.is_absolute() or any(part in {"", ".", ".."} for part in role_path.parts):
+        raise ValueError(f"package role must stay under package root: {role}")
+    resolved = (package_root / role_path).resolve()
+    try:
+        resolved.relative_to(package_root)
+    except ValueError as exc:
+        raise ValueError(f"package role escapes package root: {role}") from exc
+    if not resolved.exists() or not resolved.is_dir():
+        raise ValueError(f"package role not found: {package_root / role_path}")
+    return resolved
+
+
 def run_redline(
     *,
     package_dir: Path,
@@ -97,12 +112,13 @@ def run_redline(
     baseline_version_id: str | None = None,
     candidate_version_id: str | None = None,
     ledger_written_at: str | None = None,
+    ledger_path_label: str | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
     suite_path = suite_path.resolve()
     spec_path = spec_path.resolve()
-    baseline_dir = package_dir / baseline
-    candidate_dir = package_dir / candidate
+    baseline_dir = resolve_package_role_dir(package_dir, baseline)
+    candidate_dir = resolve_package_role_dir(package_dir, candidate)
     spec = load_spec(spec_path)
     suite = load_suite(suite_path)
     spec_hash = hash_obj(spec)
@@ -332,11 +348,11 @@ def run_redline(
         report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
     artifacts = RunArtifacts(envelope=envelope, receipt=receipt, proofs=proofs, traces=traces, report_json=report_json, out_dir=out_dir)
     if out_dir is not None:
-        write_artifacts(artifacts, out_dir=out_dir, ledger_written_at=ledger_written_at)
+        write_artifacts(artifacts, out_dir=out_dir, ledger_written_at=ledger_written_at, ledger_path_label=ledger_path_label)
     return artifacts
 
 
-def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at: str | None = None) -> None:
+def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at: str | None = None, ledger_path_label: str | None = None) -> None:
     _clear_artifacts_dir(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "envelope.json").write_text(artifacts.envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
@@ -353,6 +369,7 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at
             ledger_path=out_dir / "issuance-ledger.jsonl",
             checkpoint_path=out_dir / "issuance-ledger.checkpoint.json",
             ledger_written_at=ledger_written_at,
+            ledger_path_label=ledger_path_label,
         )
 
 

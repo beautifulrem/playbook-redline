@@ -12,9 +12,9 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from redline.canonical import hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, hash_obj, hash_tree
 from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
-from redline.runner import load_spec, load_suite, run_redline
+from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.schemas import export_schemas as export_schema_files
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
@@ -112,6 +112,8 @@ def import_cmd(
         _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "package path not found", package)
     except NotADirectoryError:
         _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "package path is not a directory", package)
+    except CanonicalizationError as exc:
+        _exit_bad_input(exc.reason_code, json_out, str(exc), package)
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
@@ -159,14 +161,21 @@ def capture_edit_cmd(
     out: Path = typer.Option(Path("artifacts/edit-provenance.json"), "--out"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    provenance = capture_edit_provenance(
-        tool=tool,
-        prompt_log=prompt_log,
-        baseline=baseline,
-        candidate=candidate,
-        diff=diff,
-        locked_by=locked_by,
-    )
+    try:
+        provenance = capture_edit_provenance(
+            tool=tool,
+            prompt_log=prompt_log,
+            baseline=baseline,
+            candidate=candidate,
+            diff=diff,
+            locked_by=locked_by,
+        )
+    except FileNotFoundError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc.filename or exc}", out)
+    except NotADirectoryError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"path is not a directory: {exc.filename or exc}", out)
+    except CanonicalizationError as exc:
+        _exit_bad_input(exc.reason_code, json_out, str(exc), out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(provenance.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if json_out:
@@ -201,6 +210,7 @@ def make_demo(
         out_dir=out / "withheld",
         edit_provenance=_fixture_edit_provenance(package, "baseline", "candidate_bad"),
         ledger_written_at=FIXTURE_TIMESTAMP,
+        ledger_path_label="issuance-ledger.jsonl",
     )
     _assert_demo_case(bad, expected_status=Status.WITHHELD, expected_reason=ReasonCode.NEW_BLOCK_BREACH, case="candidate_bad")
     good = run_redline(
@@ -212,6 +222,7 @@ def make_demo(
         out_dir=out / "pass",
         edit_provenance=_fixture_edit_provenance(package, "baseline", "candidate_good"),
         ledger_written_at=FIXTURE_TIMESTAMP,
+        ledger_path_label="issuance-ledger.jsonl",
     )
     _assert_demo_case(good, expected_status=Status.PASS, expected_reason=ReasonCode.BASELINE_GENESIS, case="candidate_good")
     table = Table("case", "status", "reason", "receipt")
@@ -380,6 +391,8 @@ def publish(
                 secret_key=secret_key,
                 passphrase=passphrase,
                 final_publish=final_publish,
+                ledger_attestation_path=ledger_attestation,
+                trust_policy_path=trust_policy_path,
             )
             result = result.model_copy(
                 update={
@@ -390,8 +403,9 @@ def publish(
                 }
             )
     result_path = out / "publish-preflight.json"
-    out.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    if result.state != "OUTPUT_PATH_INSIDE_PACKAGE":
+        out.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
@@ -737,9 +751,7 @@ def _validate_run_inputs(*, package: Path, baseline: str, candidate: str, suite:
     if not package.exists() or not package.is_dir():
         raise ValueError(f"package not found: {package}")
     for role in [baseline, candidate]:
-        role_path = package / role
-        if not role_path.exists() or not role_path.is_dir():
-            raise ValueError(f"package role not found: {role_path}")
+        resolve_package_role_dir(package, role)
     load_suite(suite)
     load_spec(spec)
 
@@ -754,7 +766,12 @@ def _fixture_edit_provenance(package: Path, baseline: str, candidate: str) -> Ed
     return EditProvenance(
         tool="fixture",
         prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
-        diff_hash=hash_obj({"baseline": hash_tree(package / baseline), "candidate": hash_tree(package / candidate)}),
+        diff_hash=hash_obj(
+            {
+                "baseline": hash_tree(resolve_package_role_dir(package, baseline)),
+                "candidate": hash_tree(resolve_package_role_dir(package, candidate)),
+            }
+        ),
         locked_by="author",
         captured_at=FIXTURE_TIMESTAMP,
     )
@@ -764,10 +781,14 @@ def _prepare_demo_out(out: Path) -> None:
     resolved = out.resolve()
     cwd = Path.cwd().resolve()
     artifacts_root = (cwd / "artifacts").resolve()
-    temp_root = Path(tempfile.gettempdir()).resolve()
+    temp_roots = {
+        Path(tempfile.gettempdir()).resolve(),
+        Path("/tmp").resolve(),
+        Path("/private/tmp").resolve(),
+    }
     if resolved in {cwd, artifacts_root}:
         raise ValueError("output path is too broad")
-    if not (_is_relative_to(resolved, artifacts_root) or _is_relative_to(resolved, temp_root)):
+    if not (_is_relative_to(resolved, artifacts_root) or any(_is_relative_to(resolved, root) for root in temp_roots)):
         raise ValueError("output path must be under artifacts/ or the system temporary directory")
     marker = resolved / ".redline-demo-output"
     seeded_repo_demo = resolved == artifacts_root / "demo" and (resolved / "pass").is_dir() and (resolved / "withheld").is_dir()

@@ -78,7 +78,12 @@ def hash_file(path: Path) -> str:
 
 
 def hash_tree(path: Path) -> str:
-    entries = [{"path": rel, "hash": hash_file(file_path)} for rel, file_path in iter_canonical_files(path)]
+    root = path.resolve()
+    if not root.exists():
+        raise FileNotFoundError(root)
+    if not root.is_dir():
+        raise NotADirectoryError(root)
+    entries = [{"path": rel, "hash": hash_file(file_path)} for rel, file_path in iter_canonical_files(root)]
     return hash_obj(entries)
 
 
