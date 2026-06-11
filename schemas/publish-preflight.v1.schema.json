@@ -45,6 +45,18 @@
       "default": null,
       "title": "Annotation Hash"
     },
+    "ledger_attestation_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ledger Attestation Hash"
+    },
     "ledger_checkpoint_hash": {
       "anyOf": [
         {
@@ -125,6 +137,13 @@
       "default": "redline.publish_preflight.v1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "sponsor_evidence": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Sponsor Evidence",
+      "type": "object"
     },
     "state": {
       "title": "State",

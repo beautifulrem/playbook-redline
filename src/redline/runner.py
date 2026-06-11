@@ -5,10 +5,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_obj, hash_tree
+from redline.canonical import hash_file, hash_obj, hash_tree
 from redline.engine_adapter import DeterministicReplayEngine, ReplayEngineError
 from redline.models import (
     Assertion,
+    ChainStatus,
     CoverageManifest,
     DecisionContext,
     Proof,
@@ -17,16 +18,21 @@ from redline.models import (
     ReasonCode,
     RedlineSpec,
     ReplayTrace,
+    Receipt,
     RunArtifacts,
     Scenario,
     Status,
     Suite,
     EditProvenance,
+    LedgerCheckpoint,
+    LedgerCheckpointAttestation,
+    TrustPolicy,
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import atomic_write_receipt, issue_receipt, make_decision_proof
 from redline.report import to_report
+from redline.trust import verify_checkpoint_attestation
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
 
 
@@ -60,6 +66,8 @@ def run_redline(
     spec_path: Path,
     out_dir: Path | None = None,
     edit_provenance: EditProvenance | None = None,
+    baseline_receipt_path: Path | None = None,
+    baseline_trust_policy_path: Path | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
     suite_path = suite_path.resolve()
@@ -72,6 +80,11 @@ def run_redline(
     package_hash = hash_tree(package_dir)
     baseline_hash = hash_tree(baseline_dir)
     candidate_hash = hash_tree(candidate_dir)
+    chain_status, baseline_receipt_hash, baseline_receipt_error = _baseline_chain(
+        baseline_hash=baseline_hash,
+        baseline_receipt_path=baseline_receipt_path,
+        baseline_trust_policy_path=baseline_trust_policy_path,
+    )
     proofs: list[Proof] = [
         _simple_proof(
             kind=ProofKind.PACKAGE_CANONICAL,
@@ -90,11 +103,12 @@ def run_redline(
     ]
     engine = DeterministicReplayEngine()
     traces: list[ReplayTrace] = []
-    reject_reason: ReasonCode | None = None
+    reject_reason: ReasonCode | None = baseline_receipt_error
     try:
-        for scenario in suite.scenarios:
-            traces.append(engine.replay(package=baseline_dir, scenario=scenario, role="baseline"))
-            traces.append(engine.replay(package=candidate_dir, scenario=scenario, role="candidate"))
+        if reject_reason is None:
+            for scenario in suite.scenarios:
+                traces.append(engine.replay(package=baseline_dir, scenario=scenario, role="baseline"))
+                traces.append(engine.replay(package=candidate_dir, scenario=scenario, role="candidate"))
     except ReplayEngineError as exc:
         reject_reason = exc.reason_code
 
@@ -215,7 +229,7 @@ def run_redline(
         proofs=proofs,
         required=REQUIRED_PROOFS,
         coverage=coverage,
-        context=DecisionContext(suite_id=suite.suite_id, spec_hash=spec_hash, reject_reason=reject_reason),
+        context=DecisionContext(suite_id=suite.suite_id, spec_hash=spec_hash, chain_status=chain_status, reject_reason=reject_reason),
     )
     engine_hash = hash_tree(Path(__file__).resolve().parent / "engine_adapter")
     receipt = issue_receipt(
@@ -225,6 +239,7 @@ def run_redline(
         package_hash=package_hash,
         baseline_name=baseline,
         baseline_hash=baseline_hash,
+        baseline_receipt_hash=baseline_receipt_hash,
         candidate_name=candidate,
         candidate_hash=candidate_hash,
         spec_hash=spec_hash,
@@ -328,6 +343,85 @@ def parse_run_inputs(package_dir: Path, suite_path: Path, spec_path: Path) -> tu
     if not package_dir.exists():
         raise ValueError(f"package not found: {package_dir}")
     return package_dir, suite_path, spec_path
+
+
+def _baseline_chain(
+    *,
+    baseline_hash: str,
+    baseline_receipt_path: Path | None,
+    baseline_trust_policy_path: Path | None,
+) -> tuple[ChainStatus, str | None, ReasonCode | None]:
+    if baseline_receipt_path is None:
+        return ChainStatus.GENESIS, None, None
+    try:
+        from redline.receipt import compute_receipt_hash
+
+        receipt = Receipt.model_validate(json.loads(baseline_receipt_path.read_text(encoding="utf-8")))
+    except Exception:
+        return ChainStatus.UNCHAINED, None, ReasonCode.BASELINE_UNCHAINED
+    if compute_receipt_hash(receipt) != receipt.receipt_hash:
+        return ChainStatus.UNCHAINED, None, ReasonCode.BASELINE_UNCHAINED
+    if receipt.result.status != Status.PASS.value:
+        return ChainStatus.UNCHAINED, receipt.receipt_hash, ReasonCode.BASELINE_UNCHAINED
+    if receipt.candidate.package_hash != baseline_hash:
+        return ChainStatus.UNCHAINED, receipt.receipt_hash, ReasonCode.BASELINE_UNCHAINED
+    if baseline_trust_policy_path is None or not _baseline_receipt_trusted(
+        receipt=receipt,
+        receipt_path=baseline_receipt_path,
+        trust_policy_path=baseline_trust_policy_path,
+    ):
+        return ChainStatus.UNCHAINED, receipt.receipt_hash, ReasonCode.BASELINE_UNCHAINED
+    return ChainStatus.CHAINED, receipt.receipt_hash, None
+
+
+def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_policy_path: Path) -> bool:
+    ledger_path = receipt_path.parent / "issuance-ledger.jsonl"
+    checkpoint_path = receipt_path.parent / "issuance-ledger.checkpoint.json"
+    attestation_path = receipt_path.parent / "issuance-ledger.attestation.json"
+    if not ledger_path.exists() or not checkpoint_path.exists() or not attestation_path.exists():
+        return False
+    try:
+        policy = TrustPolicy.model_validate(json.loads(trust_policy_path.read_text(encoding="utf-8")))
+        checkpoint = LedgerCheckpoint.model_validate(json.loads(checkpoint_path.read_text(encoding="utf-8")))
+        attestation = LedgerCheckpointAttestation.model_validate(json.loads(attestation_path.read_text(encoding="utf-8")))
+    except Exception:
+        return False
+    matched = False
+    previous_entry_hash = "sha256:genesis"
+    entry_count = 0
+    try:
+        with ledger_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                entry_count += 1
+                entry = json.loads(line)
+                entry_hash = entry.get("entry_hash")
+                if not isinstance(entry_hash, str):
+                    return False
+                expected_entry_hash = hash_obj({key: value for key, value in entry.items() if key != "entry_hash"})
+                if entry_hash != expected_entry_hash or entry.get("previous_entry_hash") != previous_entry_hash:
+                    return False
+                previous_entry_hash = entry_hash
+                if entry.get("receipt_hash") == receipt.receipt_hash:
+                    matched = True
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not matched:
+        return False
+    expected_checkpoint_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
+    if checkpoint.checkpoint_hash != expected_checkpoint_hash:
+        return False
+    if checkpoint.ledger_hash != hash_file(ledger_path):
+        return False
+    if checkpoint.ledger_tail_hash != previous_entry_hash or checkpoint.ledger_entry_count != entry_count:
+        return False
+    if receipt.receipt_hash not in checkpoint.subject_receipt_hashes:
+        return False
+    try:
+        return verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=policy)
+    except ValueError:
+        return False
 
 
 def _portable_path(path: Path) -> str:

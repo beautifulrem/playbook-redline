@@ -251,7 +251,9 @@ class PublishPreflightResult(RedlineModel):
     report_hash: str | None = None
     ledger_hash: str | None = None
     ledger_checkpoint_hash: str | None = None
+    ledger_attestation_hash: str | None = None
     annotation_hash: str | None = None
+    sponsor_evidence: dict[str, str] = Field(default_factory=dict)
     reason_code: ReasonCode | None = None
 
 
@@ -266,6 +268,43 @@ class LedgerCheckpoint(RedlineModel):
     checkpoint_hash: str
 
 
+class LedgerCheckpointAttestation(RedlineModel):
+    version: Literal["redline.ledger.attestation.v1"] = "redline.ledger.attestation.v1"
+    checkpoint_hash: str
+    ledger_hash: str
+    ledger_tail_hash: str
+    ledger_entry_count: int
+    subject_receipt_hashes: list[str]
+    trust_policy_id: str
+    key_id: str
+    issuer: str
+    audience: str = "redline.publish"
+    signer: str
+    public_key: str
+    signed_at: str
+    expires_at: str | None = None
+    signature: str
+    attestation_hash: str
+
+
+class TrustKey(RedlineModel):
+    key_id: str
+    public_key: str
+    issuer: str
+    revoked: bool = False
+    valid_from: str | None = None
+    valid_until: str | None = None
+
+
+class TrustPolicy(RedlineModel):
+    version: Literal["redline.trust_policy.v1"] = "redline.trust_policy.v1"
+    policy_id: str
+    audience: Literal["redline.publish"] = "redline.publish"
+    allow_demo: bool = False
+    keys: list[TrustKey]
+    policy_hash: str
+
+
 class PackageAnnotation(RedlineModel):
     version: Literal["redline.package.annotation.v1"] = "redline.package.annotation.v1"
     annotation_kind: Literal["demo-preview", "publish-preflight"] = "publish-preflight"
@@ -275,10 +314,12 @@ class PackageAnnotation(RedlineModel):
     package_hash: str
     ledger_hash: str
     ledger_checkpoint_hash: str
+    ledger_attestation_hash: str | None = None
+    trust_policy_id: str | None = None
+    trusted_ledger_key_id: str | None = None
     strength_summary: str
     chain_status: ChainStatus
     verification_level: VerificationLevel
-    trusted_ledger_checkpoint_hash: str | None = None
     annotation_hash: str
 
 

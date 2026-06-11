@@ -15,6 +15,7 @@ from redline.engine_adapter.deterministic import build_worker_command
 from redline.models import (
     CoverageManifest,
     DecisionContext,
+    LedgerCheckpoint,
     ProbeOutcome,
     ProbeResult,
     ProbeType,
@@ -32,15 +33,30 @@ from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash
 from redline.runner import load_suite, run_redline
 from redline.schemas import export_schemas
-from redline.sponsor.bitget import SponsorState, validate_sponsor_evidence_shape
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape
 from redline.mcp_server import redline_check_receipt
 from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html, verify_annotation
+from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "fixtures/demo_pack"
 SUITE = ROOT / "fixtures/suites/demo_suite.json"
 SPEC = ROOT / "fixtures/specs/redline_spec.json"
+
+
+def _sign_run_checkpoint(run_dir: Path, private_key: str, *, policy_id: str, key_id: str, issuer: str) -> object:
+    checkpoint = LedgerCheckpoint.model_validate(json.loads((run_dir / "issuance-ledger.checkpoint.json").read_text()))
+    attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer=issuer,
+        trust_policy_id=policy_id,
+        key_id=key_id,
+        issuer=issuer,
+    )
+    (run_dir / "issuance-ledger.attestation.json").write_text(attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return attestation
 
 
 def test_required_proofs_covers_all_statuses() -> None:
@@ -701,6 +717,255 @@ def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes
     assert bad_result.reason_code == ReasonCode.NEW_BLOCK_BREACH
 
 
+def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="test-policy", key_id="test-key", public_key=public_key, issuer="test-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline_run = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="baseline",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "baseline",
+    )
+    assert baseline_run.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="test-policy", key_id="test-key", issuer="test-ci")
+    chained_run = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "chained",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert chained_run.envelope.status == Status.PASS
+    assert chained_run.envelope.reason_code == ReasonCode.PASS
+    assert chained_run.receipt is not None
+    assert chained_run.receipt.baseline.baseline_receipt_hash == baseline_run.receipt.receipt_hash
+
+    checkpoint = LedgerCheckpoint.model_validate(json.loads((tmp_path / "chained" / "issuance-ledger.checkpoint.json").read_text()))
+    attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer="test-ci",
+        trust_policy_id="test-policy",
+        key_id="test-key",
+        issuer="test-ci",
+    )
+    attestation_path = tmp_path / "chained" / "issuance-ledger.attestation.json"
+    attestation_path.write_text(attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    assert verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=policy)
+
+    unsigned = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        level=VerificationLevel.REPLAYED,
+    )
+    assert unsigned.status == VerificationStatus.REJECTED
+    assert unsigned.reason_code == ReasonCode.BASELINE_UNCHAINED
+    verified = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trusted_ledger_public_key=public_key,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert verified.status == VerificationStatus.REJECTED
+    assert verified.reason_code == ReasonCode.BASELINE_UNCHAINED
+    try:
+        render_report_html(
+            tmp_path / "chained" / "report.json",
+            tmp_path / "raw-key-verified.html",
+            receipt_path=tmp_path / "chained" / "receipt.json",
+            package=package,
+            suite_path=SUITE,
+            spec_path=SPEC,
+            baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+            ledger_attestation_path=attestation_path,
+            trusted_ledger_public_key=public_key,
+            require_verified=True,
+        )
+    except ValueError as exc:
+        assert "BASELINE_UNCHAINED" in str(exc)
+    else:
+        raise AssertionError("raw public key must not produce a verified report stamp")
+    verified_with_policy = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert verified_with_policy.status == VerificationStatus.VERIFIED
+    assert verified_with_policy.reason_code == ReasonCode.PASS
+
+    publish = publish_preflight(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert publish.ok is True
+    assert publish.state == "ANNOTATED_PACKAGE_READY"
+    assert publish.ledger_attestation_hash == attestation.attestation_hash
+    annotation_result = verify_annotation(
+        annotation_path=tmp_path / "publish" / "redline-annotation.json",
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+    )
+    assert annotation_result.ok is True
+    assert annotation_result.reason_code == ReasonCode.PASS
+    forged_annotation_path = tmp_path / "forged-publish-annotation.json"
+    forged_annotation = json.loads((tmp_path / "publish" / "redline-annotation.json").read_text())
+    forged_annotation["ledger_attestation_hash"] = None
+    forged_annotation["trust_policy_id"] = None
+    forged_annotation["trusted_ledger_key_id"] = None
+    forged_hash_payload = {**forged_annotation, "annotation_hash": ""}
+    forged_annotation["annotation_hash"] = hash_obj({key: value for key, value in forged_hash_payload.items() if value is not None})
+    forged_annotation_path.write_text(json.dumps(forged_annotation), encoding="utf-8")
+    forged_result = verify_annotation(
+        annotation_path=forged_annotation_path,
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+    )
+    assert forged_result.ok is False
+    assert forged_result.state == "ANNOTATION_ATTESTATION_REQUIRED"
+    render_report_html(
+        tmp_path / "chained" / "report.json",
+        tmp_path / "verified.html",
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trusted_ledger_public_key=public_key,
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+        require_verified=True,
+    )
+    assert "VERIFIED / PASS" in (tmp_path / "verified.html").read_text(encoding="utf-8")
+    try:
+        render_report_html(
+            tmp_path / "chained" / "report.json",
+            tmp_path / "self-policy-verified.html",
+            receipt_path=tmp_path / "chained" / "receipt.json",
+            package=package,
+            suite_path=SUITE,
+            spec_path=SPEC,
+            baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+            ledger_attestation_path=attestation_path,
+            trust_policy_path=policy_path,
+            require_verified=True,
+        )
+    except ValueError as exc:
+        assert "PASS" in str(exc)
+    else:
+        raise AssertionError("caller-supplied trust policy without pinned hash must not produce a verified report stamp")
+
+    self_signed_publish = publish_preflight(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "self-signed-publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trusted_ledger_public_key=public_key,
+    )
+    assert self_signed_publish.ok is False
+    assert self_signed_publish.state == "TRUSTED_LEDGER_CHECKPOINT_REQUIRED"
+    unpinned_policy_publish = publish_preflight(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "unpinned-policy-publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+    )
+    assert unpinned_policy_publish.ok is False
+    assert unpinned_policy_publish.state == "TRUST_POLICY_REQUIRED"
+
+
+def test_signed_checkpoint_rejects_wrong_public_key(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="test-policy", key_id="test-key", public_key=public_key, issuer="test-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline_run = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
+    assert baseline_run.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="test-policy", key_id="test-key", issuer="test-ci")
+    chained_run = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "chained",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert chained_run.receipt is not None
+    _other_private, other_public = generate_trust_keypair()
+    wrong_policy = make_trust_policy(policy_id="test-policy", key_id="test-key", public_key=other_public, issuer="test-ci")
+    wrong_policy_path = tmp_path / "wrong-policy.json"
+    wrong_policy_path.write_text(wrong_policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    checkpoint = LedgerCheckpoint.model_validate(json.loads((tmp_path / "chained" / "issuance-ledger.checkpoint.json").read_text()))
+    attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer="test-ci",
+        trust_policy_id="test-policy",
+        key_id="test-key",
+        issuer="test-ci",
+    )
+    attestation_path = tmp_path / "chained" / "issuance-ledger.attestation.json"
+    attestation_path.write_text(attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    assert not verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trusted_public_key_text=other_public)
+    result = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=wrong_policy_path,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
 def test_report_html_is_static_escaped_render(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
@@ -747,10 +1012,9 @@ def test_report_html_rejects_stale_report_hash(tmp_path: Path) -> None:
         raise AssertionError("stale report_hash must not render")
 
 
-def test_publish_execute_writes_final_state_to_stdout_and_file(tmp_path: Path) -> None:
+def test_publish_execute_forbids_demo_baseline(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
-    out_dir = tmp_path / "publish"
     result = CliRunner().invoke(
         app,
         [
@@ -762,7 +1026,7 @@ def test_publish_execute_writes_final_state_to_stdout_and_file(tmp_path: Path) -
             "--spec",
             str(SPEC),
             "--out",
-            str(out_dir),
+            str(tmp_path / "publish"),
             "--execute",
             "--yes-i-understand-redline-is-wrapper-only",
             "--allow-demo-baseline-genesis",
@@ -771,10 +1035,118 @@ def test_publish_execute_writes_final_state_to_stdout_and_file(tmp_path: Path) -
     )
     assert result.exit_code == 6
     stdout = json.loads(result.stdout)
-    disk = json.loads((out_dir / "publish-preflight.json").read_text())
-    assert stdout == disk
     assert stdout["ok"] is False
-    assert stdout["state"] == "LIVE_SPONSOR_ADAPTER_UNAVAILABLE"
+    assert stdout["state"] == "DEMO_EXECUTE_FORBIDDEN"
+
+
+def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    archive_a = make_package_archive(package_dir=PACKAGE, out_path=tmp_path / "a.tar.gz")
+    archive_b = make_package_archive(package_dir=PACKAGE, out_path=tmp_path / "b.tar.gz")
+    assert archive_a.read_bytes() == archive_b.read_bytes()
+    calls: list[tuple[str, str, dict[str, str], bytes]] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append((method, url, headers, body))
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1", "version_id": "version-1"}).encode()
+        if url.endswith("/api/v1/playbook/run") and method == "POST":
+            return 200, json.dumps({"run_id": "run-1", "status": "started"}).encode()
+        if "/api/v1/playbook/run?" in url and method == "GET":
+            metrics_output = {
+                "status": artifacts.receipt.result.status,
+                "breaches": [assertion.model_dump(mode="json") for assertion in artifacts.receipt.result.new_breaches],
+            }
+            return 200, json.dumps({"run_id": "run-1", "version_id": "version-1", "status": "completed", "metrics_output": metrics_output}).encode()
+        return 404, b"{}"
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive_a)
+    assert upload.ok is True
+    run = adapter.run(version_id=upload.evidence["version_id"])
+    assert run.ok is True
+    readback = adapter.readback(
+        run_id=run.evidence["run_id"],
+        expected_version_id=upload.evidence["version_id"],
+        expected_metrics_output_hash=artifacts.receipt.result.result_hash,
+        expected_package_hash=artifacts.receipt.package.identity_hash,
+        expected_package_archive_hash=upload.evidence["package_archive_hash"],
+    )
+    assert readback.ok is False
+    assert readback.state == SponsorState.RECORDED_ATTESTATION_VALID
+    assert readback.reason_code == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED
+    assert readback.evidence["proof_eligible"] == "false"
+    assert "metrics_output_hash" in readback.evidence
+    transcript = (tmp_path / "transcript.jsonl").read_text(encoding="utf-8")
+    assert "abcd1234secret5678" not in transcript
+    assert "abcd***5678" in transcript
+    assert "secret-key-1" not in transcript
+    assert "passphrase-1" not in transcript
+    assert "ACCESS-SIGN" in calls[0][2]
+    assert "ACCESS-TIMESTAMP" in calls[0][2]
+    assert "ACCESS-PASSPHRASE" in calls[0][2]
+    assert calls[0][2]["Idempotency-Key"].startswith("redline-")
+
+
+def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=PACKAGE, out_path=tmp_path / "package.tar.gz")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1", "version_id": "version-1"}).encode()
+        if url.endswith("/api/v1/playbook/run") and method == "POST":
+            return 200, json.dumps({"run_id": "run-1", "status": "started"}).encode()
+        if "/api/v1/playbook/run?" in url and method == "GET":
+            return 200, json.dumps({"run_id": "run-1", "version_id": "version-1", "status": "completed", "metrics_output": {"unexpected": True}}).encode()
+        return 404, b"{}"
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    run = adapter.run(version_id=upload.evidence["version_id"])
+    readback = adapter.readback(
+        run_id=run.evidence["run_id"],
+        expected_version_id=upload.evidence["version_id"],
+        expected_metrics_output_hash=artifacts.receipt.result.result_hash,
+        expected_package_hash=artifacts.receipt.package.identity_hash,
+        expected_package_archive_hash=upload.evidence["package_archive_hash"],
+    )
+    assert readback.ok is False
+    assert readback.state == SponsorState.MISMATCH
+    assert readback.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
+def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        assert url.endswith("/api/v1/playbook/publish")
+        return 200, json.dumps({"code": "00000", "data": {"status": "failed"}}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    adapter.proof_eligible = True
+    result = adapter.publish(draft_id="draft-1")
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
 
 
 def test_sponsor_evidence_verifier() -> None:
@@ -799,6 +1171,7 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
     expected = {
         "decision-envelope.v1.schema.json",
         "edit-provenance.v1.schema.json",
+        "ledger-attestation.v1.schema.json",
         "ledger-checkpoint.v1.schema.json",
         "package-annotation.v1.schema.json",
         "package-import.v1.schema.json",

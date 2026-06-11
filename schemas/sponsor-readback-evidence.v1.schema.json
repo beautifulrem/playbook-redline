@@ -13,8 +13,29 @@
       "title": "Metrics Output Hash",
       "type": "string"
     },
+    "package_archive_hash": {
+      "title": "Package Archive Hash",
+      "type": "string"
+    },
+    "package_hash": {
+      "title": "Package Hash",
+      "type": "string"
+    },
+    "proof_eligible": {
+      "title": "Proof Eligible",
+      "type": "boolean"
+    },
     "run_id": {
       "title": "Run Id",
+      "type": "string"
+    },
+    "source_kind": {
+      "enum": [
+        "live",
+        "mock",
+        "recorded"
+      ],
+      "title": "Source Kind",
       "type": "string"
     },
     "status": {
@@ -43,6 +64,10 @@
     "metrics_output_hash",
     "expected_version_id",
     "expected_metrics_output_hash",
+    "package_hash",
+    "package_archive_hash",
+    "source_kind",
+    "proof_eligible",
     "transcript_hash"
   ],
   "title": "SponsorReadbackEvidence",

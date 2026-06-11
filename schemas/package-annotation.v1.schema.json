@@ -36,6 +36,18 @@
     "chain_status": {
       "$ref": "#/$defs/ChainStatus"
     },
+    "ledger_attestation_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ledger Attestation Hash"
+    },
     "ledger_checkpoint_hash": {
       "title": "Ledger Checkpoint Hash",
       "type": "string"
@@ -64,7 +76,7 @@
       "title": "Strength Summary",
       "type": "string"
     },
-    "trusted_ledger_checkpoint_hash": {
+    "trust_policy_id": {
       "anyOf": [
         {
           "type": "string"
@@ -74,7 +86,19 @@
         }
       ],
       "default": null,
-      "title": "Trusted Ledger Checkpoint Hash"
+      "title": "Trust Policy Id"
+    },
+    "trusted_ledger_key_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trusted Ledger Key Id"
     },
     "verification_level": {
       "$ref": "#/$defs/VerificationLevel"

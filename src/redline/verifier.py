@@ -9,6 +9,7 @@ from redline.canonical import hash_file, hash_obj, hash_tree
 from redline.models import (
     DecisionEnvelope,
     LedgerCheckpoint,
+    LedgerCheckpointAttestation,
     Proof,
     ProofKind,
     ProofVerification,
@@ -16,6 +17,7 @@ from redline.models import (
     Receipt,
     ReportJson,
     Status,
+    TrustPolicy,
     VerificationLevel,
     VerificationResult,
     VerificationStatus,
@@ -24,6 +26,7 @@ from redline.proof_kernel import REQUIRED_PROOFS
 from redline.proof_kernel import decision_proof_id
 from redline.receipt import compute_receipt_hash
 from redline.report import render_strength_summary, to_report
+from redline.trust import verify_checkpoint_attestation
 
 BAD_INPUT = {ReasonCode.FILE_NOT_FOUND, ReasonCode.PARSE_ERROR, ReasonCode.SCHEMA_INVALID, ReasonCode.VERSION_UNSUPPORTED}
 SINGLETON_PROOF_KINDS = {
@@ -53,7 +56,10 @@ def verify(
     report_path: Path | None = None,
     ledger_path: Path | None = None,
     ledger_checkpoint_path: Path | None = None,
-    trusted_ledger_checkpoint_hash: str | None = None,
+    ledger_attestation_path: Path | None = None,
+    trusted_ledger_public_key: str | None = None,
+    trust_policy_path: Path | None = None,
+    baseline_receipt_path: Path | None = None,
 ) -> VerificationResult:
     level = level or VerificationLevel.HASH_ONLY
     try:
@@ -91,13 +97,16 @@ def verify(
         return _reject(receipt, binding_error, level)
     default_ledger_path = receipt_path.parent / "issuance-ledger.jsonl"
     default_checkpoint_path = receipt_path.parent / "issuance-ledger.checkpoint.json"
+    default_attestation_path = receipt_path.parent / "issuance-ledger.attestation.json"
     if level == VerificationLevel.REPLAYED and ledger_path is not None and ledger_path.resolve() != default_ledger_path.resolve():
         return _reject(receipt, ReasonCode.RECEIPT_MISMATCH, level)
     ledger_error = _ledger_error(
         receipt=receipt,
         ledger_path=ledger_path or default_ledger_path,
         checkpoint_path=(ledger_checkpoint_path or default_checkpoint_path) if level == VerificationLevel.REPLAYED else ledger_checkpoint_path,
-        trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+        attestation_path=(ledger_attestation_path or default_attestation_path) if trusted_ledger_public_key is not None or trust_policy_path is not None else ledger_attestation_path,
+        trusted_ledger_public_key=trusted_ledger_public_key,
+        trust_policy_path=trust_policy_path,
     )
     if ledger_error is not None:
         return _reject(receipt, ledger_error, level)
@@ -164,12 +173,14 @@ def verify(
             suite_path=suite_path,
             spec_path=spec_path,
             report_path=report_path or receipt_path.parent / "report.json",
+            baseline_receipt_path=baseline_receipt_path or receipt_path.parent / "baseline-receipt.json",
+            trust_policy_path=trust_policy_path,
         )
         if replay_error is not None:
             return _reject(receipt, replay_error, level)
     if receipt.decision.reason_code == ReasonCode.BASELINE_GENESIS:
         return _unverified(receipt, ReasonCode.BASELINE_GENESIS, level)
-    if Status(receipt.result.status) == Status.PASS and trusted_ledger_checkpoint_hash is None:
+    if Status(receipt.result.status) == Status.PASS and trusted_ledger_public_key is None and trust_policy_path is None:
         return _unverified(receipt, ReasonCode.BASELINE_UNCHAINED, level)
     return VerificationResult(
         status=VerificationStatus.VERIFIED,
@@ -191,6 +202,8 @@ def verify_proof(
     package: Path | None = None,
     suite_path: Path | None = None,
     spec_path: Path | None = None,
+    baseline_receipt_path: Path | None = None,
+    trust_policy_path: Path | None = None,
 ) -> ProofVerification:
     try:
         receipt = load_receipt(receipt_path)
@@ -224,6 +237,8 @@ def verify_proof(
                 spec_path=spec_path,
                 out_dir=None,
                 edit_provenance=receipt.edit_provenance,
+                baseline_receipt_path=baseline_receipt_path,
+                baseline_trust_policy_path=trust_policy_path,
             )
         except Exception:
             return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.ENGINE_FAILURE)
@@ -300,7 +315,16 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
     return None
 
 
-def _replay_error(*, receipt: Receipt, package: Path, suite_path: Path, spec_path: Path, report_path: Path) -> ReasonCode | None:
+def _replay_error(
+    *,
+    receipt: Receipt,
+    package: Path,
+    suite_path: Path,
+    spec_path: Path,
+    report_path: Path,
+    baseline_receipt_path: Path,
+    trust_policy_path: Path | None,
+) -> ReasonCode | None:
     try:
         from redline.runner import load_spec, load_suite, run_redline
 
@@ -309,6 +333,8 @@ def _replay_error(*, receipt: Receipt, package: Path, suite_path: Path, spec_pat
         suite_lock_hash = suite.suite_lock_hash or hash_obj(suite)
         if hash_obj(spec) != receipt.spec.spec_hash or suite_lock_hash != receipt.suite.suite_lock_hash:
             return ReasonCode.RECEIPT_BINDING_FAILED
+        if receipt.baseline.chain_status.value == "chained" and not baseline_receipt_path.exists():
+            return ReasonCode.DATA_MISSING
         rerun = run_redline(
             package_dir=package,
             baseline=receipt.baseline.package_name,
@@ -317,6 +343,8 @@ def _replay_error(*, receipt: Receipt, package: Path, suite_path: Path, spec_pat
             spec_path=spec_path,
             out_dir=None,
             edit_provenance=receipt.edit_provenance,
+            baseline_receipt_path=baseline_receipt_path if receipt.baseline.chain_status.value == "chained" else None,
+            baseline_trust_policy_path=trust_policy_path if receipt.baseline.chain_status.value == "chained" else None,
         )
     except Exception:
         return ReasonCode.ENGINE_FAILURE
@@ -359,7 +387,9 @@ def _ledger_error(
     receipt: Receipt,
     ledger_path: Path,
     checkpoint_path: Path | None = None,
-    trusted_ledger_checkpoint_hash: str | None = None,
+    attestation_path: Path | None = None,
+    trusted_ledger_public_key: str | None = None,
+    trust_policy_path: Path | None = None,
 ) -> ReasonCode | None:
     if not ledger_path.exists():
         return ReasonCode.RECEIPT_MISMATCH
@@ -405,7 +435,9 @@ def _ledger_error(
             checkpoint_path=checkpoint_path,
             ledger_tail_hash=previous_entry_hash,
             ledger_entry_count=entry_count,
-            trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+            attestation_path=attestation_path,
+            trusted_ledger_public_key=trusted_ledger_public_key,
+            trust_policy_path=trust_policy_path,
         )
         if checkpoint_error is not None:
             return checkpoint_error
@@ -419,7 +451,9 @@ def _ledger_checkpoint_error(
     checkpoint_path: Path,
     ledger_tail_hash: str,
     ledger_entry_count: int,
-    trusted_ledger_checkpoint_hash: str | None,
+    attestation_path: Path | None,
+    trusted_ledger_public_key: str | None,
+    trust_policy_path: Path | None,
 ) -> ReasonCode | None:
     if not checkpoint_path.exists():
         return ReasonCode.RECEIPT_MISMATCH
@@ -430,14 +464,36 @@ def _ledger_checkpoint_error(
     expected_checkpoint_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
     if checkpoint.checkpoint_hash != expected_checkpoint_hash:
         return ReasonCode.RECEIPT_MISMATCH
-    if trusted_ledger_checkpoint_hash is not None and checkpoint.checkpoint_hash != trusted_ledger_checkpoint_hash:
-        return ReasonCode.RECEIPT_MISMATCH
     if checkpoint.ledger_hash != hash_file(ledger_path):
         return ReasonCode.RECEIPT_MISMATCH
     if checkpoint.ledger_tail_hash != ledger_tail_hash or checkpoint.ledger_entry_count != ledger_entry_count:
         return ReasonCode.RECEIPT_MISMATCH
     if receipt.receipt_hash not in checkpoint.subject_receipt_hashes:
         return ReasonCode.RECEIPT_MISMATCH
+    trust_policy = None
+    if trust_policy_path is not None:
+        try:
+            trust_policy = TrustPolicy.model_validate(json.loads(trust_policy_path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError, ValidationError):
+            return ReasonCode.RECEIPT_MISMATCH
+    if trusted_ledger_public_key is not None or trust_policy is not None:
+        if attestation_path is None or not attestation_path.exists():
+            return ReasonCode.RECEIPT_MISMATCH
+        try:
+            attestation = LedgerCheckpointAttestation.model_validate(json.loads(attestation_path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError, ValidationError):
+            return ReasonCode.RECEIPT_MISMATCH
+        try:
+            attested = verify_checkpoint_attestation(
+                checkpoint=checkpoint,
+                attestation=attestation,
+                trusted_public_key_text=trusted_ledger_public_key,
+                trust_policy=trust_policy,
+            )
+        except ValueError:
+            return ReasonCode.RECEIPT_MISMATCH
+        if not attested:
+            return ReasonCode.RECEIPT_MISMATCH
     return None
 
 

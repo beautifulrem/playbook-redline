@@ -11,8 +11,10 @@ from pydantic import ValidationError
 from redline.canonical import hash_file, hash_obj, hash_tree
 from redline.models import (
     ChainStatus,
+    DecisionEnvelope,
     EditProvenance,
     LedgerCheckpoint,
+    LedgerCheckpointAttestation,
     PackageAnnotation,
     PackageImportResult,
     ProbeSpec,
@@ -24,6 +26,7 @@ from redline.models import (
     VerificationLevel,
     VerificationStatus,
 )
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive
 from redline.verifier import load_receipt, verify
 
 
@@ -79,11 +82,16 @@ def publish_preflight(
     out_dir: Path,
     report_path: Path | None = None,
     ledger_checkpoint_path: Path | None = None,
-    trusted_ledger_checkpoint_hash: str | None = None,
+    ledger_attestation_path: Path | None = None,
+    trusted_ledger_public_key: str | None = None,
+    trust_policy_path: Path | None = None,
+    trust_policy_hash: str | None = None,
+    baseline_receipt_path: Path | None = None,
     allow_demo_baseline_genesis: bool = False,
 ) -> PublishPreflightResult:
     report_path = report_path or receipt_path.parent / "report.json"
     ledger_checkpoint_path = ledger_checkpoint_path or receipt_path.parent / "issuance-ledger.checkpoint.json"
+    ledger_attestation_path = ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json"
     result = verify(
         receipt_path=receipt_path,
         package=package,
@@ -91,7 +99,10 @@ def publish_preflight(
         spec_path=spec_path,
         report_path=report_path,
         ledger_checkpoint_path=ledger_checkpoint_path,
-        trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+        ledger_attestation_path=ledger_attestation_path,
+        trusted_ledger_public_key=trusted_ledger_public_key,
+        trust_policy_path=trust_policy_path,
+        baseline_receipt_path=baseline_receipt_path,
         level=VerificationLevel.REPLAYED,
     )
     package_hash = hash_tree(package)
@@ -148,7 +159,7 @@ def publish_preflight(
             package_hash=package_hash,
             reason_code=ReasonCode.RECEIPT_MISMATCH,
         )
-    if result.chain_status == ChainStatus.CHAINED and trusted_ledger_checkpoint_hash is None:
+    if result.chain_status == ChainStatus.CHAINED and trust_policy_path is None:
         return PublishPreflightResult(
             ok=False,
             state="TRUSTED_LEDGER_CHECKPOINT_REQUIRED",
@@ -159,6 +170,18 @@ def publish_preflight(
             ledger_checkpoint_hash=checkpoint.checkpoint_hash,
             reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
         )
+    if result.chain_status == ChainStatus.CHAINED and not _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash):
+        return PublishPreflightResult(
+            ok=False,
+            state="TRUST_POLICY_REQUIRED",
+            receipt_hash=result.receipt_hash,
+            package_hash=package_hash,
+            report_hash=_report_hash(report_path),
+            ledger_hash=checkpoint.ledger_hash,
+            ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+            reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+        )
+    attestation = _load_attestation(ledger_attestation_path) if ledger_attestation_path.exists() else None
     receipt = load_receipt(receipt_path)
     out_dir.mkdir(parents=True, exist_ok=True)
     annotation = PackageAnnotation(
@@ -169,10 +192,12 @@ def publish_preflight(
         package_hash=package_hash,
         ledger_hash=checkpoint.ledger_hash,
         ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+        ledger_attestation_hash=attestation.attestation_hash if attestation is not None else None,
         strength_summary=result.strength_summary,
         chain_status=result.chain_status,
         verification_level=result.verification_level,
-        trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+        trust_policy_id=attestation.trust_policy_id if attestation is not None else None,
+        trusted_ledger_key_id=attestation.key_id if attestation is not None else None,
         annotation_hash="",
     )
     annotation_hash = hash_obj(annotation)
@@ -187,6 +212,7 @@ def publish_preflight(
         report_hash=receipt.report.report_hash,
         ledger_hash=checkpoint.ledger_hash,
         ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+        ledger_attestation_hash=attestation.attestation_hash if attestation is not None else None,
         annotation_hash=annotation_hash,
         reason_code=result.reason_code,
     )
@@ -199,6 +225,8 @@ def verify_annotation(
     package: Path | None = None,
     report_path: Path | None = None,
     ledger_checkpoint_path: Path | None = None,
+    ledger_attestation_path: Path | None = None,
+    trust_policy_path: Path | None = None,
 ) -> PublishPreflightResult:
     try:
         annotation = PackageAnnotation.model_validate(json.loads(annotation_path.read_text(encoding="utf-8")))
@@ -229,6 +257,19 @@ def verify_annotation(
         checkpoint = _load_checkpoint(ledger_checkpoint_path)
         if checkpoint is None or annotation.ledger_checkpoint_hash != checkpoint.checkpoint_hash or annotation.ledger_hash != checkpoint.ledger_hash:
             return PublishPreflightResult(ok=False, state="ANNOTATION_LEDGER_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if annotation.annotation_kind == "publish-preflight" and (
+        annotation.ledger_attestation_hash is None or annotation.trust_policy_id is None or annotation.trusted_ledger_key_id is None
+    ):
+        return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
+    if annotation.ledger_attestation_hash is not None:
+        if ledger_attestation_path is None or trust_policy_path is None:
+            return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_REQUIRED", reason_code=ReasonCode.DATA_MISSING)
+        attestation = _load_attestation(ledger_attestation_path)
+        if attestation is None or annotation.ledger_attestation_hash != attestation.attestation_hash:
+            return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
+        checkpoint = _load_checkpoint(ledger_checkpoint_path) if ledger_checkpoint_path is not None else None
+        if checkpoint is None or not _verify_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy_path=trust_policy_path):
+            return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
     return PublishPreflightResult(
         ok=True,
         state="ANNOTATION_VERIFIED",
@@ -237,9 +278,63 @@ def verify_annotation(
         report_hash=annotation.report_hash,
         ledger_hash=annotation.ledger_hash,
         ledger_checkpoint_hash=annotation.ledger_checkpoint_hash,
+        ledger_attestation_hash=annotation.ledger_attestation_hash,
         annotation_hash=annotation.annotation_hash,
         reason_code=ReasonCode.BASELINE_GENESIS if annotation.annotation_kind == "demo-preview" else ReasonCode.PASS,
     )
+
+
+def execute_sponsor_readback(
+    *,
+    receipt_path: Path,
+    package: Path,
+    out_dir: Path,
+    access_key: str,
+    secret_key: str,
+    passphrase: str,
+    final_publish: bool = False,
+) -> SponsorStepResult:
+    receipt = load_receipt(receipt_path)
+    envelope = DecisionEnvelope(
+        status=receipt.result.status,  # type: ignore[arg-type]
+        reason_code=receipt.decision.reason_code,
+        chain_status=receipt.baseline.chain_status,
+        required_proof_ids=receipt.decision.required_proof_ids,
+        satisfied_proof_ids=receipt.decision.satisfied_proof_ids,
+        coverage=receipt.coverage,
+        capabilities=receipt.capabilities,
+    )
+    archive = make_package_archive(package_dir=package, out_path=out_dir / "package.tar.gz")
+    adapter = BitgetSponsorAdapter(access_key=access_key, secret_key=secret_key, passphrase=passphrase, transcript_path=out_dir / "sponsor-transcript.jsonl")
+    upload = adapter.upload(envelope=envelope, package_hash=receipt.package.identity_hash, package_archive=archive)
+    if not upload.ok:
+        return upload
+    version_id = upload.evidence.get("version_id") or upload.evidence.get("suggested_version")
+    if version_id is None:
+        return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
+    run = adapter.run(version_id=version_id)
+    if not run.ok:
+        return run
+    run_id = run.evidence.get("run_id")
+    if run_id is None:
+        return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
+    readback = adapter.readback(
+        run_id=run_id,
+        expected_version_id=version_id,
+        expected_metrics_output_hash=receipt.result.result_hash,
+        expected_package_hash=receipt.package.identity_hash,
+        expected_package_archive_hash=upload.evidence.get("package_archive_hash"),
+    )
+    _write_sponsor_readback(out_dir / "sponsor-readback.json", readback)
+    if not final_publish or not readback.ok:
+        return readback
+    draft_id = upload.evidence.get("draft_id")
+    if draft_id is None:
+        return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=readback.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
+    published = adapter.publish(draft_id=draft_id)
+    if not published.ok:
+        return published
+    return SponsorStepResult(ok=True, state=SponsorState.PUBLISHED, evidence={**readback.evidence, **published.evidence})
 
 
 def render_report_html(
@@ -250,6 +345,11 @@ def render_report_html(
     package: Path | None = None,
     suite_path: Path | None = None,
     spec_path: Path | None = None,
+    ledger_attestation_path: Path | None = None,
+    trusted_ledger_public_key: str | None = None,
+    trust_policy_path: Path | None = None,
+    trust_policy_hash: str | None = None,
+    baseline_receipt_path: Path | None = None,
     require_verified: bool = False,
 ) -> None:
     payload = _load_report_payload(report_path)
@@ -262,9 +362,17 @@ def render_report_html(
             suite_path=suite_path,
             spec_path=spec_path,
             report_path=report_path,
+            ledger_attestation_path=ledger_attestation_path,
+            trusted_ledger_public_key=trusted_ledger_public_key,
+            trust_policy_path=trust_policy_path,
+            baseline_receipt_path=baseline_receipt_path,
             level=VerificationLevel.REPLAYED,
         )
-        verified = result.status == VerificationStatus.VERIFIED and result.receipt_hash == payload.get("receipt_hash")
+        verified = (
+            result.status == VerificationStatus.VERIFIED
+            and result.receipt_hash == payload.get("receipt_hash")
+            and _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash)
+        )
         verification_reason = result.reason_code.value
     if require_verified and not verified:
         raise ValueError(f"report is not replay-verified: {verification_reason}")
@@ -339,6 +447,39 @@ def _load_checkpoint(path: Path) -> LedgerCheckpoint | None:
     return checkpoint if checkpoint.checkpoint_hash == expected_hash else None
 
 
+def _load_attestation(path: Path) -> LedgerCheckpointAttestation | None:
+    try:
+        attestation = LedgerCheckpointAttestation.model_validate(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, ValidationError):
+        return None
+    expected_hash = hash_obj(attestation.model_copy(update={"attestation_hash": ""}))
+    return attestation if attestation.attestation_hash == expected_hash else None
+
+
+def _verify_attestation(*, checkpoint: LedgerCheckpoint, attestation: LedgerCheckpointAttestation, trust_policy_path: Path) -> bool:
+    from redline.models import TrustPolicy
+    from redline.trust import verify_checkpoint_attestation
+
+    try:
+        policy = TrustPolicy.model_validate(json.loads(trust_policy_path.read_text(encoding="utf-8")))
+        return verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=policy)
+    except Exception:
+        return False
+
+
+def _trust_policy_matches(*, trust_policy_path: Path | None, trust_policy_hash: str | None) -> bool:
+    if trust_policy_path is None or trust_policy_hash is None:
+        return False
+    try:
+        from redline.models import TrustPolicy
+        from redline.trust import verify_trust_policy
+
+        policy = TrustPolicy.model_validate(json.loads(trust_policy_path.read_text(encoding="utf-8")))
+    except Exception:
+        return False
+    return policy.policy_hash == trust_policy_hash and verify_trust_policy(policy)
+
+
 def _load_report_payload(path: Path) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -357,3 +498,23 @@ def _report_hash(path: Path) -> str | None:
         return _load_report_payload(path)["report_hash"]
     except ValueError:
         return None
+
+
+def _write_sponsor_readback(path: Path, result: SponsorStepResult) -> None:
+    if "run_id" not in result.evidence or "version_id" not in result.evidence or "metrics_output_hash" not in result.evidence:
+        return
+    payload = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": result.evidence["run_id"],
+        "version_id": result.evidence["version_id"],
+        "status": result.evidence.get("status", ""),
+        "metrics_output_hash": result.evidence["metrics_output_hash"],
+        "expected_version_id": result.evidence.get("expected_version_id", ""),
+        "expected_metrics_output_hash": result.evidence.get("expected_metrics_output_hash", ""),
+        "package_hash": result.evidence.get("package_hash", ""),
+        "package_archive_hash": result.evidence.get("package_archive_hash", ""),
+        "source_kind": result.evidence.get("source_kind", "live"),
+        "proof_eligible": result.evidence.get("proof_eligible") == "true",
+        "transcript_hash": result.evidence.get("transcript_hash", ""),
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

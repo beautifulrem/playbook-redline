@@ -65,6 +65,7 @@ def issue_receipt(
     package_hash: str,
     baseline_name: str,
     baseline_hash: str,
+    baseline_receipt_hash: str | None = None,
     candidate_name: str,
     candidate_hash: str,
     spec_hash: str,
@@ -98,6 +99,7 @@ def issue_receipt(
         ),
         baseline=BaselineInfo(
             package_hash=baseline_hash,
+            baseline_receipt_hash=baseline_receipt_hash,
             baseline_version_id=f"fixture:{baseline_name}",
             package_name=baseline_name,
             chain_status=envelope.chain_status,

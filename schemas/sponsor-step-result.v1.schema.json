@@ -38,6 +38,7 @@
         "RUN_STARTED",
         "RUN_COMPLETED",
         "READBACK_VERIFIED",
+        "PUBLISHED",
         "RECORDED_ATTESTATION_VALID",
         "MISMATCH"
       ],

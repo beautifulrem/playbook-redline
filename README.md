@@ -10,9 +10,9 @@ Playbook Redline is a backend proof kernel and verifier for checking whether an 
 - Blocking probes for drawdown, no-entry, and trade budget checks
 - Decision kernel with closed reason codes
 - Receipt issuer and verifier
-- Ledger checkpoint artifact for replay verification
+- Ed25519-signed ledger checkpoint attestation for production publish verification
 - Proof-level verification command
-- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, ledger checkpoints, package annotations, sponsor evidence, and verification results
+- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
 
@@ -48,7 +48,7 @@ max drawdown, crash-window no-entry, and trade budget.
 
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
 Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses `--rerun` with the package, suite, and spec inputs.
-Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an externally trusted ledger checkpoint hash.
+Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an Ed25519-signed ledger attestation verified against a protected trust policy.
 
 ## CLI
 
@@ -79,14 +79,40 @@ uv run redline publish fixtures/demo_pack artifacts/demo/pass/receipt.json --jso
 
 `redline report` without `--verified` renders only an `UNVERIFIED PREVIEW`.
 `--verified` is reserved for receipts that are replayed, chained, and backed by
-an externally trusted ledger checkpoint; the bundled genesis fixture is not one.
+an externally signed ledger checkpoint under a pinned trusted policy; the
+bundled genesis fixture is not one. Like production publish, verified report
+stamping reads `REDLINE_TRUST_POLICY` and `REDLINE_TRUST_POLICY_HASH` from the
+protected environment.
 `redline publish` is fail-closed: the fixture pass receipt is still blocked as
 `BASELINE_GENESIS` unless `--allow-demo-baseline-genesis` is supplied for a demo
 annotation. That demo annotation is not final publish evidence. For a production
-publish preflight, pass `--trusted-ledger-checkpoint-hash` or set
-`REDLINE_TRUSTED_LEDGER_CHECKPOINT_HASH` to a checkpoint hash anchored outside the
-local artifact folder, for example a CI artifact digest, signed checkpoint, Git
-commit attestation, or sponsor read-back record.
+publish preflight, sign the checkpoint with `redline sign-ledger-checkpoint` and
+pass `--ledger-attestation`. `redline publish` reads the trusted policy only
+from `REDLINE_TRUST_POLICY` and requires its protected hash in
+`REDLINE_TRUST_POLICY_HASH`. Store both outside the local artifact folder, for
+example through CI secret management, repository environment protection, or
+sponsor-side key custody. `redline check` and `verify-ledger-attestation` can
+still accept a raw public key for low-level debugging, but `redline publish`
+requires the protected trust policy pair.
+
+```bash
+uv run redline trust-keygen --out-private /tmp/redline-trust.private --out-public /tmp/redline-trust.public
+uv run redline trust-policy \
+  --public-key "$(cat /tmp/redline-trust.public)" \
+  --key-id redline-demo \
+  --issuer redline-ci \
+  --out /tmp/redline-trust-policy.json
+uv run redline sign-ledger-checkpoint artifacts/demo/pass/issuance-ledger.checkpoint.json \
+  --private-key-file /tmp/redline-trust.private \
+  --key-id redline-demo \
+  --issuer redline-ci \
+  --out /tmp/redline-ledger.attestation.json
+uv run redline verify-ledger-attestation /tmp/redline-ledger.attestation.json \
+  artifacts/demo/pass/issuance-ledger.checkpoint.json \
+  --trust-policy /tmp/redline-trust-policy.json
+export REDLINE_TRUST_POLICY=/tmp/redline-trust-policy.json
+export REDLINE_TRUST_POLICY_HASH="$(python -c 'import json;print(json.load(open("/tmp/redline-trust-policy.json"))["policy_hash"])')"
+```
 
 The Python wheel installs the CLI and library only. The bundled fixture package,
 schemas, GitHub Action, and checked-in demo artifacts are repository assets; use
@@ -103,6 +129,17 @@ It also validates the bundled recorded sponsor-attestation JSON shape. That
 recorded file is not treated as live Bitget read-back proof. A nonzero
 `SPONSOR_EVIDENCE_UNVERIFIED` exit is expected until a live credentialed
 Bitget adapter is configured.
+
+`redline publish --execute` is a wrapper around the live sponsor adapter. It
+requires `REDLINE_BITGET_ACCESS_KEY`, `REDLINE_BITGET_SECRET_KEY`, and
+`REDLINE_BITGET_PASSPHRASE` (or the same names without the `REDLINE_` prefix),
+writes a redacted `sponsor-transcript.jsonl`, persists `sponsor_evidence`, and
+still refuses final publish unless the local preflight is already chained and
+signed. `--final-publish` additionally requires `--execute`,
+`--yes-final-publish`, and `REDLINE_ALLOW_FINAL_PUBLISH=1`; only a live,
+credentialed readback can reach `READBACK_VERIFIED`. The current adapter uses
+injectable mock transport for tests and a conservative HMAC-signed HTTP wrapper
+for live Bitget endpoints.
 
 ## Repository Layout
 

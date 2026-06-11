@@ -6,5 +6,9 @@
   "metrics_output_hash": "sha256:56ff6f3f8a2789f64b0d3e0e0f32d1bb933c7d9dca44aee86e9bf0e4dfae2168",
   "expected_version_id": "recorded-demo-version-001",
   "expected_metrics_output_hash": "sha256:56ff6f3f8a2789f64b0d3e0e0f32d1bb933c7d9dca44aee86e9bf0e4dfae2168",
+  "package_hash": "sha256:9e6c62b12ba5f7db13c6822cc08b074370e52300af4f3636e58868ff52a373c0",
+  "package_archive_hash": "sha256:04e935678c471ae2f1ef8e169f7723bbf7862d3b9c5c0f9bbf459a17d7a3a5b8",
+  "source_kind": "recorded",
+  "proof_eligible": false,
   "transcript_hash": "sha256:f187b7ac43293584b491e6fcb28f7f6d1c125cfbda10ca1341df9ee8587c94f7"
 }

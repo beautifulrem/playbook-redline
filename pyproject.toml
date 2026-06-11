@@ -10,6 +10,7 @@ dependencies = [
   "rich>=13.7",
   "orjson>=3.10",
   "jsonschema>=4.23",
+  "cryptography>=43",
 ]
 
 [project.optional-dependencies]
