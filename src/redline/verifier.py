@@ -273,6 +273,9 @@ def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
 def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
     if receipt.package.manifest_hash != receipt.package.identity_hash:
         return ReasonCode.RECEIPT_MISMATCH
+    proof_ids = [proof.proof_id for proof in receipt.proofs]
+    if len(set(proof_ids)) != len(proof_ids):
+        return ReasonCode.RECEIPT_MISMATCH
     for proof in receipt.proofs:
         if proof.kind in NON_VERDICT_PROOF_KINDS and proof.verdict_bearing:
             return ReasonCode.RECEIPT_MISMATCH

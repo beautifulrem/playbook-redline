@@ -40,7 +40,7 @@ from redline.models import (
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash
+from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, make_decision_proof
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
@@ -310,6 +310,30 @@ def test_candidate_operator_attrgetter_globals_bypass_is_sandbox_violation(tmp_p
         package_dir=package,
         baseline="baseline",
         candidate="candidate_attrgetter_bypass",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+
+
+def test_candidate_platform_os_reexport_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_platform_os")
+    (package / "candidate_platform_os" / "strategy.py").write_text(
+        "import platform\n\n"
+        "def signal(bar, state, config):\n"
+        "    state['host_tmp_count'] = len(platform.os.listdir('/tmp'))\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_platform_os",
         suite_path=SUITE,
         spec_path=SPEC,
         out_dir=tmp_path / "run",
@@ -1061,6 +1085,42 @@ def test_verify_proof_rejects_forged_receipt_proof(tmp_path: Path) -> None:
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
+def test_verify_proof_rejects_duplicate_receipt_proof_ids(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.receipt is not None
+    duplicate = next(proof for proof in artifacts.receipt.proofs if proof.kind == ProofKind.PROBE)
+    non_decision = [proof for proof in artifacts.receipt.proofs if proof.kind != ProofKind.DECISION]
+    ambiguous_proofs = [*non_decision, duplicate]
+    envelope = decide(
+        proofs=ambiguous_proofs,
+        coverage=artifacts.receipt.coverage,
+        context=DecisionContext(
+            suite_id=artifacts.receipt.suite.suite_id,
+            spec_hash=artifacts.receipt.spec.spec_hash,
+            chain_status=artifacts.receipt.baseline.chain_status,
+        ),
+    )
+    decision_proof = make_decision_proof(envelope=envelope, proofs=ambiguous_proofs)
+    ambiguous_receipt = artifacts.receipt.model_copy(
+        update={
+            "proofs": [*ambiguous_proofs, decision_proof],
+            "decision": artifacts.receipt.decision.model_copy(
+                update={
+                    "reason_code": envelope.reason_code,
+                    "required_proof_ids": envelope.required_proof_ids,
+                    "satisfied_proof_ids": envelope.satisfied_proof_ids,
+                }
+            ),
+            "receipt_hash": "",
+        }
+    )
+    ambiguous_receipt = ambiguous_receipt.model_copy(update={"receipt_hash": compute_receipt_hash(ambiguous_receipt)})
+    (tmp_path / "receipt.json").write_text(ambiguous_receipt.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    result = verify_proof(receipt_path=tmp_path / "receipt.json", proof_id=duplicate.proof_id, package=PACKAGE, suite_path=SUITE, spec_path=SPEC)
+    assert result.status == "proof_mismatch"
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
 def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -1690,12 +1750,34 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
         receipt_path=tmp_path / "chained" / "receipt.json",
         package=package,
         report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=attestation_path,
         trust_policy_path=policy_path,
     )
     assert annotation_result.ok is True
     assert annotation_result.reason_code == ReasonCode.PASS
+    proof_backup = tmp_path / "proof-backup"
+    shutil.copytree(tmp_path / "chained" / "proofs", proof_backup)
+    shutil.rmtree(tmp_path / "chained" / "proofs")
+    missing_sidecar_result = verify_annotation(
+        annotation_path=tmp_path / "publish" / "redline-annotation.json",
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+    )
+    assert missing_sidecar_result.ok is False
+    assert missing_sidecar_result.state == "ANNOTATION_RECEIPT_INVALID"
+    assert missing_sidecar_result.reason_code == ReasonCode.RECEIPT_MISMATCH
+    shutil.copytree(proof_backup, tmp_path / "chained" / "proofs")
     forged_annotation_path = tmp_path / "forged-publish-annotation.json"
     forged_annotation = json.loads((tmp_path / "publish" / "redline-annotation.json").read_text())
     forged_annotation["ledger_attestation_hash"] = None
@@ -1709,7 +1791,12 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
         receipt_path=tmp_path / "chained" / "receipt.json",
         package=package,
         report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
     )
     assert forged_result.ok is False
     assert forged_result.state == "ANNOTATION_ATTESTATION_REQUIRED"
@@ -2519,6 +2606,9 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
         access_key="access",
         secret_key="secret",
         passphrase="pass",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
         trust_policy_path=policy_path,
     )
@@ -2583,6 +2673,9 @@ def test_execute_sponsor_readback_rejects_tampered_receipt_before_adapter(monkey
         access_key="access",
         secret_key="secret",
         passphrase="pass",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
         trust_policy_path=policy_path,
     )
@@ -2637,6 +2730,10 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
     assert payload["state"] == "BITGET_CREDENTIALS_REQUIRED"
+    schema_dir = tmp_path / "schemas"
+    export_schemas(schema_dir)
+    schema = json.loads((schema_dir / "sponsor-step-result.v1.schema.json").read_text(encoding="utf-8"))
+    Draft202012Validator(schema).validate(payload)
 
 
 def test_verify_sponsor_script_emits_single_json_document(monkeypatch) -> None:

@@ -297,9 +297,12 @@ def verify_annotation(
     receipt_path: Path | None = None,
     package: Path | None = None,
     report_path: Path | None = None,
+    suite_path: Path | None = None,
+    spec_path: Path | None = None,
     ledger_checkpoint_path: Path | None = None,
     ledger_attestation_path: Path | None = None,
     trust_policy_path: Path | None = None,
+    baseline_receipt_path: Path | None = None,
     allow_demo_preview: bool = False,
 ) -> PublishPreflightResult:
     try:
@@ -321,16 +324,36 @@ def verify_annotation(
             receipt = load_receipt(receipt_path)
         except Exception:
             return PublishPreflightResult(ok=False, state="RECEIPT_INVALID", reason_code=ReasonCode.PARSE_ERROR)
-        verification = verify(
-            receipt_path=receipt_path,
-            report_path=report_path,
-            ledger_checkpoint_path=ledger_checkpoint_path,
-            ledger_attestation_path=ledger_attestation_path,
-            trust_policy_path=trust_policy_path,
-            level=VerificationLevel.HASH_ONLY,
-        )
+        if annotation.annotation_kind == "publish-preflight":
+            resolved_suite_path = suite_path or _resolve_receipt_source_path(receipt.suite.source_path, receipt_path=receipt_path, package=package)
+            resolved_spec_path = spec_path or _resolve_receipt_source_path(receipt.spec.source_path, receipt_path=receipt_path, package=package)
+            verification = verify(
+                receipt_path=receipt_path,
+                package=package,
+                suite_path=resolved_suite_path,
+                spec_path=resolved_spec_path,
+                report_path=report_path,
+                ledger_checkpoint_path=ledger_checkpoint_path,
+                ledger_attestation_path=ledger_attestation_path,
+                trust_policy_path=trust_policy_path,
+                baseline_receipt_path=baseline_receipt_path,
+                level=VerificationLevel.REPLAYED,
+            )
+        else:
+            verification = verify(
+                receipt_path=receipt_path,
+                report_path=report_path,
+                ledger_checkpoint_path=ledger_checkpoint_path,
+                ledger_attestation_path=ledger_attestation_path,
+                trust_policy_path=trust_policy_path,
+                level=VerificationLevel.HASH_ONLY,
+            )
         if verification.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}:
             return PublishPreflightResult(ok=False, state="ANNOTATION_RECEIPT_INVALID", reason_code=verification.reason_code)
+        if annotation.annotation_kind == "publish-preflight" and (
+            verification.status != VerificationStatus.VERIFIED or verification.reason_code != ReasonCode.PASS
+        ):
+            return PublishPreflightResult(ok=False, state="ANNOTATION_LOCAL_PASS_REQUIRED", reason_code=verification.reason_code)
         if annotation.receipt_hash != receipt.receipt_hash or annotation.report_hash != receipt.report.report_hash:
             return PublishPreflightResult(ok=False, state="ANNOTATION_BINDING_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
     if package is not None and annotation.package_hash != hash_tree(package):
@@ -413,8 +436,11 @@ def execute_sponsor_readback(
     secret_key: str,
     passphrase: str,
     final_publish: bool = False,
+    suite_path: Path | None = None,
+    spec_path: Path | None = None,
     ledger_attestation_path: Path | None = None,
     trust_policy_path: Path | None = None,
+    baseline_receipt_path: Path | None = None,
 ) -> SponsorStepResult:
     receipt = load_receipt(receipt_path)
     envelope = decision_envelope_from_receipt(receipt)
@@ -439,9 +465,12 @@ def execute_sponsor_readback(
         receipt_path=receipt_path,
         package=package,
         report_path=receipt_path.parent / "report.json",
+        suite_path=suite_path,
+        spec_path=spec_path,
         ledger_checkpoint_path=receipt_path.parent / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json",
         trust_policy_path=trust_policy_path,
+        baseline_receipt_path=baseline_receipt_path,
     )
     if not annotation_result.ok:
         return SponsorStepResult(
@@ -488,6 +517,20 @@ def execute_sponsor_readback(
     if not published.ok:
         return published
     return SponsorStepResult(ok=True, state=SponsorState.PUBLISHED, evidence={**readback.evidence, **published.evidence})
+
+
+def _resolve_receipt_source_path(value: str, *, receipt_path: Path, package: Path | None) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    candidates = [Path.cwd() / path, receipt_path.resolve().parent / path]
+    if package is not None:
+        resolved_package = package.resolve()
+        candidates.extend(parent / path for parent in resolved_package.parents)
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return (receipt_path.resolve().parent / path).resolve()
 
 
 def render_report_html(

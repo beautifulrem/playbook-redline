@@ -11,10 +11,10 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 ## Hackathon Fit
 
 - Bitget relevance: focuses on copy-trading/playbook safety before publication, with a sponsor read-back path for live run verification.
-- Technical depth: combines deterministic replay, canonical hashing, proof coverage, sandboxing, signed ledger checkpoints, MCP tools, JSON schemas, and CI integration.
+- Technical depth: combines deterministic replay, canonical hashing, proof coverage, sandboxing, signed ledger checkpoints, a narrow MCP receipt-check tool, JSON schemas, and CI integration.
 - Product clarity: the primary user is a strategy author or reviewer who needs a yes/no publish gate plus machine-checkable evidence, not another dashboard without enforceable provenance.
 - Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --rerun` let judges replay the evidence locally.
-- Extensibility: probe definitions, suites, package import, report rendering, MCP access, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel.
+- Extensibility: probe definitions, suites, package import, report rendering, internal MCP helper surfaces, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel; the public FastMCP registration exposes only the safe receipt-check tool.
 
 ## What Is Included
 

@@ -412,8 +412,11 @@ def publish(
                 secret_key=secret_key,
                 passphrase=passphrase,
                 final_publish=final_publish,
+                suite_path=suite,
+                spec_path=spec,
                 ledger_attestation_path=ledger_attestation,
                 trust_policy_path=trust_policy_path,
+                baseline_receipt_path=baseline_receipt,
             )
             result = result.model_copy(
                 update={
@@ -440,9 +443,12 @@ def verify_annotation_cmd(
     receipt: Optional[Path] = typer.Option(None, "--receipt"),
     package: Optional[Path] = typer.Option(None, "--package"),
     report: Optional[Path] = typer.Option(None, "--report"),
+    suite: Optional[Path] = typer.Option(None, "--suite"),
+    spec: Optional[Path] = typer.Option(None, "--spec"),
     ledger_checkpoint: Optional[Path] = typer.Option(None, "--ledger-checkpoint"),
     ledger_attestation: Optional[Path] = typer.Option(None, "--ledger-attestation"),
     trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
+    baseline_receipt: Optional[Path] = typer.Option(None, "--baseline-receipt"),
     allow_demo_preview: bool = typer.Option(False, "--allow-demo-preview"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -451,9 +457,12 @@ def verify_annotation_cmd(
         receipt_path=receipt,
         package=package,
         report_path=report,
+        suite_path=suite,
+        spec_path=spec,
         ledger_checkpoint_path=ledger_checkpoint,
         ledger_attestation_path=ledger_attestation,
         trust_policy_path=trust_policy,
+        baseline_receipt_path=baseline_receipt,
         allow_demo_preview=allow_demo_preview,
     )
     if json_out:
@@ -719,7 +728,7 @@ def verify_sponsor_run_cmd(
     if access_key is None or secret_key is None or passphrase is None:
         result = {
             "ok": False,
-            "state": "BITGET_CREDENTIALS_REQUIRED",
+            "state": SponsorState.BITGET_CREDENTIALS_REQUIRED.value,
             "evidence": {},
             "reason_code": ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED.value,
         }

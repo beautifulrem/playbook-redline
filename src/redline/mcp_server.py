@@ -1,7 +1,8 @@
-"""MCP surface for Playbook Redline.
+"""MCP receipt-check surface for Playbook Redline.
 
-The MCP server is deliberately thin: it calls the import/compiler/runner/verifier
-surfaces and never implements verdict logic locally.
+The module keeps import/compiler/runner/export helpers for direct tests and local
+composition, but the public FastMCP server deliberately registers only the safe
+receipt-check tool and never implements verdict logic locally.
 """
 
 import json

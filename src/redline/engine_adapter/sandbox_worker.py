@@ -18,8 +18,8 @@ from redline.models import Bar, ReasonCode
 
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
-_FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
-_FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator"}
+_FORBIDDEN_ENTROPY_MODULES = {"datetime", "random", "secrets", "time", "uuid"}
+_FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator", "platform"}
 _FORBIDDEN_STATIC_MODULES = {"builtins", "importlib", "os", "sys", *_FORBIDDEN_ENTROPY_MODULES, *_FORBIDDEN_REFLECTION_MODULES}
 _FORBIDDEN_DYNAMIC_CALLS = {
     "__import__",
@@ -147,6 +147,10 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             module_root = (node.module or "").split(".", 1)[0]
             if module_root in _FORBIDDEN_STATIC_MODULES:
                 raise RuntimeError(f"{reason}:import-{module_root}")
+            for alias in node.names:
+                alias_root = alias.name.split(".", 1)[0]
+                if alias_root in _FORBIDDEN_STATIC_MODULES:
+                    raise RuntimeError(f"{reason}:import-{alias_root}")
         elif isinstance(node, ast.Call):
             if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_DYNAMIC_CALLS:
                 raise RuntimeError(f"{reason}:dynamic-code-{node.func.id}")
@@ -160,6 +164,8 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
             if isinstance(node.func, ast.Subscript):
                 raise RuntimeError(f"{reason}:dynamic-subscript-call")
+        elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_STATIC_MODULES:
+            raise RuntimeError(f"{reason}:module-reexport-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("__") and node.attr.endswith("__"):
             raise RuntimeError(f"{reason}:dynamic-dunder-{node.attr}")
         elif isinstance(node, ast.Name) and node.id == "__builtins__":
