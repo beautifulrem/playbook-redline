@@ -17,7 +17,7 @@ from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import (
     capture_edit_provenance,
     compile_spec,
@@ -804,6 +804,17 @@ def verify_sponsor_run_cmd(
         expected_package_archive_hash=expected_package_archive_hash,
         expected_metrics_output_hash=expected_metrics_output_hash,
     )
+    if result.ok and (replayed_check.status != VerificationStatus.VERIFIED or replayed_check.reason_code != ReasonCode.PASS):
+        result = SponsorStepResult(
+            ok=False,
+            state=result.state,
+            evidence={
+                **result.evidence,
+                "verification_status": replayed_check.status.value,
+                "verification_reason_code": replayed_check.reason_code.value,
+            },
+            reason_code=replayed_check.reason_code,
+        )
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:

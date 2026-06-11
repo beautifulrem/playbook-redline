@@ -125,7 +125,7 @@ def _qwen_spec_is_semantically_sane(spec: RedlineSpec) -> bool:
             if value is None or value < 0 or value != value.to_integral_value() or value > Decimal("1000"):
                 return False
         elif probe.type == ProbeType.NO_ENTRY_WHEN:
-            before_bar = _decimal_param(probe.params, "before_bar")
+            before_bar = _decimal_param(probe.params, "before_bar" if "before_bar" in probe.params else "bar_lt")
             max_abs_position = _decimal_param(probe.params, "max_abs_position")
             if before_bar is None or before_bar < 0 or before_bar != before_bar.to_integral_value() or before_bar > Decimal("100000"):
                 return False

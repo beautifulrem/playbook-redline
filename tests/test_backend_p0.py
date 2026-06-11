@@ -804,6 +804,16 @@ def test_probe_parameter_semantics_are_schema_invalid(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         load_spec(bad_budget_spec)
 
+    spec_data = json.loads(SPEC.read_text())
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"]["before_bar"] = "not-an-int"
+            probe["params"]["bar_lt"] = "4"
+    bad_alias_spec = tmp_path / "bad-alias-spec.json"
+    bad_alias_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(bad_alias_spec)
+
     text_spec = tmp_path / "unsafe-redline.txt"
     text_spec.write_text("Max drawdown <= 999%; no entry before bar 3; trade budget 20.", encoding="utf-8")
     with pytest.raises(ValidationError):
@@ -1661,6 +1671,28 @@ def test_qwen_compile_path_records_locked_spec_metadata(tmp_path: Path) -> None:
     assert compiled.tool_schema_hash is not None
     assert compiled.degraded_reason is None
     assert compiled.probes[0].params["max_drawdown"] == "0.07"
+
+
+def test_qwen_compile_accepts_no_entry_bar_lt_alias(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        content = {
+            "version": "redline.spec.v2.1",
+            "spec_id": "qwen-compiled",
+            "probes": [
+                {"id": "drawdown_limit", "type": "max_drawdown", "params": {"max_drawdown": "0.07"}, "block": True},
+                {"id": "no_entry_when_crash", "type": "no_entry_when", "params": {"scenario_id": "btc-crash-2024-03-05", "bar_lt": "4", "max_abs_position": "0"}, "block": True},
+                {"id": "trade_budget", "type": "trade_budget", "params": {"max_trades": "12"}, "block": True},
+            ],
+        }
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps(content)}}]}).encode()
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    assert compiled.compiler == "qwen"
+    assert compiled.degraded_reason is None
+    assert compiled.probes[1].params["bar_lt"] == "4"
 
 
 def test_qwen_compile_discards_invalid_model_output(tmp_path: Path) -> None:
@@ -3322,6 +3354,76 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
     Draft202012Validator(schema).validate(payload)
 
 
+def test_verify_sponsor_run_cli_preserves_amber_exit_after_successful_sponsor(monkeypatch, tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=PACKAGE,
+        annotation_path=tmp_path / "archive" / "redline-annotation.json",
+        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
+    )
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": sha256_bytes(archive.read_bytes()),
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    class FakeAdapter:
+        proof_eligible = True
+
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def poll(self, *, run_id: str) -> SponsorStepResult:
+            return SponsorStepResult(
+                ok=True,
+                state=SponsorState.READBACK_VERIFIED,
+                evidence={
+                    "run_id": run_id,
+                    "version_id": evidence["expected_version_id"],
+                    "status": "completed",
+                    "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                    "package_hash": evidence["package_hash"],
+                    "package_archive_hash": evidence["package_archive_hash"],
+                },
+            )
+
+    monkeypatch.setattr(cli_module, "BitgetSponsorAdapter", FakeAdapter)
+    monkeypatch.setenv("REDLINE_BITGET_ACCESS_KEY", "access")
+    monkeypatch.setenv("REDLINE_BITGET_SECRET_KEY", "secret")
+    monkeypatch.setenv("REDLINE_BITGET_PASSPHRASE", "passphrase")
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(PACKAGE),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 10
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == SponsorState.READBACK_VERIFIED.value
+    assert payload["reason_code"] == ReasonCode.BASELINE_GENESIS.value
+    assert payload["evidence"]["verification_reason_code"] == ReasonCode.BASELINE_GENESIS.value
+
+
 def test_verify_sponsor_script_emits_single_json_document(monkeypatch) -> None:
     env = os.environ.copy()
     for key in [
@@ -3551,7 +3653,9 @@ def test_receipt_write_removes_receipt_when_ledger_write_fails(monkeypatch, tmp_
 
 
 def test_anti_reroll_ledger_rejects_conflicting_status(tmp_path: Path) -> None:
-    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
     assert artifacts.receipt is not None
     receipt = artifacts.receipt
     key_hash = hash_obj(
@@ -3574,7 +3678,9 @@ def test_anti_reroll_ledger_rejects_conflicting_status(tmp_path: Path) -> None:
 
 
 def test_anti_reroll_ledger_rejects_same_status_reroll(tmp_path: Path) -> None:
-    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
     assert artifacts.receipt is not None
     receipt = artifacts.receipt
     key_hash = hash_obj(

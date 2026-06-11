@@ -130,9 +130,7 @@ class ProbeSpec(RedlineModel):
             scenario_id = self.params.get("scenario_id")
             if not isinstance(scenario_id, str) or not scenario_id.strip():
                 raise ValueError("no_entry_when requires a non-empty scenario_id")
-            before_bar = _decimal_param(self.params, "before_bar")
-            if before_bar is None:
-                before_bar = _decimal_param(self.params, "bar_lt")
+            before_bar = _decimal_param(self.params, "before_bar" if "before_bar" in self.params else "bar_lt")
             if before_bar is None or before_bar < 0 or before_bar != before_bar.to_integral_value() or before_bar > Decimal("100000"):
                 raise ValueError("no_entry_when before_bar must be a finite integer in [0, 100000]")
             max_abs_position = _decimal_param(self.params, "max_abs_position")
