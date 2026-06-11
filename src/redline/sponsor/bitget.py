@@ -255,6 +255,7 @@ def verify_sponsor_readback_evidence(
 
 
 Transport = Callable[[str, str, dict[str, str], bytes], tuple[int, bytes]]
+OFFICIAL_BITGET_API_HOST = "api.bitget.com"
 
 
 class BitgetCredentials(BaseModel):
@@ -325,7 +326,11 @@ class BitgetSponsorAdapter:
         self.credentials = credentials
         self.base_url = base_url.rstrip("/")
         self.transport = transport or _urllib_transport
-        self.proof_eligible = credentials.source_kind == "live" and transport is None
+        self.proof_eligible = (
+            credentials.source_kind == "live"
+            and transport is None
+            and _is_official_bitget_base_url(self.base_url)
+        )
         self.transcript = SponsorTranscript(transcript_path)
         self._expected_version_id: str | None = None
         self._expected_package_hash: str | None = None
@@ -567,7 +572,7 @@ class BitgetSponsorAdapter:
                 },
                 reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
             )
-        if self.proof_eligible:
+        if self.proof_eligible or "code" in payload or "data" in payload:
             code = str(payload.get("code", ""))
             if code != "00000":
                 return SponsorStepResult(
@@ -577,7 +582,7 @@ class BitgetSponsorAdapter:
                         "status_code": str(status_code),
                         "bitget_code": code,
                         "source_kind": self.credentials.source_kind,
-                        "proof_eligible": "true",
+                        "proof_eligible": str(self.proof_eligible).lower(),
                         "transcript_hash": self.transcript.transcript_hash,
                     },
                     reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
@@ -591,7 +596,7 @@ class BitgetSponsorAdapter:
                         "status_code": str(status_code),
                         "bitget_code": code,
                         "source_kind": self.credentials.source_kind,
-                        "proof_eligible": "true",
+                        "proof_eligible": str(self.proof_eligible).lower(),
                         "transcript_hash": self.transcript.transcript_hash,
                     },
                     reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
@@ -691,6 +696,18 @@ def _multipart_body(*, fields: dict[str, str], file_field: str, file_name: str, 
 
 def _idempotency_key(package_hash: str) -> str:
     return "redline-" + package_hash.removeprefix("sha256:")[:32]
+
+
+def _is_official_bitget_base_url(base_url: str) -> bool:
+    parsed = urllib.parse.urlsplit(base_url.rstrip("/"))
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == OFFICIAL_BITGET_API_HOST
+        and parsed.port is None
+        and parsed.path == ""
+        and parsed.query == ""
+        and parsed.fragment == ""
+    )
 
 
 def _publish_success_evidence(evidence: dict[str, str]) -> bool:

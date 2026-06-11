@@ -683,6 +683,24 @@ def verify_sponsor_run_cmd(
             }
             _print_json_or_table(result, json_out, evidence)
             raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
+        receipt_check = verify(receipt_path=receipt, level=VerificationLevel.HASH_ONLY)
+        if (
+            receipt_check.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}
+            or receipt_check.proof_coverage != "complete"
+            or receipt_check.missing_proof_ids
+        ):
+            result = {
+                "ok": False,
+                "state": SponsorState.MISMATCH.value,
+                "evidence": {
+                    "verification_status": receipt_check.status.value,
+                    "proof_coverage": receipt_check.proof_coverage,
+                    "receipt_hash": receipt_check.receipt_hash or "",
+                },
+                "reason_code": receipt_check.reason_code.value,
+            }
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[receipt_check.reason_code])
         try:
             receipt_obj = load_receipt(receipt)
             expected_package_hash = hash_tree(package)

@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 import redline.surfaces as surfaces_module
 import redline.receipt as receipt_module
 import redline.cli as cli_module
+import redline.sponsor.bitget as bitget_module
 
 from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree, sha256_bytes
 from redline.cli import app
@@ -2539,6 +2540,134 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
     assert payload["state"] == SponsorState.READBACK_VERIFIED.value
+
+
+def test_verify_sponsor_run_cli_rejects_tampered_receipt_before_credentials(monkeypatch, tmp_path: Path) -> None:
+    for key in [
+        "REDLINE_BITGET_ACCESS_KEY",
+        "REDLINE_BITGET_SECRET_KEY",
+        "REDLINE_BITGET_PASSPHRASE",
+        "BITGET_ACCESS_KEY",
+        "BITGET_SECRET_KEY",
+        "BITGET_PASSPHRASE",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "archive" / "redline-annotation.json",
+        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
+    )
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": sha256_bytes(archive.read_bytes()),
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+    receipt_path = tmp_path / "run" / "receipt.json"
+    receipt_payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt_payload["result"]["result_hash"] = "sha256:" + "0" * 64
+    receipt_path.write_text(json.dumps(receipt_payload), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(receipt_path),
+            "--package",
+            str(package),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == SponsorState.MISMATCH.value
+    assert payload["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
+
+
+def test_verify_sponsor_run_cli_local_base_url_is_not_live_proof(monkeypatch, tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "archive" / "redline-annotation.json",
+        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
+    )
+    archive_hash = sha256_bytes(archive.read_bytes())
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-local-1",
+        "version_id": "version-local-1",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-local-1",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": archive_hash,
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    def fake_transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        assert url.startswith("http://127.0.0.1:18987/")
+        payload = {
+            "code": "00000",
+            "data": {
+                "run_id": evidence["run_id"],
+                "version_id": evidence["expected_version_id"],
+                "status": "completed",
+                "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                "package_hash": evidence["package_hash"],
+                "package_archive_hash": archive_hash,
+            },
+        }
+        return 200, json.dumps(payload).encode("utf-8")
+
+    monkeypatch.setattr(bitget_module, "_urllib_transport", fake_transport)
+    monkeypatch.setenv("REDLINE_BITGET_ACCESS_KEY", "access")
+    monkeypatch.setenv("REDLINE_BITGET_SECRET_KEY", "secret")
+    monkeypatch.setenv("REDLINE_BITGET_PASSPHRASE", "passphrase")
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(package),
+            "--out-transcript",
+            str(tmp_path / "transcript.jsonl"),
+            "--base-url",
+            "http://127.0.0.1:18987",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == SponsorState.RECORDED_ATTESTATION_VALID.value
+    assert payload["reason_code"] == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED.value
+    assert payload["evidence"]["proof_eligible"] == "false"
 
 
 def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
