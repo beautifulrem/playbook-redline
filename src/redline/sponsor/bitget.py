@@ -58,11 +58,11 @@ class SponsorAdapter(Protocol):
 
 
 def assert_local_pass(envelope: DecisionEnvelope, call_site: str) -> SponsorStepResult | None:
-    if envelope.status != Status.PASS:
+    if envelope.status != Status.PASS or envelope.reason_code != ReasonCode.PASS:
         return SponsorStepResult(
             ok=False,
             state=SponsorState.LOCAL_PASS_REQUIRED,
-            evidence={"call_site": call_site, "status": envelope.status.value},
+            evidence={"call_site": call_site, "status": envelope.status.value, "reason_code": envelope.reason_code.value},
             reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
     return None

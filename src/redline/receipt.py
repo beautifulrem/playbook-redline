@@ -151,6 +151,7 @@ def atomic_write_receipt(
     *,
     ledger_path: Path | None = None,
     checkpoint_path: Path | None = None,
+    ledger_written_at: str | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if ledger_path is not None:
@@ -164,7 +165,7 @@ def atomic_write_receipt(
         os.fsync(fh.fileno())
     os.replace(tmp, path)
     if ledger_path is not None:
-        _append_ledger(ledger_path, receipt)
+        _append_ledger(ledger_path, receipt, written_at=ledger_written_at)
         create_ledger_checkpoint(
             ledger_path=ledger_path,
             checkpoint_path=checkpoint_path,
@@ -198,7 +199,7 @@ def create_ledger_checkpoint(
     return checkpoint
 
 
-def _append_ledger(path: Path, receipt: Receipt) -> None:
+def _append_ledger(path: Path, receipt: Receipt, *, written_at: str | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     previous_entry_hash = _last_ledger_entry_hash(path)
     entry = {
@@ -206,7 +207,7 @@ def _append_ledger(path: Path, receipt: Receipt) -> None:
         "status": receipt.result.status,
         "receipt_hash": receipt.receipt_hash,
         "previous_entry_hash": previous_entry_hash,
-        "written_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "written_at": written_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
     entry["entry_hash"] = hash_obj(entry)
     with path.open("a", encoding="utf-8") as fh:

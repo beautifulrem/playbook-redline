@@ -43,9 +43,8 @@ still use the exchange's own runtime sandbox.
 ## Quick Start
 
 ```bash
-uv run --extra dev pytest
-uv run redline export-schemas
-uv run redline make-demo
+make install
+make goldens
 uv run redline check artifacts/demo/pass/receipt.json --package fixtures/demo_pack --rerun --json
 uv run redline check artifacts/demo/withheld/receipt.json --package fixtures/demo_pack --rerun --json
 ```

@@ -12,9 +12,9 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from redline.canonical import hash_tree
+from redline.canonical import hash_obj, hash_tree
 from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
-from redline.runner import run_redline
+from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas as export_schema_files
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
@@ -24,6 +24,7 @@ from redline.models import LedgerCheckpoint, LedgerCheckpointAttestation
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
+FIXTURE_TIMESTAMP = "2026-06-10T00:00:00Z"
 
 EXIT_BY_REASON: dict[ReasonCode, int] = {
     ReasonCode.PASS: 0,
@@ -70,19 +71,29 @@ def run(
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     provenance = _load_edit_provenance(edit_provenance) if edit_provenance is not None else None
-    artifacts = run_redline(
-        package_dir=package,
-        baseline=baseline,
-        candidate=candidate,
-        suite_path=suite,
-        spec_path=spec,
-        out_dir=out,
-        edit_provenance=provenance,
-        baseline_receipt_path=baseline_receipt,
-        baseline_trust_policy_path=baseline_trust_policy,
-        baseline_version_id=baseline_version_id,
-        candidate_version_id=candidate_version_id,
-    )
+    try:
+        _validate_run_inputs(package=package, baseline=baseline, candidate=candidate, suite=suite, spec=spec)
+        artifacts = run_redline(
+            package_dir=package,
+            baseline=baseline,
+            candidate=candidate,
+            suite_path=suite,
+            spec_path=spec,
+            out_dir=out,
+            edit_provenance=provenance,
+            baseline_receipt_path=baseline_receipt,
+            baseline_trust_policy_path=baseline_trust_policy,
+            baseline_version_id=baseline_version_id,
+            candidate_version_id=candidate_version_id,
+        )
+    except FileNotFoundError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc.filename or exc}", out)
+    except json.JSONDecodeError:
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "run input JSON is invalid", out)
+    except ValidationError:
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "run input failed schema validation", out)
+    except ValueError as exc:
+        _exit_bad_input(ReasonCode.DATA_MISSING, json_out, str(exc), out)
     if json_out:
         console.print_json(data=artifacts.envelope.model_dump(mode="json"))
     else:
@@ -172,12 +183,37 @@ def make_demo(
     out: Path = Path("artifacts/demo"),
 ) -> None:
     try:
+        _validate_run_inputs(package=package, baseline="baseline", candidate="candidate_bad", suite=suite, spec=spec)
+        _validate_run_inputs(package=package, baseline="baseline", candidate="candidate_good", suite=suite, spec=spec)
         _prepare_demo_out(out)
     except ValueError as exc:
         console.print(f"make-demo rejected: {exc}")
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING]) from exc
-    bad = run_redline(package_dir=package, baseline="baseline", candidate="candidate_bad", suite_path=suite, spec_path=spec, out_dir=out / "withheld")
-    good = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=suite, spec_path=spec, out_dir=out / "pass")
+    except (FileNotFoundError, json.JSONDecodeError, ValidationError) as exc:
+        console.print(f"make-demo rejected: {exc}")
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING]) from exc
+    bad = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_bad",
+        suite_path=suite,
+        spec_path=spec,
+        out_dir=out / "withheld",
+        edit_provenance=_fixture_edit_provenance(package, "baseline", "candidate_bad"),
+        ledger_written_at=FIXTURE_TIMESTAMP,
+    )
+    _assert_demo_case(bad, expected_status=Status.WITHHELD, expected_reason=ReasonCode.NEW_BLOCK_BREACH, case="candidate_bad")
+    good = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=suite,
+        spec_path=spec,
+        out_dir=out / "pass",
+        edit_provenance=_fixture_edit_provenance(package, "baseline", "candidate_good"),
+        ledger_written_at=FIXTURE_TIMESTAMP,
+    )
+    _assert_demo_case(good, expected_status=Status.PASS, expected_reason=ReasonCode.BASELINE_GENESIS, case="candidate_good")
     table = Table("case", "status", "reason", "receipt")
     table.add_row("candidate_bad", bad.envelope.status.value, bad.envelope.reason_code.value, str((out / "withheld" / "receipt.json").resolve()))
     table.add_row("candidate_good", good.envelope.status.value, good.envelope.reason_code.value, str((out / "pass" / "receipt.json").resolve()))
@@ -580,6 +616,16 @@ def verify_sponsor_run_cmd(
     base_url: str = typer.Option("https://api.bitget.com", "--base-url"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
+    shape = validate_sponsor_evidence_shape(evidence)
+    if shape.reason_code in {ReasonCode.SCHEMA_INVALID, ReasonCode.SPONSOR_READBACK_MISMATCH}:
+        result = {
+            "ok": False,
+            "state": shape.state.value,
+            "evidence": shape.evidence,
+            "reason_code": shape.reason_code.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[shape.reason_code])
     expected_package_hash: str | None = None
     expected_metrics_output_hash: str | None = None
     if receipt is not None or package is not None:
@@ -685,6 +731,33 @@ def _exit_bad_input(reason_code: ReasonCode, json_out: bool, message: str, targe
     }
     _print_json_or_table(result, json_out, target)
     raise typer.Exit(EXIT_BY_REASON[reason_code])
+
+
+def _validate_run_inputs(*, package: Path, baseline: str, candidate: str, suite: Path, spec: Path) -> None:
+    if not package.exists() or not package.is_dir():
+        raise ValueError(f"package not found: {package}")
+    for role in [baseline, candidate]:
+        role_path = package / role
+        if not role_path.exists() or not role_path.is_dir():
+            raise ValueError(f"package role not found: {role_path}")
+    load_suite(suite)
+    load_spec(spec)
+
+
+def _assert_demo_case(artifacts, *, expected_status: Status, expected_reason: ReasonCode, case: str) -> None:
+    if artifacts.envelope.status != expected_status or artifacts.envelope.reason_code != expected_reason or artifacts.receipt is None:
+        raise typer.Exit(EXIT_BY_REASON[artifacts.envelope.reason_code])
+
+
+def _fixture_edit_provenance(package: Path, baseline: str, candidate: str) -> EditProvenance:
+    package = package.resolve()
+    return EditProvenance(
+        tool="fixture",
+        prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
+        diff_hash=hash_obj({"baseline": hash_tree(package / baseline), "candidate": hash_tree(package / candidate)}),
+        locked_by="author",
+        captured_at=FIXTURE_TIMESTAMP,
+    )
 
 
 def _prepare_demo_out(out: Path) -> None:

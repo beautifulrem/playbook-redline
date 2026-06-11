@@ -28,7 +28,7 @@ from redline.models import (
     VerificationStatus,
 )
 from redline.canonical import sha256_bytes
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_annotated_package_archive, make_package_archive
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, assert_local_pass, make_annotated_package_archive, make_package_archive
 from redline.spec_compiler import LLMTransport, compile_text_spec
 from redline.verifier import load_receipt, verify
 
@@ -347,6 +347,16 @@ def execute_sponsor_readback(
         coverage=receipt.coverage,
         capabilities=receipt.capabilities,
     )
+    pass_error = assert_local_pass(envelope, "execute_sponsor_readback")
+    if pass_error is not None:
+        return pass_error
+    if envelope.chain_status != ChainStatus.CHAINED:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.LOCAL_PASS_REQUIRED,
+            evidence={"call_site": "execute_sponsor_readback", "chain_status": envelope.chain_status.value},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
     annotation_path = out_dir / "redline-annotation.json"
     if not annotation_path.exists():
         return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.DATA_MISSING)

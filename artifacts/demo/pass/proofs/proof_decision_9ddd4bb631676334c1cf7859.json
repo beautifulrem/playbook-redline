@@ -1,0 +1,11 @@
+{
+  "proof_id": "proof:decision:9ddd4bb631676334c1cf7859",
+  "phase": "decide",
+  "kind": "decision",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:b6ee3e191f610339b77ed7f083fe762e1354c6cd6cd7d0f21d9d26e236ddba4b",
+  "artifact_hash": "sha256:21a5287e8942d455e8f26893c5559de46540ab38e54b8b100f4d8dcfd5a0d767",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:9ddd4bb631676334c1cf7859 --package <package> --suite <suite> --spec <spec>",
+  "meta": {}
+}

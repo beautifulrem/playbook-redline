@@ -39,6 +39,7 @@ SINGLETON_PROOF_KINDS = {
     ProofKind.CANDIDATE_ABSOLUTE,
     ProofKind.DECISION,
 }
+NON_VERDICT_PROOF_KINDS = {ProofKind.EDIT_PROVENANCE, ProofKind.SPONSOR_READBACK}
 
 
 def load_receipt(path: Path) -> Receipt:
@@ -272,6 +273,9 @@ def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
 def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
     if receipt.package.manifest_hash != receipt.package.identity_hash:
         return ReasonCode.RECEIPT_MISMATCH
+    for proof in receipt.proofs:
+        if proof.kind in NON_VERDICT_PROOF_KINDS and proof.verdict_bearing:
+            return ReasonCode.RECEIPT_MISMATCH
     for kind in SINGLETON_PROOF_KINDS:
         matches = [proof for proof in receipt.proofs if proof.kind is kind]
         if len(matches) > 1:

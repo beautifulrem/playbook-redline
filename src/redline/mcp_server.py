@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from redline.canonical import hash_obj
 from redline.models import ReasonCode, Status, TrustPolicy, VerificationLevel, VerificationStatus
 from redline.runner import run_redline
@@ -91,6 +93,8 @@ def redline_verify_receipt(
 def redline_import_playbook(pkg_path: str) -> dict:
     try:
         result = import_package(Path(pkg_path))
+    except FileNotFoundError as exc:
+        return _mcp_bad_input(ReasonCode.FILE_NOT_FOUND, str(exc))
     except Exception as exc:
         return _mcp_bad_input(ReasonCode.DATA_MISSING, str(exc))
     payload = result.model_dump(mode="json")
@@ -106,6 +110,12 @@ def redline_compile_spec(
 ) -> dict:
     try:
         spec = compile_spec(Path(source_path), use_qwen=use_qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
+    except FileNotFoundError as exc:
+        return _mcp_bad_input(ReasonCode.FILE_NOT_FOUND, str(exc))
+    except json.JSONDecodeError as exc:
+        return _mcp_bad_input(ReasonCode.PARSE_ERROR, str(exc))
+    except ValidationError as exc:
+        return _mcp_bad_input(ReasonCode.SCHEMA_INVALID, str(exc))
     except Exception as exc:
         return _mcp_bad_input(ReasonCode.SCHEMA_INVALID, str(exc))
     return {
@@ -132,6 +142,8 @@ def redline_run_suite(
     candidate_version_id: str | None = None,
 ) -> dict:
     try:
+        if not Path(pkg_path).exists():
+            return _mcp_bad_input(ReasonCode.FILE_NOT_FOUND, f"package not found: {pkg_path}")
         artifacts = run_redline(
             package_dir=Path(pkg_path),
             baseline=baseline,

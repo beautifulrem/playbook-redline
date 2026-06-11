@@ -96,6 +96,7 @@ def run_redline(
     baseline_trust_policy_path: Path | None = None,
     baseline_version_id: str | None = None,
     candidate_version_id: str | None = None,
+    ledger_written_at: str | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
     suite_path = suite_path.resolve()
@@ -331,11 +332,11 @@ def run_redline(
         report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
     artifacts = RunArtifacts(envelope=envelope, receipt=receipt, proofs=proofs, traces=traces, report_json=report_json, out_dir=out_dir)
     if out_dir is not None:
-        write_artifacts(artifacts, out_dir=out_dir)
+        write_artifacts(artifacts, out_dir=out_dir, ledger_written_at=ledger_written_at)
     return artifacts
 
 
-def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
+def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at: str | None = None) -> None:
     _clear_artifacts_dir(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "envelope.json").write_text(artifacts.envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
@@ -351,6 +352,7 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
             artifacts.receipt,
             ledger_path=out_dir / "issuance-ledger.jsonl",
             checkpoint_path=out_dir / "issuance-ledger.checkpoint.json",
+            ledger_written_at=ledger_written_at,
         )
 
 
