@@ -40,6 +40,26 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "vars",
 }
 _FORBIDDEN_FILE_READ_CALLS = {"open", "read_bytes", "read_text"}
+_FORBIDDEN_FILE_METADATA_CALLS = {
+    "absolute",
+    "exists",
+    "expanduser",
+    "glob",
+    "home",
+    "is_dir",
+    "is_file",
+    "is_mount",
+    "is_socket",
+    "is_symlink",
+    "iterdir",
+    "lstat",
+    "owner",
+    "readlink",
+    "resolve",
+    "rglob",
+    "samefile",
+    "stat",
+}
 _FORBIDDEN_ENTROPY_ATTRS = {
     "choice",
     "choices",
@@ -160,6 +180,8 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:dynamic-call-result")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_READ_CALLS:
                 raise RuntimeError(f"{reason}:file-read-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_METADATA_CALLS:
+                raise RuntimeError(f"{reason}:file-metadata-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
             if isinstance(node.func, ast.Subscript):
@@ -179,6 +201,8 @@ def _reject_forbidden_string(value: str, reason: str) -> None:
         raise RuntimeError(f"{reason}:dynamic-dunder-string")
     if value in _FORBIDDEN_DYNAMIC_CALLS:
         raise RuntimeError(f"{reason}:dynamic-code-string-{value}")
+    if value in _FORBIDDEN_FILE_READ_CALLS or value in _FORBIDDEN_FILE_METADATA_CALLS:
+        raise RuntimeError(f"{reason}:file-access-string-{value}")
     if value in _FORBIDDEN_ENTROPY_ATTRS:
         raise RuntimeError(f"{reason}:entropy-string-{value}")
     if value.split(".", 1)[0] in _FORBIDDEN_STATIC_MODULES:

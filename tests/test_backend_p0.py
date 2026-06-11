@@ -343,6 +343,30 @@ def test_candidate_platform_os_reexport_is_sandbox_violation(tmp_path: Path) -> 
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
 
 
+def test_candidate_pathlib_metadata_read_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_pathlib_metadata")
+    (package / "candidate_pathlib_metadata" / "strategy.py").write_text(
+        "from pathlib import Path\n\n"
+        "def signal(bar, state, config):\n"
+        "    state['outside_root_entries'] = [path.name for path in Path('/').iterdir()][:3]\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_pathlib_metadata",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+
+
 def test_no_entry_when_probe_catches_early_crash_entry(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
