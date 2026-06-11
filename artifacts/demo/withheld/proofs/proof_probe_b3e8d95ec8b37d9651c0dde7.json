@@ -17,5 +17,8 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec>",
-  "meta": {}
+  "meta": {
+    "scenario_id": "btc-crash-2024-03-05",
+    "probe_id": "trade_budget"
+  }
 }

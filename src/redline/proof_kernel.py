@@ -78,6 +78,10 @@ def decide(
     proof_list = list(proofs)
     if coverage.complete and (not coverage.cells or len(set(coverage.cells)) != len(coverage.cells)):
         coverage = CoverageManifest(cells=sorted(set(coverage.cells)), complete=False, missing=[ReasonCode.COVERAGE_INCOMPLETE.value])
+    if coverage.complete:
+        missing_cells = _missing_probe_coverage_cells(proof_list=proof_list, coverage=coverage)
+        if missing_cells:
+            coverage = CoverageManifest(cells=coverage.cells, complete=False, missing=missing_cells)
     capabilities = Capabilities(scenario_count=len({cell[0] for cell in coverage.cells}))
     if context.reject_reason is not None:
         status = Status.REJECT
@@ -141,3 +145,18 @@ def _has_block_breach(proofs: Sequence[Proof]) -> bool:
                 if not assertion.holds:
                     return True
     return False
+
+
+def _missing_probe_coverage_cells(*, proof_list: Sequence[Proof], coverage: CoverageManifest) -> list[str]:
+    covered: set[tuple[str, str]] = set()
+    for proof in proof_list:
+        if proof.kind is not ProofKind.PROBE or not proof.verdict_bearing:
+            continue
+        scenario_id = proof.meta.get("scenario_id")
+        probe_id = proof.meta.get("probe_id")
+        if not isinstance(scenario_id, str) or not isinstance(probe_id, str):
+            continue
+        if not any(assertion.scenario_id == scenario_id for assertion in proof.assertions):
+            continue
+        covered.add((scenario_id, probe_id))
+    return [f"{scenario_id}:{probe_id}:missing_probe_proof" for scenario_id, probe_id in coverage.cells if (scenario_id, probe_id) not in covered]

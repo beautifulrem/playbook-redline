@@ -40,6 +40,7 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "vars",
 }
 _FORBIDDEN_FILE_READ_CALLS = {"open", "read_bytes", "read_text"}
+_FORBIDDEN_FILE_WRITE_CALLS = {"touch", "write_bytes", "write_text"}
 _FORBIDDEN_FILE_METADATA_CALLS = {
     "absolute",
     "exists",
@@ -102,6 +103,7 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
             "os.system",
             "os.truncate",
             "os.unlink",
+            "os.urandom",
             "os.utime",
             "pty.spawn",
             "shutil.copyfile",
@@ -114,6 +116,8 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
         }
         if event.startswith(blocked_prefixes) or event in blocked_events:
             raise RuntimeError(f"{reason}:{event}")
+        if event == "exec" and args and str(getattr(args[0], "co_filename", "")).startswith("<"):
+            raise RuntimeError(f"{reason}:exec-dynamic")
         if event == "import" and args:
             module_name = str(args[0])
             module_root = module_name.split(".", 1)[0]
@@ -176,16 +180,24 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:dynamic-code-{node.func.id}")
             if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_FILE_READ_CALLS:
                 raise RuntimeError(f"{reason}:file-read-{node.func.id}")
+            if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_FILE_WRITE_CALLS:
+                raise RuntimeError(f"{reason}:file-write-{node.func.id}")
             if isinstance(node.func, ast.Call):
                 raise RuntimeError(f"{reason}:dynamic-call-result")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_READ_CALLS:
                 raise RuntimeError(f"{reason}:file-read-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_WRITE_CALLS:
+                raise RuntimeError(f"{reason}:file-write-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_DYNAMIC_CALLS:
+                raise RuntimeError(f"{reason}:dynamic-code-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_METADATA_CALLS:
                 raise RuntimeError(f"{reason}:file-metadata-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
             if isinstance(node.func, ast.Subscript):
                 raise RuntimeError(f"{reason}:dynamic-subscript-call")
+        elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            raise RuntimeError(f"{reason}:private-attribute-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_STATIC_MODULES:
             raise RuntimeError(f"{reason}:module-reexport-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("__") and node.attr.endswith("__"):
@@ -201,7 +213,7 @@ def _reject_forbidden_string(value: str, reason: str) -> None:
         raise RuntimeError(f"{reason}:dynamic-dunder-string")
     if value in _FORBIDDEN_DYNAMIC_CALLS:
         raise RuntimeError(f"{reason}:dynamic-code-string-{value}")
-    if value in _FORBIDDEN_FILE_READ_CALLS or value in _FORBIDDEN_FILE_METADATA_CALLS:
+    if value in _FORBIDDEN_FILE_READ_CALLS or value in _FORBIDDEN_FILE_WRITE_CALLS or value in _FORBIDDEN_FILE_METADATA_CALLS:
         raise RuntimeError(f"{reason}:file-access-string-{value}")
     if value in _FORBIDDEN_ENTROPY_ATTRS:
         raise RuntimeError(f"{reason}:entropy-string-{value}")
@@ -241,9 +253,10 @@ def _read_config(path: Path) -> dict[str, object]:
         return json.load(fh)
 
 
-def _run_signals(*, package_dir: Path, bars: list[Bar]) -> list[str]:
+def _run_signals(*, package_dir: Path, bars: list[Bar], allowed_read_roots: tuple[Path, ...]) -> list[str]:
     config = _read_config(package_dir / "config.json")
     strategy = _load_strategy(package_dir / "strategy.py")
+    sys.addaudithook(_make_audit_hook(allowed_read_roots))
     signals: list[str] = []
     state: dict[str, object] = {}
     for bar in bars:
@@ -275,12 +288,8 @@ def main() -> int:
             roots.add(Path(path).resolve())
     for path in site.getsitepackages():
         roots.add(Path(path).resolve())
-    sys.addaudithook(_make_audit_hook(tuple(roots)))
     try:
-        signals = _run_signals(
-            package_dir=Path(args.package).resolve(),
-            bars=bars,
-        )
+        signals = _run_signals(package_dir=Path(args.package).resolve(), bars=bars, allowed_read_roots=tuple(roots))
     except Exception as exc:  # subprocess boundary: return typed error instead of traceback contract drift
         reason = ReasonCode.ENGINE_FAILURE.value
         text = str(exc)

@@ -217,7 +217,8 @@ def verify_proof(
     receipt_proof = next((proof for proof in receipt.proofs if proof.proof_id == proof_id), None)
     if receipt_proof is None:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
-    proof_path = (proofs_dir or receipt_path.parent / "proofs") / f"{proof_id.replace(':', '_')}.json"
+    proofs_root = proofs_dir or receipt_path.parent / "proofs"
+    proof_path = proofs_root / f"{proof_id.replace(':', '_')}.json"
     try:
         external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
     except Exception:
@@ -229,6 +230,8 @@ def verify_proof(
     if package is not None:
         if suite_path is None or spec_path is None:
             return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.DATA_MISSING)
+        if _external_proofs_error(receipt=receipt, proofs_dir=proofs_root) is not None:
+            return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
         try:
             from redline.runner import run_redline
 

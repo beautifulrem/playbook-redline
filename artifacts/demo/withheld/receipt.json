@@ -43,8 +43,8 @@
   },
   "runner": {
     "engine": "deterministic",
-    "engine_source_tree_hash": "sha256:0ee8c953757c1a6bcfecc504033db222db04d27102b22416252803320fcc779c",
-    "runner_lock_hash": "sha256:0b34966d7342ffa28b5bd295483730211fb0eb15ff3a82b7e543bcafd237df18",
+    "engine_source_tree_hash": "sha256:898ae4c05f3069ff32412c4d1e271459227032828c32bc379bd47658832deb66",
+    "runner_lock_hash": "sha256:d23ba535017c8af091de1026cf195af668c73fca4f114f2b7c038ec61be74511",
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
@@ -257,7 +257,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b5785a8f2f863c305e84df47 --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "drawdown_limit"
+      }
     },
     {
       "proof_id": "proof:probe:2b0b31d7e8e89665ae2fab01",
@@ -278,7 +281,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:2b0b31d7e8e89665ae2fab01 --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "no_entry_when_crash"
+      }
     },
     {
       "proof_id": "proof:probe:b3e8d95ec8b37d9651c0dde7",
@@ -299,7 +305,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "trade_budget"
+      }
     },
     {
       "proof_id": "proof:probe:1ea0185c616b3d37f783091d",
@@ -320,7 +329,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ea0185c616b3d37f783091d --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "drawdown_limit"
+      }
     },
     {
       "proof_id": "proof:probe:a13bf024e0d494f47d38b48f",
@@ -341,7 +353,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "no_entry_when_crash"
+      }
     },
     {
       "proof_id": "proof:probe:c3ad8af9ce3ea6a163703aee",
@@ -362,7 +377,10 @@
         }
       ],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec>",
-      "meta": {}
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "trade_budget"
+      }
     },
     {
       "proof_id": "proof:coverage:07629775749a0c50afc55033",
@@ -522,7 +540,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:9b1d4915851d9741f56374c2d11bcf3ac609862db4619a4a7a7eeb0a3e039389",
+    "report_hash": "sha256:61d24bd57a5d59429516de24d456af6a022c19b05d94d023aabc9efa34abfe51",
     "attribution_report_hash": null
   },
   "publish": {
@@ -535,5 +553,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:9e76c8a06d749084170e3e9002bbed512d4c3c8fadc5a5380aeab0542f392bbd"
+  "receipt_hash": "sha256:806c7fe1b01b9f4be2e51fe711fcdbfe47ac4f1379df3479c32554d57dfada09"
 }

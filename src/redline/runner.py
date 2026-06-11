@@ -278,6 +278,7 @@ def run_redline(
                         artifact={"baseline": baseline_result, "candidate": candidate_result},
                         verdict_bearing=probe_spec.block,
                         assertions=candidate_result.assertions,
+                        meta={"scenario_id": scenario.id, "probe_id": probe_spec.id},
                     )
                 )
         if reject_reason is None:

@@ -673,73 +673,72 @@ def verify_sponsor_run_cmd(
     expected_package_hash: str | None = None
     expected_package_archive_hash: str | None = None
     expected_metrics_output_hash: str | None = None
-    if receipt is not None or package is not None:
-        if receipt is None or package is None:
-            result = {
-                "ok": False,
-                "state": "RECEIPT_PACKAGE_BINDING_REQUIRED",
-                "evidence": {},
-                "reason_code": ReasonCode.DATA_MISSING.value,
-            }
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
-        receipt_check = verify(receipt_path=receipt, level=VerificationLevel.HASH_ONLY)
-        if (
-            receipt_check.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}
-            or receipt_check.proof_coverage != "complete"
-            or receipt_check.missing_proof_ids
-        ):
-            result = {
-                "ok": False,
-                "state": SponsorState.MISMATCH.value,
-                "evidence": {
-                    "verification_status": receipt_check.status.value,
-                    "proof_coverage": receipt_check.proof_coverage,
-                    "receipt_hash": receipt_check.receipt_hash or "",
-                },
-                "reason_code": receipt_check.reason_code.value,
-            }
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[receipt_check.reason_code])
-        try:
-            receipt_obj = load_receipt(receipt)
-            expected_package_hash = hash_tree(package)
-        except FileNotFoundError:
-            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.FILE_NOT_FOUND.value}
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.FILE_NOT_FOUND])
-        except Exception:
-            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
-        if expected_package_hash != receipt_obj.package.identity_hash:
-            result = {
-                "ok": False,
-                "state": SponsorState.MISMATCH.value,
-                "evidence": {"package_hash": expected_package_hash, "expected_package_hash": receipt_obj.package.identity_hash},
-                "reason_code": ReasonCode.RECEIPT_BINDING_FAILED.value,
-            }
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
-        try:
-            with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
-                archive, _annotation = make_receipt_bound_package_archive(
-                    receipt_path=receipt,
-                    package=package,
-                    annotation_path=Path(tmp) / "redline-annotation.json",
-                    out_path=Path(tmp) / "annotated-package.tar.gz",
-                    package_hash=expected_package_hash,
-                )
-                expected_package_archive_hash = sha256_bytes(archive.read_bytes())
-        except FileNotFoundError:
-            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.DATA_MISSING.value}
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
-        except Exception:
-            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
-            _print_json_or_table(result, json_out, evidence)
-            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
-        expected_metrics_output_hash = receipt_obj.result.result_hash
+    if receipt is None or package is None:
+        result = {
+            "ok": False,
+            "state": "RECEIPT_PACKAGE_BINDING_REQUIRED",
+            "evidence": {},
+            "reason_code": ReasonCode.DATA_MISSING.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
+    receipt_check = verify(receipt_path=receipt, level=VerificationLevel.HASH_ONLY)
+    if (
+        receipt_check.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}
+        or receipt_check.proof_coverage != "complete"
+        or receipt_check.missing_proof_ids
+    ):
+        result = {
+            "ok": False,
+            "state": SponsorState.MISMATCH.value,
+            "evidence": {
+                "verification_status": receipt_check.status.value,
+                "proof_coverage": receipt_check.proof_coverage,
+                "receipt_hash": receipt_check.receipt_hash or "",
+            },
+            "reason_code": receipt_check.reason_code.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[receipt_check.reason_code])
+    try:
+        receipt_obj = load_receipt(receipt)
+        expected_package_hash = hash_tree(package)
+    except FileNotFoundError:
+        result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.FILE_NOT_FOUND.value}
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.FILE_NOT_FOUND])
+    except Exception:
+        result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
+    if expected_package_hash != receipt_obj.package.identity_hash:
+        result = {
+            "ok": False,
+            "state": SponsorState.MISMATCH.value,
+            "evidence": {"package_hash": expected_package_hash, "expected_package_hash": receipt_obj.package.identity_hash},
+            "reason_code": ReasonCode.RECEIPT_BINDING_FAILED.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
+    try:
+        with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
+            archive, _annotation = make_receipt_bound_package_archive(
+                receipt_path=receipt,
+                package=package,
+                annotation_path=Path(tmp) / "redline-annotation.json",
+                out_path=Path(tmp) / "annotated-package.tar.gz",
+                package_hash=expected_package_hash,
+            )
+            expected_package_archive_hash = sha256_bytes(archive.read_bytes())
+    except FileNotFoundError:
+        result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.DATA_MISSING.value}
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
+    except Exception:
+        result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
+    expected_metrics_output_hash = receipt_obj.result.result_hash
     access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
     secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")
     passphrase = os.environ.get("REDLINE_BITGET_PASSPHRASE") or os.environ.get("BITGET_PASSPHRASE")

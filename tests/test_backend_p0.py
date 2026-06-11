@@ -23,10 +23,13 @@ from redline.cli import app
 from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
 from redline.models import (
+    Assertion,
+    ChainStatus,
     CoverageManifest,
     DecisionContext,
     LedgerCheckpoint,
     PackageAnnotation,
+    Proof,
     ProbeOutcome,
     ProbeResult,
     ProbeType,
@@ -711,6 +714,35 @@ def test_partial_coverage_never_passes() -> None:
     assert envelope.reason_code == ReasonCode.COVERAGE_INCOMPLETE
 
 
+def test_complete_coverage_requires_probe_proof_for_each_cell() -> None:
+    def proof(kind: ProofKind, *, assertions: list[Assertion] | None = None, meta: dict[str, object] | None = None) -> Proof:
+        artifact_hash = hash_obj({"kind": kind.value, "assertions": [item.model_dump(mode="json") for item in assertions or []], "meta": meta or {}})
+        return Proof(
+            proof_id=f"proof:{kind.value}:{artifact_hash.removeprefix('sha256:')[:24]}",
+            phase="test",
+            kind=kind,
+            verdict_bearing=True,
+            inputs_hash=artifact_hash,
+            artifact_hash=artifact_hash,
+            assertions=assertions or [],
+            meta=meta or {},
+        )
+
+    assertion = Assertion(metric="max_drawdown", op="<=", threshold="0.08", observed="0.01", scenario_id="s1", bar=1, holds=True)
+    proofs = [
+        proof(kind, assertions=[assertion] if kind is ProofKind.PROBE else [], meta={"scenario_id": "s1", "probe_id": "p1"} if kind is ProofKind.PROBE else {})
+        for kind in REQUIRED_PROOFS[Status.PASS]
+        if kind is not ProofKind.DECISION
+    ]
+    coverage = CoverageManifest(cells=[("s1", "p1"), ("s2", "p1")], complete=True, missing=[])
+    envelope = decide(proofs=proofs, coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x", chain_status=ChainStatus.CHAINED))
+
+    assert envelope.status == Status.UNVERIFIED_NO_VERDICT
+    assert envelope.reason_code == ReasonCode.COVERAGE_INCOMPLETE
+    assert envelope.coverage.complete is False
+    assert envelope.coverage.missing == ["s2:p1:missing_probe_proof"]
+
+
 def test_empty_complete_coverage_never_passes() -> None:
     coverage = CoverageManifest.model_construct(cells=[], complete=True, missing=[])
     envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
@@ -905,6 +937,56 @@ def test_sandbox_rejects_sys_modules_builtin_access(tmp_path: Path) -> None:
     assert artifacts.envelope.status == Status.REJECT
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
     assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_private_module_reexport_eval_access(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_argparse_sys_eval")
+    (package / "candidate_argparse_sys_eval" / "strategy.py").write_text(
+        "import argparse\n\n"
+        "def signal(bar, state, config):\n"
+        "    state['entropy'] = argparse._sys.modules['built' + 'ins'].eval(\"__import__('os').urandom(1)[0]\")\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_argparse_sys_eval",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_file_write_in_python_fallback(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-marker"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_write")
+    (package / "candidate_import_time_write" / "strategy.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).write_text('escaped', encoding='utf-8')\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_write",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
 
 
 def test_sandbox_rejects_object_address_entropy(tmp_path: Path) -> None:
@@ -1161,6 +1243,21 @@ def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
     mismatch = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
     assert mismatch.status == "proof_mismatch"
     assert mismatch.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_verify_proof_requires_all_sidecars_for_decision_replay(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    decision_id = next(proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.DECISION)
+    probe_id = next(proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.PROBE)
+    (tmp_path / "run" / "proofs" / f"{probe_id.replace(':', '_')}.json").unlink()
+
+    result = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=decision_id, package=package, suite_path=SUITE, spec_path=SPEC)
+
+    assert result.status == "proof_mismatch"
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
 def test_chained_verify_proof_reproduce_carries_chain_inputs(tmp_path: Path) -> None:
@@ -1624,6 +1721,40 @@ def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes
     )
     assert annotation_verify.ok is True
     assert annotation_verify.reason_code == ReasonCode.BASELINE_GENESIS
+    report_path = tmp_path / "good" / "report.json"
+    original_report = report_path.read_text(encoding="utf-8")
+    report_data = json.loads(original_report)
+    report_data["receipt_hash"] = "sha256:" + "0" * 64
+    report_path.write_text(json.dumps(report_data), encoding="utf-8")
+    tampered_report_verify = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        report_path=report_path,
+        ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+        allow_demo_preview=True,
+    )
+    assert tampered_report_verify.ok is False
+    assert tampered_report_verify.state == "ANNOTATION_RECEIPT_INVALID"
+    assert tampered_report_verify.reason_code == ReasonCode.RECEIPT_MISMATCH
+    report_path.write_text(original_report, encoding="utf-8")
+    proof_backup = tmp_path / "good-proof-backup"
+    shutil.copytree(tmp_path / "good" / "proofs", proof_backup)
+    probe_sidecar = next((tmp_path / "good" / "proofs").glob("proof_probe_*.json"))
+    probe_sidecar.unlink()
+    missing_demo_sidecar_verify = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        report_path=tmp_path / "good" / "report.json",
+        ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+        allow_demo_preview=True,
+    )
+    assert missing_demo_sidecar_verify.ok is False
+    assert missing_demo_sidecar_verify.state == "ANNOTATION_RECEIPT_INVALID"
+    assert missing_demo_sidecar_verify.reason_code == ReasonCode.RECEIPT_MISMATCH
+    shutil.rmtree(tmp_path / "good" / "proofs")
+    shutil.copytree(proof_backup, tmp_path / "good" / "proofs")
     bare_verify = verify_annotation(annotation_path=annotation_path)
     assert bare_verify.ok is False
     assert bare_verify.state == "ANNOTATION_BINDINGS_REQUIRED"
@@ -2542,6 +2673,19 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
     assert payload["state"] == SponsorState.READBACK_VERIFIED.value
 
 
+def test_verify_sponsor_run_cli_requires_receipt_package_binding(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_BITGET_ACCESS_KEY", "access")
+    monkeypatch.setenv("REDLINE_BITGET_SECRET_KEY", "secret")
+    monkeypatch.setenv("REDLINE_BITGET_PASSPHRASE", "passphrase")
+    result = CliRunner().invoke(app, ["verify-sponsor-run", str(ROOT / "artifacts/sponsor/demo-readback.json"), "--json"])
+
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "RECEIPT_PACKAGE_BINDING_REQUIRED"
+    assert payload["reason_code"] == ReasonCode.DATA_MISSING.value
+
+
 def test_verify_sponsor_run_cli_rejects_tampered_receipt_before_credentials(monkeypatch, tmp_path: Path) -> None:
     for key in [
         "REDLINE_BITGET_ACCESS_KEY",
@@ -2878,7 +3022,18 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
         "BITGET_PASSPHRASE",
     ]:
         monkeypatch.delenv(key, raising=False)
-    result = CliRunner().invoke(app, ["verify-sponsor-run", str(ROOT / "artifacts/sponsor/demo-readback.json"), "--json"])
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(ROOT / "artifacts/sponsor/demo-readback.json"),
+            "--receipt",
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--package",
+            str(ROOT / "fixtures/demo_pack"),
+            "--json",
+        ],
+    )
     assert result.exit_code == 6
     payload = json.loads(result.stdout)
     assert payload["ok"] is False

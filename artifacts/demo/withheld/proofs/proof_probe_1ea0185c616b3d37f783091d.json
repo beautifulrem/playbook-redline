@@ -17,5 +17,8 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ea0185c616b3d37f783091d --package <package> --suite <suite> --spec <spec>",
-  "meta": {}
+  "meta": {
+    "scenario_id": "btc-chop-2024-08",
+    "probe_id": "drawdown_limit"
+  }
 }
