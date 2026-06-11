@@ -67,6 +67,12 @@
       "proof:coverage:07629775749a0c50afc55033",
       "proof:decision:9ddd4bb631676334c1cf7859",
       "proof:package_canonical:d626e536e38620bff850851f",
+      "proof:probe:0b22c22a0727d2c30c2de30e",
+      "proof:probe:10142a4c4d62b0f91a288df0",
+      "proof:probe:3b8c87af8a7a1db1b6e073f7",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
       "proof:replay:90796eb2f6174bc3f22ab72b",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
       "proof:spec_compile:793a7818c323072d18bcf8d8"
@@ -77,6 +83,12 @@
       "proof:coverage:07629775749a0c50afc55033",
       "proof:decision:9ddd4bb631676334c1cf7859",
       "proof:package_canonical:d626e536e38620bff850851f",
+      "proof:probe:0b22c22a0727d2c30c2de30e",
+      "proof:probe:10142a4c4d62b0f91a288df0",
+      "proof:probe:3b8c87af8a7a1db1b6e073f7",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
       "proof:replay:90796eb2f6174bc3f22ab72b",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
       "proof:spec_compile:793a7818c323072d18bcf8d8"
@@ -454,7 +466,7 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:21a5287e8942d455e8f26893c5559de46540ab38e54b8b100f4d8dcfd5a0d767",
+      "artifact_hash": "sha256:1c28c358f3743575a9ad7a19078ec725f580312cf35a053109dad78ebc6ddb3d",
       "assertions": [],
       "inputs_hash": "sha256:b6ee3e191f610339b77ed7f083fe762e1354c6cd6cd7d0f21d9d26e236ddba4b",
       "kind": "decision",
@@ -475,8 +487,8 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:e71ddbc44e8b6d417009e504ba67045989b1d1193f500aa8a065221d62e80c3b",
-  "report_hash": "sha256:cf24ed5cd34bda91af600b529320a5e769dede117b5e3d48734d3fecc1973a98",
+  "receipt_hash": "sha256:786d9b76ea5be2c80a5f2b65f275e53e090e591dd15433ce0097235544a68fb7",
+  "report_hash": "sha256:81dee7cee64576689b9d6a0565255d6d35f097892fd2a69a524749252841e28c",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

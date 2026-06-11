@@ -142,6 +142,7 @@ def verify_sponsor_readback_evidence(
     evidence_path: Path,
     adapter: SponsorAdapter,
     expected_package_hash: str | None = None,
+    expected_package_archive_hash: str | None = None,
     expected_metrics_output_hash: str | None = None,
 ) -> SponsorStepResult:
     try:
@@ -160,6 +161,13 @@ def verify_sponsor_readback_evidence(
             ok=False,
             state=SponsorState.MISMATCH,
             evidence={"metrics_output_hash": evidence.expected_metrics_output_hash, "expected_metrics_output_hash": expected_metrics_output_hash},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if expected_package_archive_hash is not None and evidence.package_archive_hash != expected_package_archive_hash:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"package_archive_hash": evidence.package_archive_hash, "expected_package_archive_hash": expected_package_archive_hash},
             reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
     result = adapter.poll(run_id=evidence.run_id)

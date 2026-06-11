@@ -64,8 +64,9 @@ def redline_verify_receipt(
     trust_policy_path: str | None = None,
     baseline_receipt_path: str | None = None,
 ) -> dict:
-    level = VerificationLevel.REPLAYED if rerun else VerificationLevel.HASH_ONLY
-    if rerun:
+    effective_rerun = rerun or pkg_path is not None
+    level = VerificationLevel.REPLAYED if effective_rerun else VerificationLevel.HASH_ONLY
+    if effective_rerun:
         suite_path, spec_path = _rerun_paths_from_receipt(
             receipt_path=Path(receipt_path),
             pkg_path=Path(pkg_path) if pkg_path else None,
@@ -324,53 +325,6 @@ def build_server():
             trust_policy_path=trust_policy_path,
             baseline_receipt_path=baseline_receipt_path,
         )
-
-    @server.tool(name="redline_verify_receipt")
-    def redline_verify_receipt_tool(
-        receipt_path: str,
-        pkg_path: str | None = None,
-        rerun: bool = False,
-        suite_path: str | None = None,
-        spec_path: str | None = None,
-        report_path: str | None = None,
-        ledger_path: str | None = None,
-        ledger_checkpoint_path: str | None = None,
-        ledger_attestation_path: str | None = None,
-        trust_policy_path: str | None = None,
-        baseline_receipt_path: str | None = None,
-    ) -> dict:
-        """Verify a Redline receipt and return the MCP check schema."""
-
-        return redline_verify_receipt(
-            receipt_path=receipt_path,
-            pkg_path=pkg_path,
-            rerun=rerun,
-            suite_path=suite_path,
-            spec_path=spec_path,
-            report_path=report_path,
-            ledger_path=ledger_path,
-            ledger_checkpoint_path=ledger_checkpoint_path,
-            ledger_attestation_path=ledger_attestation_path,
-            trust_policy_path=trust_policy_path,
-            baseline_receipt_path=baseline_receipt_path,
-        )
-
-    @server.tool(name="redline_import_playbook")
-    def redline_import_playbook_tool(pkg_path: str) -> dict:
-        """Import a playbook package and return its canonical identity."""
-
-        return redline_import_playbook(pkg_path)
-
-    @server.tool(name="redline_compile_spec")
-    def redline_compile_spec_tool(
-        source_path: str,
-        use_qwen: bool = False,
-        qwen_model: str | None = None,
-        qwen_base_url: str | None = None,
-    ) -> dict:
-        """Compile a JSON or text RedlineSpec without making a verdict."""
-
-        return redline_compile_spec(source_path, use_qwen=use_qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
 
     return server
 

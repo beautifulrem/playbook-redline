@@ -1,4 +1,4 @@
-.PHONY: install test schemas demo verify-demo goldens
+.PHONY: install test schemas demo verify-demo goldens goldens-check
 
 install:
 	uv sync --frozen --extra dev
@@ -23,3 +23,6 @@ verify-demo:
 	if [ "$$code" -ne 3 ]; then echo "expected withheld demo to exit 3 NEW_BLOCK_BREACH, got $$code"; exit $$code; fi
 
 goldens: schemas demo verify-demo
+
+goldens-check: goldens
+	git diff --exit-code -- schemas artifacts/demo

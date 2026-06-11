@@ -120,7 +120,18 @@ class ProbeSpec(RedlineModel):
 class RedlineSpec(RedlineModel):
     version: Literal["redline.spec.v2.1"] = "redline.spec.v2.1"
     spec_id: str
-    probes: list[ProbeSpec] = Field(min_length=1)
+    probes: list[ProbeSpec] = Field(
+        min_length=1,
+        json_schema_extra={
+            "x-unique-by": "id",
+            "contains": {
+                "anyOf": [
+                    {"not": {"required": ["block"]}},
+                    {"properties": {"block": {"const": True}}, "required": ["block"]},
+                ]
+            }
+        },
+    )
     compiler: str = "json"
     declared_intent: str | None = None
     model: str | None = None
@@ -129,6 +140,7 @@ class RedlineSpec(RedlineModel):
 
     @model_validator(mode="after")
     def require_block_probe(self) -> RedlineSpec:
+        _ensure_unique_ids("probe", [probe.id for probe in self.probes])
         if not any(probe.block for probe in self.probes):
             raise ValueError("redline spec must define at least one block probe")
         return self
@@ -147,8 +159,13 @@ class Scenario(RedlineModel):
 class Suite(RedlineModel):
     version: Literal["redline.suite.v2"] = "redline.suite.v2"
     suite_id: str
-    scenarios: list[Scenario] = Field(min_length=1)
+    scenarios: list[Scenario] = Field(min_length=1, json_schema_extra={"x-unique-by": "id"})
     suite_lock_hash: str | None = None
+
+    @model_validator(mode="after")
+    def require_unique_scenario_ids(self) -> Suite:
+        _ensure_unique_ids("scenario", [scenario.id for scenario in self.scenarios])
+        return self
 
 
 class Bar(RedlineModel):
@@ -202,6 +219,20 @@ class CoverageManifest(RedlineModel):
     cells: list[tuple[str, str]]
     complete: bool
     missing: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_unique_cells(self) -> CoverageManifest:
+        if len(set(self.cells)) != len(self.cells):
+            raise ValueError("coverage cells must be unique")
+        if self.complete and (not self.cells or self.missing):
+            raise ValueError("complete coverage requires non-empty cells and no missing entries")
+        return self
+
+
+def _ensure_unique_ids(kind: str, ids: list[str]) -> None:
+    duplicates = sorted({item for item in ids if ids.count(item) > 1})
+    if duplicates:
+        raise ValueError(f"duplicate {kind} id: {', '.join(duplicates)}")
 
 
 class Proof(RedlineModel):

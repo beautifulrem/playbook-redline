@@ -81,7 +81,8 @@
       },
       "minItems": 1,
       "title": "Scenarios",
-      "type": "array"
+      "type": "array",
+      "x-unique-by": "id"
     },
     "suite_id": {
       "title": "Suite Id",

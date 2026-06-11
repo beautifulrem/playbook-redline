@@ -12,11 +12,12 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from redline.canonical import CanonicalizationError, hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, hash_obj, hash_tree, sha256_bytes
 from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
+from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import load_receipt, verify, verify_proof
@@ -94,6 +95,8 @@ def run(
         _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "run input failed schema validation", out)
     except ValueError as exc:
         _exit_bad_input(ReasonCode.DATA_MISSING, json_out, str(exc), out)
+    except IssuanceLedgerConflict as exc:
+        _exit_bad_input(ReasonCode.RECEIPT_BINDING_FAILED, json_out, str(exc), out)
     if json_out:
         console.print_json(data=artifacts.envelope.model_dump(mode="json"))
     else:
@@ -360,6 +363,15 @@ def publish(
         }
         _print_json_or_table(result, json_out, out)
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED])
+    if out.exists() and not out.is_dir():
+        result = {
+            "schema_version": "redline.publish_preflight.v1",
+            "ok": False,
+            "state": "OUTPUT_PATH_INVALID",
+            "reason_code": ReasonCode.DATA_MISSING.value,
+        }
+        _print_json_or_table(result, json_out, out)
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
     trust_policy_path = Path(os.environ["REDLINE_TRUST_POLICY"]) if os.environ.get("REDLINE_TRUST_POLICY") else None
     trust_policy_hash = os.environ.get("REDLINE_TRUST_POLICY_HASH")
     result = publish_preflight(
@@ -641,6 +653,7 @@ def verify_sponsor_run_cmd(
         _print_json_or_table(result, json_out, evidence)
         raise typer.Exit(EXIT_BY_REASON[shape.reason_code])
     expected_package_hash: str | None = None
+    expected_package_archive_hash: str | None = None
     expected_metrics_output_hash: str | None = None
     if receipt is not None or package is not None:
         if receipt is None or package is None:
@@ -672,6 +685,9 @@ def verify_sponsor_run_cmd(
             }
             _print_json_or_table(result, json_out, evidence)
             raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
+        with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
+            archive = make_package_archive(package_dir=package, out_path=Path(tmp) / "package.tar.gz")
+            expected_package_archive_hash = sha256_bytes(archive.read_bytes())
         expected_metrics_output_hash = receipt_obj.result.result_hash
     access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
     secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")
@@ -696,6 +712,7 @@ def verify_sponsor_run_cmd(
         evidence_path=evidence,
         adapter=adapter,
         expected_package_hash=expected_package_hash,
+        expected_package_archive_hash=expected_package_archive_hash,
         expected_metrics_output_hash=expected_metrics_output_hash,
     )
     if json_out:

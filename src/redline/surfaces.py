@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.models import (
     ChainStatus,
-    DecisionEnvelope,
     EditProvenance,
     LedgerCheckpoint,
     LedgerCheckpointAttestation,
@@ -30,6 +29,7 @@ from redline.models import (
     VerificationStatus,
 )
 from redline.canonical import sha256_bytes
+from redline.proof_kernel import decision_envelope_from_receipt
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, assert_local_pass, make_annotated_package_archive, make_package_archive
 from redline.spec_compiler import LLMTransport, compile_text_spec
 from redline.verifier import load_receipt, verify
@@ -123,6 +123,8 @@ def publish_preflight(
     ledger_attestation_path = ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json"
     if out_dir.resolve() == package.resolve() or package.resolve() in out_dir.resolve().parents:
         return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INSIDE_PACKAGE", reason_code=ReasonCode.RECEIPT_BINDING_FAILED)
+    if out_dir.exists() and not out_dir.is_dir():
+        return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INVALID", reason_code=ReasonCode.DATA_MISSING)
     try:
         package_hash = hash_tree(package)
     except FileNotFoundError:
@@ -384,15 +386,7 @@ def execute_sponsor_readback(
     trust_policy_path: Path | None = None,
 ) -> SponsorStepResult:
     receipt = load_receipt(receipt_path)
-    envelope = DecisionEnvelope(
-        status=receipt.result.status,  # type: ignore[arg-type]
-        reason_code=receipt.decision.reason_code,
-        chain_status=receipt.baseline.chain_status,
-        required_proof_ids=receipt.decision.required_proof_ids,
-        satisfied_proof_ids=receipt.decision.satisfied_proof_ids,
-        coverage=receipt.coverage,
-        capabilities=receipt.capabilities,
-    )
+    envelope = decision_envelope_from_receipt(receipt)
     pass_error = assert_local_pass(envelope, "execute_sponsor_readback")
     if pass_error is not None:
         return pass_error

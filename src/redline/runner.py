@@ -33,7 +33,7 @@ from redline.models import (
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import atomic_write_receipt, issue_receipt, make_decision_proof
+from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof
 from redline.report import to_report
 from redline.trust import verify_checkpoint_attestation
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
@@ -353,6 +353,8 @@ def run_redline(
 
 
 def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at: str | None = None, ledger_path_label: str | None = None) -> None:
+    if artifacts.receipt is not None:
+        assert_no_issuance_conflict(out_dir / "issuance-ledger.jsonl", artifacts.receipt)
     _clear_artifacts_dir(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "envelope.json").write_text(artifacts.envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
@@ -380,8 +382,6 @@ def _clear_artifacts_dir(out_dir: Path) -> None:
         "envelope.json",
         "report.json",
         "receipt.json",
-        "issuance-ledger.jsonl",
-        "issuance-ledger.checkpoint.json",
         "issuance-ledger.attestation.json",
     ]:
         path = out_dir / name

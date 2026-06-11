@@ -156,7 +156,7 @@ def atomic_write_receipt(
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if ledger_path is not None:
-        _raise_on_ledger_conflict(ledger_path, receipt)
+        assert_no_issuance_conflict(ledger_path, receipt)
     tmp = path.with_suffix(path.suffix + ".tmp")
     data = receipt.model_dump_json(indent=2)
     with tmp.open("w", encoding="utf-8") as fh:
@@ -204,6 +204,10 @@ def create_ledger_checkpoint(
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint_path.write_text(checkpoint.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return checkpoint
+
+
+def assert_no_issuance_conflict(ledger_path: Path, receipt: Receipt) -> None:
+    _raise_on_ledger_conflict(ledger_path, receipt)
 
 
 def _append_ledger(path: Path, receipt: Receipt, *, written_at: str | None = None) -> None:

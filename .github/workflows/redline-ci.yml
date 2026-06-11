@@ -15,6 +15,7 @@ jobs:
       - run: uv run redline export-schemas --out /tmp/redline-schemas
       - run: diff -ru schemas /tmp/redline-schemas
       - run: uv run redline make-demo
+      - run: git diff --exit-code -- schemas artifacts/demo
       - name: Replay pass demo
         run: |
           set +e

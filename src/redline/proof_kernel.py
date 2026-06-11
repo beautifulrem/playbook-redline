@@ -21,6 +21,7 @@ REQUIRED_PROOFS: dict[Status, frozenset[ProofKind]] = {
             ProofKind.REPLAY,
             ProofKind.REPLAY_WELLFORMED,
             ProofKind.COVERAGE,
+            ProofKind.PROBE,
             ProofKind.CANDIDATE_ABSOLUTE,
             ProofKind.PACKAGE_CANONICAL,
             ProofKind.SPEC_COMPILE,
@@ -55,6 +56,18 @@ def decision_proof_id(*, status: Status, reason_code: ReasonCode, proof_ids: Seq
     ).removeprefix("sha256:")[:24]
 
 
+def decision_envelope_from_receipt(receipt) -> DecisionEnvelope:
+    return DecisionEnvelope(
+        status=Status(receipt.result.status),
+        reason_code=receipt.decision.reason_code,
+        chain_status=receipt.baseline.chain_status,
+        required_proof_ids=receipt.decision.required_proof_ids,
+        satisfied_proof_ids=receipt.decision.satisfied_proof_ids,
+        coverage=receipt.coverage,
+        capabilities=receipt.capabilities,
+    )
+
+
 def decide(
     *,
     proofs: Sequence[Proof],
@@ -63,6 +76,8 @@ def decide(
     context: DecisionContext,
 ) -> DecisionEnvelope:
     proof_list = list(proofs)
+    if coverage.complete and (not coverage.cells or len(set(coverage.cells)) != len(coverage.cells)):
+        coverage = CoverageManifest(cells=sorted(set(coverage.cells)), complete=False, missing=[ReasonCode.COVERAGE_INCOMPLETE.value])
     capabilities = Capabilities(scenario_count=len({cell[0] for cell in coverage.cells}))
     if context.reject_reason is not None:
         status = Status.REJECT

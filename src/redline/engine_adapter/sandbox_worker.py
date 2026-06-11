@@ -19,7 +19,7 @@ from redline.models import Bar, ReasonCode
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
 _FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
-_FORBIDDEN_STATIC_MODULES = {"builtins", "os", *_FORBIDDEN_ENTROPY_MODULES}
+_FORBIDDEN_STATIC_MODULES = {"builtins", "importlib", "os", "sys", *_FORBIDDEN_ENTROPY_MODULES}
 _FORBIDDEN_DYNAMIC_CALLS = {
     "__import__",
     "compile",
@@ -29,7 +29,11 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "exec",
     "getattr",
     "globals",
+    "hash",
+    "id",
     "locals",
+    "object",
+    "repr",
     "setattr",
     "type",
     "vars",

@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.models import (
-    DecisionEnvelope,
     LedgerCheckpoint,
     LedgerCheckpointAttestation,
     Proof,
@@ -22,8 +21,7 @@ from redline.models import (
     VerificationResult,
     VerificationStatus,
 )
-from redline.proof_kernel import REQUIRED_PROOFS
-from redline.proof_kernel import decision_proof_id
+from redline.proof_kernel import REQUIRED_PROOFS, decision_envelope_from_receipt, decision_proof_id
 from redline.receipt import compute_receipt_hash
 from redline.report import render_strength_summary, to_report
 from redline.trust import verify_checkpoint_attestation
@@ -309,15 +307,7 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
         )
         if decision_proof.proof_id != expected_decision_id:
             return ReasonCode.RECEIPT_MISMATCH
-        expected_envelope = DecisionEnvelope(
-            status=Status(receipt.result.status),
-            reason_code=receipt.decision.reason_code,
-            chain_status=receipt.baseline.chain_status,
-            required_proof_ids=receipt.decision.required_proof_ids,
-            satisfied_proof_ids=receipt.decision.satisfied_proof_ids,
-            coverage=receipt.coverage,
-            capabilities=receipt.capabilities,
-        )
+        expected_envelope = decision_envelope_from_receipt(receipt)
         if decision_proof.artifact_hash != hash_obj(expected_envelope):
             return ReasonCode.RECEIPT_MISMATCH
     return None

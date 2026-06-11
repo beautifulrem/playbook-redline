@@ -358,6 +358,14 @@ def test_replayed_verification_reruns_package(tmp_path: Path) -> None:
     assert result.verification_level == VerificationLevel.REPLAYED
 
 
+def test_pass_receipt_requires_each_block_probe_proof(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    probe_ids = {proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.PROBE and proof.verdict_bearing}
+    assert probe_ids
+    assert probe_ids.issubset(set(artifacts.receipt.decision.required_proof_ids))
+
+
 def test_demo_receipts_replay_from_fresh_clone_path(monkeypatch, tmp_path: Path) -> None:
     clone = tmp_path / "clone"
     shutil.copytree(ROOT / "fixtures", clone / "fixtures")
@@ -618,10 +626,15 @@ def test_partial_coverage_never_passes() -> None:
 
 
 def test_empty_complete_coverage_never_passes() -> None:
-    coverage = CoverageManifest(cells=[], complete=True, missing=[])
+    coverage = CoverageManifest.model_construct(cells=[], complete=True, missing=[])
     envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
     assert envelope.status == Status.UNVERIFIED_NO_VERDICT
     assert envelope.reason_code == ReasonCode.COVERAGE_INCOMPLETE
+
+
+def test_duplicate_coverage_cells_are_schema_invalid() -> None:
+    with pytest.raises(ValidationError):
+        CoverageManifest(cells=[("scenario", "probe"), ("scenario", "probe")], complete=True, missing=[])
 
 
 def test_empty_suite_and_nonblocking_spec_are_schema_invalid(tmp_path: Path) -> None:
@@ -647,6 +660,33 @@ def test_empty_suite_and_nonblocking_spec_are_schema_invalid(tmp_path: Path) -> 
     nonblocking_spec.write_text(json.dumps(spec_data), encoding="utf-8")
     with pytest.raises(ValidationError):
         load_spec(nonblocking_spec)
+
+
+def test_duplicate_suite_scenario_and_probe_ids_are_schema_invalid(tmp_path: Path) -> None:
+    suite_data = json.loads(SUITE.read_text())
+    suite_data["suite_lock_hash"] = None
+    suite_data["scenarios"][1]["id"] = suite_data["scenarios"][0]["id"]
+    duplicate_suite = tmp_path / "duplicate-suite.json"
+    duplicate_suite.write_text(json.dumps(suite_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_suite(duplicate_suite)
+
+    spec_data = json.loads(SPEC.read_text())
+    spec_data["probes"][1]["id"] = spec_data["probes"][0]["id"]
+    duplicate_spec = tmp_path / "duplicate-spec.json"
+    duplicate_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(duplicate_spec)
+
+
+def test_exported_spec_schema_requires_block_probe(tmp_path: Path) -> None:
+    export_schemas(tmp_path)
+    schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    for probe in spec_data["probes"]:
+        probe["block"] = False
+    errors = list(Draft202012Validator(schema).iter_errors(spec_data))
+    assert errors
 
 
 def test_sandbox_network_violation_rejects(tmp_path: Path) -> None:
@@ -726,6 +766,74 @@ def test_sandbox_rejects_indirect_dynamic_entropy(tmp_path: Path) -> None:
         package_dir=package,
         baseline="baseline",
         candidate="candidate_dynamic_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_importlib_dynamic_builtin_access(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_importlib_eval")
+    (package / "candidate_importlib_eval" / "strategy.py").write_text(
+        "import importlib\n\n"
+        "def signal(bar, state, config):\n"
+        "    return importlib.import_module('builtins').eval('1')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_importlib_eval",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_sys_modules_builtin_access(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_sys_modules_eval")
+    (package / "candidate_sys_modules_eval" / "strategy.py").write_text(
+        "import sys\n\n"
+        "def signal(bar, state, config):\n"
+        "    return sys.modules['builtins'].eval('1')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_sys_modules_eval",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_object_address_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_object_entropy")
+    (package / "candidate_object_entropy" / "strategy.py").write_text(
+        "def signal(bar, state, config):\n"
+        "    return hash(str(object())) % 2\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_object_entropy",
         suite_path=SUITE,
         spec_path=SPEC,
         out_dir=tmp_path / "run",
@@ -941,6 +1049,17 @@ def test_mcp_rerun_uses_default_suite_and_spec(monkeypatch, tmp_path: Path) -> N
     assert result["verification_level"] == VerificationLevel.REPLAYED.value
 
 
+def test_mcp_package_path_defaults_to_replayed_and_checks_proof_sidecars(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    next((tmp_path / "run" / "proofs").glob("proof_probe_*.json")).unlink()
+    result = redline_check_receipt(str(tmp_path / "run" / "receipt.json"), pkg_path=str(PACKAGE))
+    assert result["schema_version"] == "redline.mcp.check.v1"
+    assert result["verification_level"] == VerificationLevel.REPLAYED.value
+    assert result["status"] == VerificationStatus.REJECTED.value
+    assert result["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
+
+
 def test_mcp_import_compile_run_and_export_surfaces(tmp_path: Path) -> None:
     imported = redline_import_playbook(str(PACKAGE))
     assert imported["schema_version"] == "redline.mcp.import.v1"
@@ -983,15 +1102,12 @@ def test_mcp_import_compile_run_and_export_surfaces(tmp_path: Path) -> None:
 def test_fastmcp_registers_design_tool_names() -> None:
     server = build_server()
     tool_names = set(server._tool_manager._tools)
-    assert {
-        "redline_check_receipt",
-        "redline_verify_receipt",
-        "redline_import_playbook",
-        "redline_compile_spec",
-    }.issubset(tool_names)
+    assert tool_names == {"redline_check_receipt"}
+    assert "redline_verify_receipt" not in tool_names
+    assert "redline_import_playbook" not in tool_names
+    assert "redline_compile_spec" not in tool_names
     assert "redline_run_suite" not in tool_names
     assert "redline_export_if_clean" not in tool_names
-    assert not any(name.endswith("_tool") for name in tool_names)
 
 
 def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: Path) -> None:
@@ -1795,6 +1911,29 @@ def test_publish_rejects_output_inside_package_and_symlink_package(tmp_path: Pat
     assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
 
 
+def test_publish_rejects_existing_file_out_path_with_json_error(tmp_path: Path) -> None:
+    out_file = tmp_path / "publish-file"
+    out_file.write_text("not a directory", encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        [
+            "publish",
+            str(PACKAGE),
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--out",
+            str(out_file),
+            "--allow-demo-baseline-genesis",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "OUTPUT_PATH_INVALID"
+    assert payload["reason_code"] == ReasonCode.DATA_MISSING.value
+    assert "Traceback" not in result.stderr
+
+
 def test_make_demo_refuses_broad_or_unowned_output_paths(tmp_path: Path) -> None:
     runner = CliRunner()
     root_result = runner.invoke(app, ["make-demo", "--out", "."])
@@ -1845,6 +1984,22 @@ def test_run_rejects_package_role_escape_without_receipt(tmp_path: Path) -> None
     assert payload["schema_version"] == "redline.cli.error.v1"
     assert payload["reason_code"] == ReasonCode.DATA_MISSING.value
     assert not (out_dir / "receipt.json").exists()
+
+
+def test_run_same_out_dir_preserves_ledger_conflict(tmp_path: Path) -> None:
+    runner = CliRunner()
+    out_dir = tmp_path / "run"
+    first = runner.invoke(app, ["run", str(PACKAGE), "--candidate", "candidate_good", "--out", str(out_dir), "--json"])
+    assert first.exit_code == 10
+    receipt_before = (out_dir / "receipt.json").read_text(encoding="utf-8")
+    ledger_before = (out_dir / "issuance-ledger.jsonl").read_text(encoding="utf-8")
+    second = runner.invoke(app, ["run", str(PACKAGE), "--candidate", "candidate_good", "--out", str(out_dir), "--json"])
+    assert second.exit_code == 4
+    payload = json.loads(second.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+    assert (out_dir / "receipt.json").read_text(encoding="utf-8") == receipt_before
+    assert (out_dir / "issuance-ledger.jsonl").read_text(encoding="utf-8") == ledger_before
 
 
 def test_make_demo_rebuild_is_stable(tmp_path: Path) -> None:
@@ -2100,6 +2255,30 @@ def test_sponsor_run_evidence_binds_expected_receipt_package(tmp_path: Path) -> 
     assert result.ok is False
     assert result.state == SponsorState.MISMATCH
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
+def test_sponsor_run_evidence_binds_expected_package_archive(tmp_path: Path) -> None:
+    data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text())
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(data), encoding="utf-8")
+
+    class NoPollAdapter:
+        proof_eligible = True
+
+        def poll(self, *, run_id: str):
+            raise AssertionError("archive binding mismatch should be rejected before live poll")
+
+    result = verify_sponsor_readback_evidence(
+        evidence_path=evidence_path,
+        adapter=NoPollAdapter(),  # type: ignore[arg-type]
+        expected_package_hash=data["package_hash"],
+        expected_package_archive_hash="sha256:" + "0" * 64,
+        expected_metrics_output_hash=data["expected_metrics_output_hash"],
+    )
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert result.evidence["expected_package_archive_hash"] == "sha256:" + "0" * 64
 
 
 def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
@@ -2426,6 +2605,16 @@ def test_composite_action_runs_against_caller_workspace() -> None:
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
     assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
+
+
+def test_decision_envelope_construction_stays_in_proof_kernel() -> None:
+    offenders = []
+    for path in sorted((ROOT / "src/redline").glob("*.py")):
+        if path.name in {"models.py", "proof_kernel.py"}:
+            continue
+        if "DecisionEnvelope(" in path.read_text(encoding="utf-8"):
+            offenders.append(path.name)
+    assert offenders == []
 
 
 def test_proof_reproduce_commands_are_valid_shape(tmp_path: Path) -> None:
