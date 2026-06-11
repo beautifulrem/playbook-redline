@@ -115,7 +115,7 @@
       "phase": "import",
       "kind": "package_canonical",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
+      "inputs_hash": "sha256:92dd7dbdc1876eb27a3f83f03f31a6a78e37c51d84c92ae4e5b2660d363c1fbf",
       "artifact_hash": "sha256:d626e536e38620bff850851fcb3a3a2ce09cbd5a65e5ce1fd398ae613db7af5b",
       "assertions": [],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:d626e536e38620bff850851f --package <package> --suite <suite> --spec <spec>",
@@ -140,7 +140,7 @@
       "phase": "compile",
       "kind": "spec_compile",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
+      "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
       "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
       "assertions": [],
       "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8 --package <package> --suite <suite> --spec <spec>",
@@ -495,7 +495,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:242006b5f4c912a265c370251f9d6fd76343aa19757a122797df0000664632b9",
+    "report_hash": "sha256:cf24ed5cd34bda91af600b529320a5e769dede117b5e3d48734d3fecc1973a98",
     "attribution_report_hash": null
   },
   "publish": {
@@ -508,5 +508,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:a34575a580f512645bc3c990bbc4ea8da2e637f92e73316b8b928e31467618b8"
+  "receipt_hash": "sha256:e71ddbc44e8b6d417009e504ba67045989b1d1193f500aa8a065221d62e80c3b"
 }

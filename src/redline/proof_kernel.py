@@ -67,7 +67,7 @@ def decide(
     if context.reject_reason is not None:
         status = Status.REJECT
         reason_code = context.reject_reason
-    elif not coverage.complete:
+    elif not coverage.complete or not coverage.cells:
         status = Status.UNVERIFIED_NO_VERDICT
         reason_code = ReasonCode.PROBE_ERROR if any("errored" in item for item in coverage.missing) else ReasonCode.COVERAGE_INCOMPLETE
     elif _has_block_breach(proof_list):

@@ -112,7 +112,7 @@
     {
       "artifact_hash": "sha256:4cd04e9bfa40c96d2f823de9fe36cd405e48b48dddd3cece1f4f89a056f7f01d",
       "assertions": [],
-      "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
+      "inputs_hash": "sha256:fd857c79df5dac9e88e8f8982602841a57526d6a3d04c704ffa9d049ceb61209",
       "kind": "package_canonical",
       "meta": {},
       "phase": "import",
@@ -137,7 +137,7 @@
     {
       "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
       "assertions": [],
-      "inputs_hash": "sha256:0f337e1deec1a0e31d11089bfc115a7ffa4f449bcc7129962c5955105b9e4d3d",
+      "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
       "kind": "spec_compile",
       "meta": {
         "compiler": "json",
@@ -483,8 +483,8 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:7afd4bd411ce188f9658125c57b0e569ddf3dc0aa53a17e46df2f44df6de526e",
-  "report_hash": "sha256:ecd6bde563f4a64e51379702a4e7d8cafa5c7b270de157e8d4dc89c3211098e8",
+  "receipt_hash": "sha256:c6210d6c7d7d08f11dd2e3e3cfd338455a767f56b2bbc2cf289be38901303c71",
+  "report_hash": "sha256:9b1d4915851d9741f56374c2d11bcf3ac609862db4619a4a7a7eeb0a3e039389",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

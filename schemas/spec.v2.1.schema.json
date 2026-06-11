@@ -88,6 +88,7 @@
       "items": {
         "$ref": "#/$defs/ProbeSpec"
       },
+      "minItems": 1,
       "title": "Probes",
       "type": "array"
     },

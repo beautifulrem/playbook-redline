@@ -3,7 +3,7 @@
   "phase": "import",
   "kind": "package_canonical",
   "verdict_bearing": true,
-  "inputs_hash": "sha256:58bbf7e780b5729892523c9ba47c90ec7da8126681bf2ac69aab918c986a0a02",
+  "inputs_hash": "sha256:fd857c79df5dac9e88e8f8982602841a57526d6a3d04c704ffa9d049ceb61209",
   "artifact_hash": "sha256:4cd04e9bfa40c96d2f823de9fe36cd405e48b48dddd3cece1f4f89a056f7f01d",
   "assertions": [],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:4cd04e9bfa40c96d2f823de9 --package <package> --suite <suite> --spec <spec>",

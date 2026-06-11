@@ -140,7 +140,7 @@ def run_redline(
         _simple_proof(
             kind=ProofKind.PACKAGE_CANONICAL,
             phase="import",
-            inputs={"package": str(package_dir)},
+            inputs={"package": "playbook", "baseline_role": baseline, "candidate_role": candidate},
             artifact={"package_hash": package_hash, "baseline_hash": baseline_hash, "candidate_hash": candidate_hash},
             verdict_bearing=True,
         ),
@@ -155,7 +155,7 @@ def run_redline(
         _simple_proof(
             kind=ProofKind.SPEC_COMPILE,
             phase="compile",
-            inputs={"spec_path": str(spec_path)},
+            inputs={"spec_id": spec.spec_id, "compiler": spec.compiler},
             artifact=spec,
             verdict_bearing=True,
             meta={

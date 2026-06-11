@@ -6,7 +6,9 @@ import tarfile
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 import redline.surfaces as surfaces_module
@@ -36,7 +38,7 @@ from redline.models import (
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash
-from redline.runner import load_suite, run_redline
+from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite
@@ -356,6 +358,33 @@ def test_replayed_verification_reruns_package(tmp_path: Path) -> None:
     assert result.verification_level == VerificationLevel.REPLAYED
 
 
+def test_demo_receipts_replay_from_fresh_clone_path(monkeypatch, tmp_path: Path) -> None:
+    clone = tmp_path / "clone"
+    shutil.copytree(ROOT / "fixtures", clone / "fixtures")
+    shutil.copytree(ROOT / "artifacts/demo", clone / "artifacts/demo")
+    monkeypatch.chdir(clone)
+
+    pass_result = verify(
+        receipt_path=Path("artifacts/demo/pass/receipt.json"),
+        package=Path("fixtures/demo_pack"),
+        suite_path=Path("fixtures/suites/demo_suite.json"),
+        spec_path=Path("fixtures/specs/redline_spec.json"),
+        level=VerificationLevel.REPLAYED,
+    )
+    assert pass_result.status == VerificationStatus.UNVERIFIED_NO_VERDICT
+    assert pass_result.reason_code == ReasonCode.BASELINE_GENESIS
+
+    withheld_result = verify(
+        receipt_path=Path("artifacts/demo/withheld/receipt.json"),
+        package=Path("fixtures/demo_pack"),
+        suite_path=Path("fixtures/suites/demo_suite.json"),
+        spec_path=Path("fixtures/specs/redline_spec.json"),
+        level=VerificationLevel.REPLAYED,
+    )
+    assert withheld_result.status == VerificationStatus.VERIFIED
+    assert withheld_result.reason_code == ReasonCode.NEW_BLOCK_BREACH
+
+
 def test_replayed_verification_rejects_recomputed_hash_with_stale_proofs(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -586,6 +615,38 @@ def test_partial_coverage_never_passes() -> None:
     envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
     assert envelope.status == Status.UNVERIFIED_NO_VERDICT
     assert envelope.reason_code == ReasonCode.COVERAGE_INCOMPLETE
+
+
+def test_empty_complete_coverage_never_passes() -> None:
+    coverage = CoverageManifest(cells=[], complete=True, missing=[])
+    envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
+    assert envelope.status == Status.UNVERIFIED_NO_VERDICT
+    assert envelope.reason_code == ReasonCode.COVERAGE_INCOMPLETE
+
+
+def test_empty_suite_and_nonblocking_spec_are_schema_invalid(tmp_path: Path) -> None:
+    suite_data = json.loads(SUITE.read_text())
+    suite_data["suite_lock_hash"] = None
+    suite_data["scenarios"] = []
+    empty_suite = tmp_path / "empty-suite.json"
+    empty_suite.write_text(json.dumps(suite_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_suite(empty_suite)
+
+    spec_data = json.loads(SPEC.read_text())
+    spec_data["probes"] = []
+    empty_spec = tmp_path / "empty-spec.json"
+    empty_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(empty_spec)
+
+    spec_data = json.loads(SPEC.read_text())
+    for probe in spec_data["probes"]:
+        probe["block"] = False
+    nonblocking_spec = tmp_path / "nonblocking-spec.json"
+    nonblocking_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(nonblocking_spec)
 
 
 def test_sandbox_network_violation_rejects(tmp_path: Path) -> None:
@@ -927,9 +988,9 @@ def test_fastmcp_registers_design_tool_names() -> None:
         "redline_verify_receipt",
         "redline_import_playbook",
         "redline_compile_spec",
-        "redline_run_suite",
-        "redline_export_if_clean",
     }.issubset(tool_names)
+    assert "redline_run_suite" not in tool_names
+    assert "redline_export_if_clean" not in tool_names
     assert not any(name.endswith("_tool") for name in tool_names)
 
 

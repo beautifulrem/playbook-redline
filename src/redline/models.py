@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class RedlineModel(BaseModel):
@@ -120,12 +120,18 @@ class ProbeSpec(RedlineModel):
 class RedlineSpec(RedlineModel):
     version: Literal["redline.spec.v2.1"] = "redline.spec.v2.1"
     spec_id: str
-    probes: list[ProbeSpec]
+    probes: list[ProbeSpec] = Field(min_length=1)
     compiler: str = "json"
     declared_intent: str | None = None
     model: str | None = None
     tool_schema_hash: str | None = None
     degraded_reason: str | None = None
+
+    @model_validator(mode="after")
+    def require_block_probe(self) -> RedlineSpec:
+        if not any(probe.block for probe in self.probes):
+            raise ValueError("redline spec must define at least one block probe")
+        return self
 
 
 class Scenario(RedlineModel):
@@ -141,7 +147,7 @@ class Scenario(RedlineModel):
 class Suite(RedlineModel):
     version: Literal["redline.suite.v2"] = "redline.suite.v2"
     suite_id: str
-    scenarios: list[Scenario]
+    scenarios: list[Scenario] = Field(min_length=1)
     suite_lock_hash: str | None = None
 
 

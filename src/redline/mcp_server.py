@@ -372,58 +372,6 @@ def build_server():
 
         return redline_compile_spec(source_path, use_qwen=use_qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
 
-    @server.tool(name="redline_run_suite")
-    def redline_run_suite_tool(
-        pkg_path: str,
-        baseline: str = "baseline",
-        candidate: str = "candidate_good",
-        suite_path: str = "fixtures/suites/demo_suite.json",
-        spec_path: str = "fixtures/specs/redline_spec.json",
-        baseline_receipt_path: str | None = None,
-        baseline_trust_policy_path: str | None = None,
-        baseline_version_id: str | None = None,
-        candidate_version_id: str | None = None,
-    ) -> dict:
-        """Run the deterministic suite in memory and return the kernel envelope."""
-
-        return redline_run_suite(
-            pkg_path=pkg_path,
-            baseline=baseline,
-            candidate=candidate,
-            suite_path=suite_path,
-            spec_path=spec_path,
-            baseline_receipt_path=baseline_receipt_path,
-            baseline_trust_policy_path=baseline_trust_policy_path,
-            baseline_version_id=baseline_version_id,
-            candidate_version_id=candidate_version_id,
-        )
-
-    @server.tool(name="redline_export_if_clean")
-    def redline_export_if_clean_tool(
-        receipt_path: str,
-        pkg_path: str,
-        suite_path: str | None = None,
-        spec_path: str | None = None,
-        report_path: str | None = None,
-        ledger_attestation_path: str | None = None,
-        trust_policy_path: str | None = None,
-        baseline_receipt_path: str | None = None,
-        out_dir: str | None = None,
-    ) -> dict:
-        """Export an annotated package only when a receipt is replay-verified and clean."""
-
-        return redline_export_if_clean(
-            receipt_path=receipt_path,
-            pkg_path=pkg_path,
-            suite_path=suite_path,
-            spec_path=spec_path,
-            report_path=report_path,
-            ledger_attestation_path=ledger_attestation_path,
-            trust_policy_path=trust_policy_path,
-            baseline_receipt_path=baseline_receipt_path,
-            out_dir=out_dir,
-        )
-
     return server
 
 
