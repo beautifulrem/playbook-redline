@@ -19,7 +19,8 @@ from redline.models import Bar, ReasonCode
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
 _FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
-_FORBIDDEN_STATIC_MODULES = {"builtins", "importlib", "os", "sys", *_FORBIDDEN_ENTROPY_MODULES}
+_FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator"}
+_FORBIDDEN_STATIC_MODULES = {"builtins", "importlib", "os", "sys", *_FORBIDDEN_ENTROPY_MODULES, *_FORBIDDEN_REFLECTION_MODULES}
 _FORBIDDEN_DYNAMIC_CALLS = {
     "__import__",
     "compile",
@@ -97,7 +98,7 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
             module_name = str(args[0])
             module_root = module_name.split(".", 1)[0]
             if (
-                module_root in _FORBIDDEN_ENTROPY_MODULES
+                module_root in _FORBIDDEN_STATIC_MODULES
                 or module_name in {"_ctypes", "ctypes", "cffi"}
                 or module_name.startswith(("ctypes.", "cffi."))
             ):
@@ -163,6 +164,19 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             raise RuntimeError(f"{reason}:dynamic-dunder-{node.attr}")
         elif isinstance(node, ast.Name) and node.id == "__builtins__":
             raise RuntimeError(f"{reason}:dynamic-builtins")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            _reject_forbidden_string(node.value, reason)
+
+
+def _reject_forbidden_string(value: str, reason: str) -> None:
+    if "__" in value:
+        raise RuntimeError(f"{reason}:dynamic-dunder-string")
+    if value in _FORBIDDEN_DYNAMIC_CALLS:
+        raise RuntimeError(f"{reason}:dynamic-code-string-{value}")
+    if value in _FORBIDDEN_ENTROPY_ATTRS:
+        raise RuntimeError(f"{reason}:entropy-string-{value}")
+    if value.split(".", 1)[0] in _FORBIDDEN_STATIC_MODULES:
+        raise RuntimeError(f"{reason}:import-string-{value}")
 
 
 def _read_bars(path: Path) -> list[Bar]:

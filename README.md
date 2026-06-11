@@ -135,10 +135,11 @@ a repository checkout for the complete demo.
 scripts/verify-sponsor-run.sh artifacts/sponsor/demo-readback.json artifacts/demo/pass/receipt.json fixtures/demo_pack
 ```
 
-The script runs receipt verification in replayed mode with package binding.
-It then calls `redline verify-sponsor-run`, which requires Bitget credentials and
-rechecks the recorded `run_id` through the sponsor read-back endpoint. The live
-read-back must match `status=completed`, `version_id`, and
+The script emits one machine-parseable JSON document containing both the receipt
+check and sponsor read-back result. It runs receipt verification in replayed mode
+with package binding, then calls `redline verify-sponsor-run`, which requires
+Bitget credentials and rechecks the recorded `run_id` through the sponsor
+read-back endpoint. The live read-back must match `status=completed`, `version_id`, and
 `metrics_output_hash`; otherwise it exits fail-closed. The bundled recorded
 file is not treated as live Bitget proof by itself, so
 `BITGET_CREDENTIALS_REQUIRED` / `SPONSOR_EVIDENCE_UNVERIFIED` is expected until

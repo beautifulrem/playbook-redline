@@ -220,30 +220,18 @@ def publish_preflight(
             ledger_checkpoint_hash=checkpoint.checkpoint_hash,
             reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
         )
-    attestation = _load_attestation(ledger_attestation_path) if ledger_attestation_path.exists() else None
-    receipt = load_receipt(receipt_path)
     out_dir.mkdir(parents=True, exist_ok=True)
-    annotation = PackageAnnotation(
-        annotation_kind="demo-preview" if result.chain_status != ChainStatus.CHAINED else "publish-preflight",
-        receipt_path=str(receipt_path),
-        receipt_hash=receipt.receipt_hash,
-        report_hash=receipt.report.report_hash,
+    package_archive, annotation = make_receipt_bound_package_archive(
+        receipt_path=receipt_path,
+        package=package,
+        annotation_path=out_dir / "redline-annotation.json",
+        out_path=out_dir / "annotated-package.tar.gz",
+        ledger_checkpoint_path=ledger_checkpoint_path,
+        ledger_attestation_path=ledger_attestation_path,
         package_hash=package_hash,
-        ledger_hash=checkpoint.ledger_hash,
-        ledger_checkpoint_hash=checkpoint.checkpoint_hash,
-        ledger_attestation_hash=attestation.attestation_hash if attestation is not None else None,
         strength_summary=result.strength_summary,
-        chain_status=result.chain_status,
         verification_level=result.verification_level,
-        trust_policy_id=attestation.trust_policy_id if attestation is not None else None,
-        trusted_ledger_key_id=attestation.key_id if attestation is not None else None,
-        annotation_hash="",
     )
-    annotation_hash = hash_obj(annotation)
-    annotation = annotation.model_copy(update={"annotation_hash": annotation_hash})
-    annotation_path = out_dir / "redline-annotation.json"
-    annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    package_archive = make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_dir / "annotated-package.tar.gz")
     package_archive_hash = sha256_bytes(package_archive.read_bytes())
     return PublishPreflightResult(
         ok=True,
@@ -251,13 +239,56 @@ def publish_preflight(
         receipt_hash=result.receipt_hash,
         package_hash=package_hash,
         package_archive_hash=package_archive_hash,
+        report_hash=annotation.report_hash,
+        ledger_hash=checkpoint.ledger_hash,
+        ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+        ledger_attestation_hash=annotation.ledger_attestation_hash,
+        annotation_hash=annotation.annotation_hash,
+        reason_code=result.reason_code,
+    )
+
+
+def make_receipt_bound_package_archive(
+    *,
+    receipt_path: Path,
+    package: Path,
+    annotation_path: Path,
+    out_path: Path,
+    ledger_checkpoint_path: Path | None = None,
+    ledger_attestation_path: Path | None = None,
+    package_hash: str | None = None,
+    strength_summary: str | None = None,
+    verification_level: VerificationLevel = VerificationLevel.REPLAYED,
+) -> tuple[Path, PackageAnnotation]:
+    receipt = load_receipt(receipt_path)
+    package_hash = package_hash or hash_tree(package)
+    checkpoint_path = ledger_checkpoint_path or receipt_path.parent / "issuance-ledger.checkpoint.json"
+    checkpoint = _load_checkpoint(checkpoint_path)
+    if checkpoint is None:
+        raise FileNotFoundError(checkpoint_path)
+    attestation_path = ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json"
+    attestation = _load_attestation(attestation_path) if attestation_path.exists() else None
+    annotation = PackageAnnotation(
+        annotation_kind="demo-preview" if receipt.baseline.chain_status != ChainStatus.CHAINED else "publish-preflight",
+        receipt_path=str(receipt_path),
+        receipt_hash=receipt.receipt_hash,
         report_hash=receipt.report.report_hash,
+        package_hash=package_hash,
         ledger_hash=checkpoint.ledger_hash,
         ledger_checkpoint_hash=checkpoint.checkpoint_hash,
         ledger_attestation_hash=attestation.attestation_hash if attestation is not None else None,
-        annotation_hash=annotation_hash,
-        reason_code=result.reason_code,
+        strength_summary=strength_summary or receipt.strength_summary,
+        chain_status=receipt.baseline.chain_status,
+        verification_level=verification_level,
+        trust_policy_id=attestation.trust_policy_id if attestation is not None else None,
+        trusted_ledger_key_id=attestation.key_id if attestation is not None else None,
+        annotation_hash="",
     )
+    annotation = annotation.model_copy(update={"annotation_hash": hash_obj(annotation)})
+    annotation_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_path), annotation
 
 
 def verify_annotation(

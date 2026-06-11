@@ -66,6 +66,7 @@ def redline_verify_receipt(
 ) -> dict:
     effective_rerun = rerun or pkg_path is not None
     level = VerificationLevel.REPLAYED if effective_rerun else VerificationLevel.HASH_ONLY
+    protected_trust_policy_path = trust_policy_path if _protected_trust_policy_matches(trust_policy_path) else None
     if effective_rerun:
         suite_path, spec_path = _rerun_paths_from_receipt(
             receipt_path=Path(receipt_path),
@@ -83,11 +84,12 @@ def redline_verify_receipt(
         ledger_path=Path(ledger_path) if ledger_path else None,
         ledger_checkpoint_path=Path(ledger_checkpoint_path) if ledger_checkpoint_path else None,
         ledger_attestation_path=Path(ledger_attestation_path) if ledger_attestation_path else None,
-        trust_policy_path=Path(trust_policy_path) if trust_policy_path else None,
+        trust_policy_path=Path(protected_trust_policy_path) if protected_trust_policy_path else None,
         baseline_receipt_path=Path(baseline_receipt_path) if baseline_receipt_path else None,
     )
     payload = result.model_dump(mode="json")
     payload["schema_version"] = "redline.mcp.check.v1"
+    payload["trust_source"] = "protected_env" if protected_trust_policy_path is not None else "untrusted_tool_input"
     return payload
 
 

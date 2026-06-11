@@ -17,8 +17,17 @@ from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
-from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.surfaces import (
+    capture_edit_provenance,
+    compile_spec,
+    execute_sponsor_readback,
+    import_package,
+    make_receipt_bound_package_archive,
+    publish_preflight,
+    render_report_html,
+    verify_annotation,
+)
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import load_receipt, verify, verify_proof
 from redline.models import LedgerCheckpoint, LedgerCheckpointAttestation
@@ -685,9 +694,24 @@ def verify_sponsor_run_cmd(
             }
             _print_json_or_table(result, json_out, evidence)
             raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
-        with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
-            archive = make_package_archive(package_dir=package, out_path=Path(tmp) / "package.tar.gz")
-            expected_package_archive_hash = sha256_bytes(archive.read_bytes())
+        try:
+            with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
+                archive, _annotation = make_receipt_bound_package_archive(
+                    receipt_path=receipt,
+                    package=package,
+                    annotation_path=Path(tmp) / "redline-annotation.json",
+                    out_path=Path(tmp) / "annotated-package.tar.gz",
+                    package_hash=expected_package_hash,
+                )
+                expected_package_archive_hash = sha256_bytes(archive.read_bytes())
+        except FileNotFoundError:
+            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.DATA_MISSING.value}
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
+        except Exception:
+            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
         expected_metrics_output_hash = receipt_obj.result.result_hash
     access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
     secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")

@@ -33,10 +33,12 @@ from redline.models import (
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof
+from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof, make_verify_proof_reproduce
 from redline.report import to_report
 from redline.trust import verify_checkpoint_attestation
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
+
+DEFAULT_EDIT_PROVENANCE_CAPTURED_AT = "2026-06-10T00:00:00Z"
 
 
 def load_spec(path: Path) -> RedlineSpec:
@@ -129,22 +131,48 @@ def run_redline(
     effective_edit_provenance = edit_provenance or EditProvenance(
         prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
         diff_hash=expected_edit_diff_hash,
-        captured_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        captured_at=DEFAULT_EDIT_PROVENANCE_CAPTURED_AT,
     )
     chain_status, baseline_receipt_hash, baseline_receipt_error = _baseline_chain(
         baseline_hash=baseline_hash,
         baseline_receipt_path=baseline_receipt_path,
         baseline_trust_policy_path=baseline_trust_policy_path,
     )
+    proof_reproduce_kwargs = {
+        "include_baseline_receipt": chain_status == ChainStatus.CHAINED,
+        "include_trust_policy": chain_status == ChainStatus.CHAINED and baseline_trust_policy_path is not None,
+    }
+
+    def simple_proof(
+        *,
+        kind: ProofKind,
+        phase: str,
+        inputs: object,
+        artifact: object,
+        verdict_bearing: bool,
+        assertions: list[Assertion] | None = None,
+        meta: dict[str, object] | None = None,
+    ) -> Proof:
+        return _simple_proof(
+            kind=kind,
+            phase=phase,
+            inputs=inputs,
+            artifact=artifact,
+            verdict_bearing=verdict_bearing,
+            assertions=assertions,
+            meta=meta,
+            **proof_reproduce_kwargs,
+        )
+
     proofs: list[Proof] = [
-        _simple_proof(
+        simple_proof(
             kind=ProofKind.PACKAGE_CANONICAL,
             phase="import",
             inputs={"package": "playbook", "baseline_role": baseline, "candidate_role": candidate},
             artifact={"package_hash": package_hash, "baseline_hash": baseline_hash, "candidate_hash": candidate_hash},
             verdict_bearing=True,
         ),
-        _simple_proof(
+        simple_proof(
             kind=ProofKind.EDIT_PROVENANCE,
             phase="capture-edit",
             inputs={"baseline_hash": baseline_hash, "candidate_hash": candidate_hash},
@@ -152,7 +180,7 @@ def run_redline(
             verdict_bearing=False,
             meta={"expected_diff_hash": expected_edit_diff_hash, "binding": "package_pair"},
         ),
-        _simple_proof(
+        simple_proof(
             kind=ProofKind.SPEC_COMPILE,
             phase="compile",
             inputs={"spec_id": spec.spec_id, "compiler": spec.compiler},
@@ -186,7 +214,7 @@ def run_redline(
     candidate_probe_assertions: list[Assertion] = []
     if reject_reason is None:
         proofs.append(
-            _simple_proof(
+            simple_proof(
                 kind=ProofKind.REPLAY,
                 phase="run",
                 inputs={"suite": suite.suite_id, "baseline": baseline_hash, "candidate": candidate_hash},
@@ -196,7 +224,7 @@ def run_redline(
         )
         wellformed_assertions = _wellformed_assertions(traces)
         proofs.append(
-            _simple_proof(
+            simple_proof(
                 kind=ProofKind.REPLAY_WELLFORMED,
                 phase="run",
                 inputs={"trace_hashes": [trace.artifact_hash for trace in traces]},
@@ -243,7 +271,7 @@ def run_redline(
                     baseline_probe_assertions.extend(baseline_result.assertions)
                     candidate_probe_assertions.extend(candidate_result.assertions)
                 proofs.append(
-                    _simple_proof(
+                    simple_proof(
                         kind=ProofKind.PROBE,
                         phase="probe",
                         inputs={"scenario": scenario.id, "probe": probe_spec.id},
@@ -255,7 +283,7 @@ def run_redline(
         if reject_reason is None:
             coverage = CoverageManifest(cells=coverage_cells, complete=not missing, missing=missing)
             proofs.append(
-                _simple_proof(
+                simple_proof(
                     kind=ProofKind.COVERAGE,
                     phase="decide",
                     inputs={"suite": suite.suite_id, "spec": spec.spec_id},
@@ -264,7 +292,7 @@ def run_redline(
                 )
             )
             proofs.append(
-                _simple_proof(
+                simple_proof(
                     kind=ProofKind.BASELINE_CALIBRATION,
                     phase="calibrate",
                     inputs={"baseline_hash": baseline_hash, "suite": suite.suite_id},
@@ -275,7 +303,7 @@ def run_redline(
             )
             candidate_absolute = _candidate_absolute_assertions(candidate_probe_assertions)
             proofs.append(
-                _simple_proof(
+                simple_proof(
                     kind=ProofKind.CANDIDATE_ABSOLUTE,
                     phase="probe",
                     inputs={"candidate_hash": candidate_hash},
@@ -333,9 +361,10 @@ def run_redline(
         engine_source_tree_hash=engine_hash,
         runner_lock_hash=hash_obj({"engine": "deterministic", "engine_hash": engine_hash}),
         edit_provenance=effective_edit_provenance,
+        **proof_reproduce_kwargs,
     )
     if receipt is None:
-        decision_proof = make_decision_proof(envelope=envelope, proofs=proofs)
+        decision_proof = make_decision_proof(envelope=envelope, proofs=proofs, **proof_reproduce_kwargs)
         if decision_proof.proof_id not in {proof.proof_id for proof in proofs}:
             proofs.append(decision_proof)
     report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
@@ -402,6 +431,8 @@ def _simple_proof(
     verdict_bearing: bool,
     assertions: list[Assertion] | None = None,
     meta: dict[str, object] | None = None,
+    include_baseline_receipt: bool = False,
+    include_trust_policy: bool = False,
 ) -> Proof:
     inputs_hash = hash_obj(inputs)
     artifact_hash = hash_obj(artifact)
@@ -415,7 +446,11 @@ def _simple_proof(
         artifact_hash=artifact_hash,
         assertions=assertions or [],
         meta=meta or {},
-        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>",
+        reproduce=make_verify_proof_reproduce(
+            proof_id=proof_id,
+            include_baseline_receipt=include_baseline_receipt,
+            include_trust_policy=include_trust_policy,
+        ),
     )
 
 

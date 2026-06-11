@@ -34,7 +34,27 @@ class IssuanceLedgerConflict(RuntimeError):
     pass
 
 
-def make_decision_proof(*, envelope: DecisionEnvelope, proofs: list[Proof]) -> Proof:
+def make_verify_proof_reproduce(
+    *,
+    proof_id: str,
+    include_baseline_receipt: bool = False,
+    include_trust_policy: bool = False,
+) -> str:
+    command = f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>"
+    if include_baseline_receipt:
+        command += " --baseline-receipt <baseline-receipt>"
+    if include_trust_policy:
+        command += " --trust-policy <trust-policy>"
+    return command
+
+
+def make_decision_proof(
+    *,
+    envelope: DecisionEnvelope,
+    proofs: list[Proof],
+    include_baseline_receipt: bool = False,
+    include_trust_policy: bool = False,
+) -> Proof:
     proof_id = decision_proof_id(
         status=envelope.status,
         reason_code=envelope.reason_code,
@@ -49,7 +69,11 @@ def make_decision_proof(*, envelope: DecisionEnvelope, proofs: list[Proof]) -> P
         inputs_hash=hash_obj({"proof_ids": [proof.proof_id for proof in proofs], "coverage": envelope.coverage}),
         artifact_hash=hash_obj(envelope),
         assertions=[],
-        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>",
+        reproduce=make_verify_proof_reproduce(
+            proof_id=proof_id,
+            include_baseline_receipt=include_baseline_receipt,
+            include_trust_policy=include_trust_policy,
+        ),
     )
 
 
@@ -84,11 +108,18 @@ def issue_receipt(
     runner_lock_hash: str,
     report_hash: str = "sha256:pending",
     edit_provenance: EditProvenance | None = None,
+    include_baseline_receipt: bool = False,
+    include_trust_policy: bool = False,
 ) -> Receipt | None:
     if envelope.status not in {Status.PASS, Status.WITHHELD}:
         return None
     all_proofs = [*proofs]
-    decision_proof = make_decision_proof(envelope=envelope, proofs=proofs)
+    decision_proof = make_decision_proof(
+        envelope=envelope,
+        proofs=proofs,
+        include_baseline_receipt=include_baseline_receipt,
+        include_trust_policy=include_trust_policy,
+    )
     if decision_proof.proof_id not in {proof.proof_id for proof in all_proofs}:
         all_proofs.append(decision_proof)
     breaches: list[Assertion] = [

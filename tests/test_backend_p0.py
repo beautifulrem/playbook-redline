@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
 import tarfile
 from decimal import Decimal
 from pathlib import Path
@@ -13,8 +15,9 @@ from typer.testing import CliRunner
 
 import redline.surfaces as surfaces_module
 import redline.receipt as receipt_module
+import redline.cli as cli_module
 
-from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree, sha256_bytes
 from redline.cli import app
 from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
@@ -40,9 +43,18 @@ from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite
-from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
+from redline.surfaces import (
+    capture_edit_provenance,
+    compile_spec,
+    execute_sponsor_readback,
+    import_package,
+    make_receipt_bound_package_archive,
+    publish_preflight,
+    render_report_html,
+    verify_annotation,
+)
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import verify, verify_proof
 
@@ -273,6 +285,31 @@ def test_candidate_builtins_eval_bypass_is_sandbox_violation(tmp_path: Path) -> 
         package_dir=package,
         baseline="baseline",
         candidate="candidate_eval_bypass",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+
+
+def test_candidate_operator_attrgetter_globals_bypass_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_attrgetter_bypass")
+    (package / "candidate_attrgetter_bypass" / "strategy.py").write_text(
+        "import operator\n\n"
+        "def signal(bar, state, config):\n"
+        "    builtins = operator.attrgetter('__globals__')(signal)['__builtins__']\n"
+        "    importer = builtins['__import__'] if isinstance(builtins, dict) else builtins.__dict__['__import__']\n"
+        "    return int.from_bytes(importer('os').urandom(1), 'big') % 2\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_attrgetter_bypass",
         suite_path=SUITE,
         spec_path=SPEC,
         out_dir=tmp_path / "run",
@@ -1030,12 +1067,35 @@ def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
     proof_id = next(proof.proof_id for proof in artifacts.receipt.proofs if proof.kind == ProofKind.REPLAY)
+    proof = next(proof for proof in artifacts.receipt.proofs if proof.proof_id == proof_id)
+    assert "--baseline-receipt" not in proof.reproduce
+    assert "--trust-policy" not in proof.reproduce
     result = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
     assert result.status == "proof_verified"
     (package / "candidate_good" / "config.json").write_text('{"entry_bar": 1, "exit_bar": 99, "leverage": "2.0"}\n', encoding="utf-8")
     mismatch = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
     assert mismatch.status == "proof_mismatch"
     assert mismatch.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_chained_verify_proof_reproduce_carries_chain_inputs(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    replay_proof = next(proof for proof in artifacts.receipt.proofs if proof.kind == ProofKind.REPLAY)
+    decision_proof = next(proof for proof in artifacts.receipt.proofs if proof.kind == ProofKind.DECISION)
+    for proof in (replay_proof, decision_proof):
+        assert "--baseline-receipt <baseline-receipt>" in proof.reproduce
+        assert "--trust-policy <trust-policy>" in proof.reproduce
+    result = verify_proof(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        proof_id=replay_proof.proof_id,
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        trust_policy_path=tmp_path / "trust-policy.json",
+    )
+    assert result.status == "proof_verified"
 
 
 def test_mcp_rerun_uses_default_suite_and_spec(monkeypatch, tmp_path: Path) -> None:
@@ -1132,7 +1192,7 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
     )
     assert chained.receipt is not None
     _sign_run_checkpoint(tmp_path / "chained", private_key, policy_id="mcp-policy", key_id="mcp-key", issuer="mcp-ci")
-    result = redline_check_receipt(
+    untrusted_check = redline_check_receipt(
         str(tmp_path / "chained" / "receipt.json"),
         pkg_path=str(package),
         rerun=True,
@@ -1140,9 +1200,9 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
         trust_policy_path=str(policy_path),
         baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
     )
-    assert result["status"] == VerificationStatus.VERIFIED.value
-    assert result["reason_code"] == ReasonCode.PASS.value
-    assert result["chain_status"] == "chained"
+    assert untrusted_check["status"] != VerificationStatus.VERIFIED.value
+    assert untrusted_check["reason_code"] == ReasonCode.BASELINE_UNCHAINED.value
+    assert untrusted_check["trust_source"] == "untrusted_tool_input"
     untrusted_export = redline_export_if_clean(
         str(tmp_path / "chained" / "receipt.json"),
         str(package),
@@ -1156,6 +1216,18 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
     assert untrusted_export["export_allowed"] is False
     assert untrusted_export["trust_source"] == "untrusted_tool_input"
     monkeypatch.setenv("REDLINE_TRUST_POLICY_HASH", policy.policy_hash)
+    result = redline_check_receipt(
+        str(tmp_path / "chained" / "receipt.json"),
+        pkg_path=str(package),
+        rerun=True,
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert result["status"] == VerificationStatus.VERIFIED.value
+    assert result["reason_code"] == ReasonCode.PASS.value
+    assert result["chain_status"] == "chained"
+    assert result["trust_source"] == "protected_env"
     trusted_export = redline_export_if_clean(
         str(tmp_path / "chained" / "receipt.json"),
         str(package),
@@ -2019,6 +2091,14 @@ def test_make_demo_rebuild_is_stable(tmp_path: Path) -> None:
     assert third_snapshot == first_snapshot
 
 
+def test_default_run_receipt_is_stable_across_output_dirs(tmp_path: Path) -> None:
+    first = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "a")
+    second = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "b")
+    assert first.receipt is not None
+    assert second.receipt is not None
+    assert second.receipt.receipt_hash == first.receipt.receipt_hash
+
+
 def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
@@ -2281,6 +2361,75 @@ def test_sponsor_run_evidence_binds_expected_package_archive(tmp_path: Path) -> 
     assert result.evidence["expected_package_archive_hash"] == "sha256:" + "0" * 64
 
 
+def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "archive" / "redline-annotation.json",
+        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
+    )
+    archive_hash = sha256_bytes(archive.read_bytes())
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": archive_hash,
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    class FakeAdapter:
+        proof_eligible = True
+
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def poll(self, *, run_id: str) -> SponsorStepResult:
+            return SponsorStepResult(
+                ok=True,
+                state=SponsorState.READBACK_VERIFIED,
+                evidence={
+                    "run_id": run_id,
+                    "version_id": evidence["expected_version_id"],
+                    "status": "completed",
+                    "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                    "package_hash": evidence["package_hash"],
+                    "package_archive_hash": evidence["package_archive_hash"],
+                },
+            )
+
+    monkeypatch.setattr(cli_module, "BitgetSponsorAdapter", FakeAdapter)
+    monkeypatch.setenv("REDLINE_BITGET_ACCESS_KEY", "access")
+    monkeypatch.setenv("REDLINE_BITGET_SECRET_KEY", "secret")
+    monkeypatch.setenv("REDLINE_BITGET_PASSPHRASE", "passphrase")
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(package),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["state"] == SponsorState.READBACK_VERIFIED.value
+
+
 def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -2488,6 +2637,39 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
     assert payload["state"] == "BITGET_CREDENTIALS_REQUIRED"
+
+
+def test_verify_sponsor_script_emits_single_json_document(monkeypatch) -> None:
+    env = os.environ.copy()
+    for key in [
+        "REDLINE_BITGET_ACCESS_KEY",
+        "REDLINE_BITGET_SECRET_KEY",
+        "REDLINE_BITGET_PASSPHRASE",
+        "BITGET_ACCESS_KEY",
+        "BITGET_SECRET_KEY",
+        "BITGET_PASSPHRASE",
+    ]:
+        env.pop(key, None)
+    result = subprocess.run(
+        [
+            str(ROOT / "scripts/verify-sponsor-run.sh"),
+            "artifacts/sponsor/demo-readback.json",
+            "artifacts/demo/pass/receipt.json",
+            "fixtures/demo_pack",
+        ],
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 6
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "redline.sponsor.verify_script.v1"
+    assert payload["receipt_exit_code"] == 10
+    assert payload["sponsor_exit_code"] == 6
+    assert payload["receipt_check"]["schema_version"] == "redline.verify.v1"
+    assert payload["sponsor_readback"]["state"] == "BITGET_CREDENTIALS_REQUIRED"
 
 
 def test_verify_sponsor_run_cli_checks_evidence_before_credentials(monkeypatch, tmp_path: Path) -> None:
