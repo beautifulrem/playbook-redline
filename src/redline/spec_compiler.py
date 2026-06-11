@@ -4,6 +4,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
 
@@ -30,7 +31,7 @@ def compile_text_spec(
     transport: LLMTransport | None = None,
 ) -> RedlineSpec:
     if use_qwen:
-        proposed = _compile_with_openai_compatible_qwen(
+        proposed, degraded_reason = _compile_with_openai_compatible_qwen(
             text=text,
             source_path=source_path,
             model=model,
@@ -40,6 +41,7 @@ def compile_text_spec(
         )
         if proposed is not None:
             return proposed
+        return _compile_text_spec(text, source_path=source_path).model_copy(update={"degraded_reason": degraded_reason})
     return _compile_text_spec(text, source_path=source_path)
 
 
@@ -51,12 +53,12 @@ def _compile_with_openai_compatible_qwen(
     base_url: str | None,
     api_key: str | None,
     transport: LLMTransport | None,
-) -> RedlineSpec | None:
+) -> tuple[RedlineSpec | None, str | None]:
     model = model or os.environ.get("REDLINE_QWEN_MODEL") or "qwen-plus"
     base_url = (base_url or os.environ.get("REDLINE_QWEN_BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions").rstrip("/")
     api_key = api_key or os.environ.get("REDLINE_QWEN_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
     if api_key is None and transport is None:
-        return None
+        return None, "qwen_credentials_missing"
     payload = {
         "model": model,
         "temperature": 0,
@@ -84,24 +86,60 @@ def _compile_with_openai_compatible_qwen(
     try:
         status, response_body = (transport or _urllib_transport)(base_url, headers, body)
     except Exception:
-        return None
+        return None, "qwen_transport_exception"
     if status >= 400:
-        return None
+        return None, f"qwen_http_{status}"
     try:
         response = json.loads(response_body.decode("utf-8"))
         content = response["choices"][0]["message"]["content"]
         proposed_payload = json.loads(content) if isinstance(content, str) else content
         spec = RedlineSpec.model_validate(proposed_payload)
     except (KeyError, IndexError, TypeError, UnicodeDecodeError, json.JSONDecodeError, ValidationError):
-        return None
-    return spec.model_copy(
-        update={
-            "declared_intent": text,
-            "compiler": "qwen",
-            "model": model,
-            "tool_schema_hash": tool_schema_hash(),
-        }
+        return None, "qwen_response_invalid"
+    if not _qwen_spec_is_semantically_sane(spec):
+        return None, "qwen_semantic_sanity_failed"
+    return (
+        spec.model_copy(
+            update={
+                "declared_intent": text,
+                "compiler": "qwen",
+                "model": model,
+                "tool_schema_hash": tool_schema_hash(),
+                "degraded_reason": None,
+            }
+        ),
+        None,
     )
+
+
+def _qwen_spec_is_semantically_sane(spec: RedlineSpec) -> bool:
+    for probe in spec.probes:
+        if probe.type == ProbeType.MAX_DRAWDOWN:
+            value = _decimal_param(probe.params, "max_drawdown")
+            if value is None or value <= 0 or value > Decimal("1"):
+                return False
+        elif probe.type == ProbeType.TRADE_BUDGET:
+            value = _decimal_param(probe.params, "max_trades")
+            if value is None or value < 0 or value != value.to_integral_value() or value > Decimal("1000"):
+                return False
+        elif probe.type == ProbeType.NO_ENTRY_WHEN:
+            before_bar = _decimal_param(probe.params, "before_bar")
+            max_abs_position = _decimal_param(probe.params, "max_abs_position")
+            if before_bar is None or before_bar < 0 or before_bar != before_bar.to_integral_value() or before_bar > Decimal("100000"):
+                return False
+            if max_abs_position is None or max_abs_position < 0 or max_abs_position > Decimal("1"):
+                return False
+            if not probe.params.get("scenario_id"):
+                return False
+    return True
+
+
+def _decimal_param(params: dict[str, str], key: str) -> Decimal | None:
+    try:
+        value = Decimal(params[key])
+    except (KeyError, InvalidOperation):
+        return None
+    return value if value.is_finite() else None
 
 
 def _compile_text_spec(text: str, *, source_path: Path) -> RedlineSpec:

@@ -146,6 +146,7 @@ def run_redline(
                 "model": spec.model or "",
                 "tool_schema_hash": spec.tool_schema_hash or "",
                 "degraded": str(spec.compiler != "qwen").lower(),
+                "degraded_reason": spec.degraded_reason or "",
             },
         ),
     ]
@@ -281,10 +282,11 @@ def run_redline(
         coverage=coverage,
         context=DecisionContext(suite_id=suite.suite_id, spec_hash=spec_hash, chain_status=chain_status, reject_reason=reject_reason),
     )
+    qwen_degraded_reason = spec.degraded_reason or ("qwen_not_used" if spec.compiler != "qwen" else None)
     envelope = envelope.model_copy(
         update={
             "capabilities": envelope.capabilities.model_copy(
-                update={"qwen_compile": Capability(mode=spec.compiler, degraded=spec.compiler != "qwen")}
+                update={"qwen_compile": Capability(mode=spec.compiler, degraded=spec.compiler != "qwen", reason=qwen_degraded_reason)}
             )
         }
     )
@@ -306,6 +308,7 @@ def run_redline(
         spec_compiler=spec.compiler,
         spec_model=spec.model,
         spec_tool_schema_hash=spec.tool_schema_hash,
+        spec_degraded_reason=spec.degraded_reason,
         suite_id=suite.suite_id,
         scenario_ids=[scenario.id for scenario in suite.scenarios],
         suite_lock_hash=suite.suite_lock_hash or hash_obj(suite),
@@ -333,6 +336,7 @@ def run_redline(
 
 
 def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
+    _clear_artifacts_dir(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "envelope.json").write_text(artifacts.envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
     (out_dir / "report.json").write_text(json.dumps(artifacts.report_json, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -348,6 +352,26 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
             ledger_path=out_dir / "issuance-ledger.jsonl",
             checkpoint_path=out_dir / "issuance-ledger.checkpoint.json",
         )
+
+
+def _clear_artifacts_dir(out_dir: Path) -> None:
+    if not out_dir.exists():
+        return
+    for name in [
+        "envelope.json",
+        "report.json",
+        "receipt.json",
+        "issuance-ledger.jsonl",
+        "issuance-ledger.checkpoint.json",
+        "issuance-ledger.attestation.json",
+    ]:
+        path = out_dir / name
+        if path.exists():
+            path.unlink()
+    proofs_dir = out_dir / "proofs"
+    if proofs_dir.exists():
+        for proof_path in proofs_dir.glob("*.json"):
+            proof_path.unlink()
 
 
 def _simple_proof(
@@ -372,7 +396,7 @@ def _simple_proof(
         artifact_hash=artifact_hash,
         assertions=assertions or [],
         meta=meta or {},
-        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id}",
+        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>",
     )
 
 

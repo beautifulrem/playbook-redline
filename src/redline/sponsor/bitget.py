@@ -137,11 +137,31 @@ def validate_sponsor_evidence_shape(path: Path) -> SponsorStepResult:
     )
 
 
-def verify_sponsor_readback_evidence(*, evidence_path: Path, adapter: SponsorAdapter) -> SponsorStepResult:
+def verify_sponsor_readback_evidence(
+    *,
+    evidence_path: Path,
+    adapter: SponsorAdapter,
+    expected_package_hash: str | None = None,
+    expected_metrics_output_hash: str | None = None,
+) -> SponsorStepResult:
     try:
         evidence = SponsorReadbackEvidence.model_validate(json.loads(evidence_path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, ValidationError):
         return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.SCHEMA_INVALID)
+    if expected_package_hash is not None and evidence.package_hash != expected_package_hash:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"package_hash": evidence.package_hash, "expected_package_hash": expected_package_hash},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if expected_metrics_output_hash is not None and evidence.expected_metrics_output_hash != expected_metrics_output_hash:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={"metrics_output_hash": evidence.expected_metrics_output_hash, "expected_metrics_output_hash": expected_metrics_output_hash},
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
     result = adapter.poll(run_id=evidence.run_id)
     if not result.ok:
         return result

@@ -12,4 +12,4 @@ set -e
 if [ "$receipt_code" -ne 0 ] && [ "$receipt_code" -ne 10 ]; then
   exit "$receipt_code"
 fi
-uv run redline verify-sponsor-run "$evidence_path" --json
+uv run redline verify-sponsor-run "$evidence_path" --receipt "$receipt_path" --package "$package_path" --json

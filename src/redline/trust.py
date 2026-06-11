@@ -107,6 +107,7 @@ def make_trust_policy(
     valid_from: str | None = None,
     valid_until: str | None = None,
 ) -> TrustPolicy:
+    _parse_public_key(public_key)
     policy = TrustPolicy(
         policy_id=policy_id,
         keys=[

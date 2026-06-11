@@ -7,7 +7,7 @@
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:41b3c95654bfea72fd8185b0",
+    "proof:decision:cd01aa1c525224bf87e94e1e",
     "proof:package_canonical:d626e536e38620bff850851f",
     "proof:replay:90796eb2f6174bc3f22ab72b",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -17,7 +17,7 @@
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:41b3c95654bfea72fd8185b0",
+    "proof:decision:cd01aa1c525224bf87e94e1e",
     "proof:package_canonical:d626e536e38620bff850851f",
     "proof:replay:90796eb2f6174bc3f22ab72b",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -57,16 +57,19 @@
   "capabilities": {
     "engine": {
       "mode": "deterministic",
-      "degraded": false
+      "degraded": false,
+      "reason": null
     },
     "scenario_count": 2,
     "qwen_compile": {
       "mode": "json",
-      "degraded": true
+      "degraded": true,
+      "reason": "qwen_not_used"
     },
     "sponsor_readback": {
       "mode": "unavailable",
-      "degraded": true
+      "degraded": true,
+      "reason": null
     },
     "llm_in_verdict": false
   }

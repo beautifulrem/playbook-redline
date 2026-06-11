@@ -106,16 +106,16 @@ def _read_bars(path: Path) -> list[Bar]:
     rows: list[Bar] = []
     with path.open(newline="", encoding="utf-8") as fh:
         for i, row in enumerate(csv.DictReader(fh)):
-            rows.append(
-                Bar(
-                    i=i,
-                    timestamp=row["timestamp"],
-                    open=Decimal(row["open"]),
-                    high=Decimal(row["high"]),
-                    low=Decimal(row["low"]),
-                    close=Decimal(row["close"]),
-                )
+            bar = Bar(
+                i=i,
+                timestamp=row["timestamp"],
+                open=Decimal(row["open"]),
+                high=Decimal(row["high"]),
+                low=Decimal(row["low"]),
+                close=Decimal(row["close"]),
             )
+            _validate_bar(bar)
+            rows.append(bar)
     if not rows:
         raise ValueError("empty scenario")
     return rows
@@ -126,6 +126,12 @@ def _read_config(path: Path) -> dict[str, object]:
         return {}
     with path.open(encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def _validate_bar(bar: Bar) -> None:
+    values = [bar.open, bar.high, bar.low, bar.close]
+    if any(not value.is_finite() or value <= 0 for value in values):
+        raise ValueError("scenario OHLC values must be finite and positive")
 
 
 def _build_trace(
@@ -143,7 +149,12 @@ def _build_trace(
     trade_count = 0
     points: list[ReplayPoint] = []
     previous_close = bars[0].close
-    leverage = Decimal(str(config.get("leverage", "1")))
+    try:
+        leverage = Decimal(str(config.get("leverage", "1")))
+    except Exception as exc:
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "invalid leverage") from exc
+    if not leverage.is_finite():
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "non-finite leverage")
     for bar, signal_value in zip(bars, signals, strict=True):
         if not signal_value.is_finite():
             raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "non-finite signal")

@@ -19,7 +19,9 @@ from redline.models import Bar, ReasonCode
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
 _FORBIDDEN_ENTROPY_MODULES = {"random", "secrets", "time", "uuid"}
-_FORBIDDEN_DYNAMIC_CALLS = {"__import__", "compile", "eval", "exec"}
+_FORBIDDEN_STATIC_MODULES = {"os", *_FORBIDDEN_ENTROPY_MODULES}
+_FORBIDDEN_DYNAMIC_CALLS = {"__import__", "compile", "eval", "exec", "getattr"}
+_FORBIDDEN_FILE_READ_CALLS = {"open", "read_bytes", "read_text"}
 _FORBIDDEN_ENTROPY_ATTRS = {
     "choice",
     "choices",
@@ -121,36 +123,50 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 module_root = alias.name.split(".", 1)[0]
-                if module_root in _FORBIDDEN_ENTROPY_MODULES:
+                if module_root in _FORBIDDEN_STATIC_MODULES:
                     raise RuntimeError(f"{reason}:import-{module_root}")
         elif isinstance(node, ast.ImportFrom):
             module_root = (node.module or "").split(".", 1)[0]
-            if module_root in _FORBIDDEN_ENTROPY_MODULES:
+            if module_root in _FORBIDDEN_STATIC_MODULES:
                 raise RuntimeError(f"{reason}:import-{module_root}")
         elif isinstance(node, ast.Call):
             if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_DYNAMIC_CALLS:
                 raise RuntimeError(f"{reason}:dynamic-code-{node.func.id}")
+            if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_FILE_READ_CALLS:
+                raise RuntimeError(f"{reason}:file-read-{node.func.id}")
+            if isinstance(node.func, ast.Call):
+                raise RuntimeError(f"{reason}:dynamic-call-result")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_READ_CALLS:
+                raise RuntimeError(f"{reason}:file-read-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
+        elif isinstance(node, ast.Name) and node.id == "__builtins__":
+            raise RuntimeError(f"{reason}:dynamic-builtins")
 
 
 def _read_bars(path: Path) -> list[Bar]:
     rows: list[Bar] = []
     with path.open(newline="", encoding="utf-8") as fh:
         for i, row in enumerate(csv.DictReader(fh)):
-            rows.append(
-                Bar(
-                    i=i,
-                    timestamp=row["timestamp"],
-                    open=Decimal(row["open"]),
-                    high=Decimal(row["high"]),
-                    low=Decimal(row["low"]),
-                    close=Decimal(row["close"]),
-                )
+            bar = Bar(
+                i=i,
+                timestamp=row["timestamp"],
+                open=Decimal(row["open"]),
+                high=Decimal(row["high"]),
+                low=Decimal(row["low"]),
+                close=Decimal(row["close"]),
             )
+            _validate_bar(bar)
+            rows.append(bar)
     if not rows:
         raise RuntimeError(f"{ReasonCode.DATA_MISSING.value}:empty scenario")
     return rows
+
+
+def _validate_bar(bar: Bar) -> None:
+    values = [bar.open, bar.high, bar.low, bar.close]
+    if any(not value.is_finite() or value <= 0 for value in values):
+        raise RuntimeError(f"{ReasonCode.DATA_MISSING.value}:scenario OHLC values must be finite and positive")
 
 
 def _read_config(path: Path) -> dict[str, object]:

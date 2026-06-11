@@ -16,6 +16,8 @@ from redline.models import (
     LedgerCheckpointAttestation,
     PackageAnnotation,
     PackageImportResult,
+    Proof,
+    ProofKind,
     ProbeSpec,
     ProbeType,
     PublishPreflightResult,
@@ -33,6 +35,10 @@ from redline.verifier import load_receipt, verify
 
 def import_package(path: Path) -> PackageImportResult:
     root = path.resolve()
+    if not root.exists():
+        raise FileNotFoundError(root)
+    if not root.is_dir():
+        raise NotADirectoryError(root)
     files = [
         file_path.relative_to(root).as_posix()
         for file_path in sorted(p for p in root.rglob("*") if p.is_file())
@@ -50,10 +56,14 @@ def compile_spec(
     qwen_api_key: str | None = None,
     qwen_transport: LLMTransport | None = None,
 ) -> RedlineSpec:
+    if not source_path.exists():
+        raise FileNotFoundError(source_path)
     text = source_path.read_text(encoding="utf-8")
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
+        if source_path.suffix.lower() == ".json":
+            raise
         return compile_text_spec(
             text=text,
             source_path=source_path,
@@ -362,6 +372,13 @@ def execute_sponsor_readback(
         expected_package_archive_hash=upload.evidence.get("package_archive_hash"),
     )
     _write_sponsor_readback(out_dir / "sponsor-readback.json", readback)
+    _write_sponsor_readback_proof(
+        out_dir=out_dir,
+        result=readback,
+        receipt_hash=receipt.receipt_hash,
+        package_hash=receipt.package.identity_hash,
+        annotation_hash=hash_file(annotation_path),
+    )
     if not final_publish or not readback.ok:
         return readback
     draft_id = upload.evidence.get("draft_id")
@@ -521,4 +538,48 @@ def _write_sponsor_readback(path: Path, result: SponsorStepResult) -> None:
         "proof_eligible": result.evidence.get("proof_eligible") == "true",
         "transcript_hash": result.evidence.get("transcript_hash", ""),
     }
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_sponsor_readback_proof(
+    *,
+    out_dir: Path,
+    result: SponsorStepResult,
+    receipt_hash: str,
+    package_hash: str,
+    annotation_hash: str,
+) -> None:
+    if "run_id" not in result.evidence or "version_id" not in result.evidence or "metrics_output_hash" not in result.evidence:
+        return
+    artifact = {
+        "state": result.state.value,
+        "ok": result.ok,
+        "reason_code": (result.reason_code or ReasonCode.PASS).value,
+        "evidence": result.evidence,
+    }
+    proof = Proof(
+        proof_id=f"proof:sponsor_readback:{hash_obj({'receipt_hash': receipt_hash, 'artifact': artifact})[-24:]}",
+        phase="sponsor-readback",
+        kind=ProofKind.SPONSOR_READBACK,
+        verdict_bearing=False,
+        inputs_hash=hash_obj(
+            {
+                "receipt_hash": receipt_hash,
+                "package_hash": package_hash,
+                "annotation_hash": annotation_hash,
+            }
+        ),
+        artifact_hash=hash_obj(artifact),
+        reproduce="uv run redline verify-sponsor-run sponsor-readback.json --receipt <receipt> --package <package> --json",
+        meta={
+            "receipt_hash": receipt_hash,
+            "package_hash": package_hash,
+            "annotation_hash": annotation_hash,
+            "proof_eligible": str(result.evidence.get("proof_eligible", "")).lower(),
+            "state": result.state.value,
+        },
+    )
+    proofs_dir = out_dir / "proofs"
+    proofs_dir.mkdir(parents=True, exist_ok=True)
+    (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")

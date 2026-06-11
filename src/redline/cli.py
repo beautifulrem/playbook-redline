@@ -8,16 +8,18 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
+from redline.canonical import hash_tree
 from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
 from redline.runner import run_redline
 from redline.schemas import export_schemas as export_schema_files
-from redline.sponsor.bitget import BitgetSponsorAdapter, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
-from redline.verifier import verify, verify_proof
+from redline.verifier import load_receipt, verify, verify_proof
 from redline.models import LedgerCheckpoint, LedgerCheckpointAttestation
 
 app = typer.Typer(no_args_is_help=True)
@@ -93,7 +95,12 @@ def import_cmd(
     package: Path,
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    result = import_package(package)
+    try:
+        result = import_package(package)
+    except FileNotFoundError:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "package path not found", package)
+    except NotADirectoryError:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "package path is not a directory", package)
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
@@ -113,7 +120,16 @@ def compile_cmd(
     qwen_base_url: Optional[str] = typer.Option(None, "--qwen-base-url"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    spec = compile_spec(source, use_qwen=qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
+    try:
+        spec = compile_spec(source, use_qwen=qwen, qwen_model=qwen_model, qwen_base_url=qwen_base_url)
+    except FileNotFoundError:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "spec source not found", source)
+    except json.JSONDecodeError:
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "spec JSON is invalid", source)
+    except OSError:
+        _exit_bad_input(ReasonCode.DATA_MISSING, json_out, "spec source could not be read", source)
+    except (ValidationError, ValueError):
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "spec source failed validation", source)
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(spec.model_dump_json(indent=2) + "\n", encoding="utf-8")
@@ -407,14 +423,17 @@ def trust_policy_cmd(
     out: Path = typer.Option(Path("artifacts/trust-policy.json"), "--out"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    policy = make_trust_policy(
-        policy_id=policy_id,
-        key_id=key_id,
-        public_key=public_key,
-        issuer=issuer,
-        valid_from=valid_from,
-        valid_until=valid_until,
-    )
+    try:
+        policy = make_trust_policy(
+            policy_id=policy_id,
+            key_id=key_id,
+            public_key=public_key,
+            issuer=issuer,
+            valid_from=valid_from,
+            valid_until=valid_until,
+        )
+    except ValueError:
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "invalid trust public key", out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if json_out:
@@ -443,17 +462,24 @@ def sign_ledger_checkpoint_cmd(
     if key_text is None:
         console.print("missing signing key: pass --private-key-file or REDLINE_TRUST_PRIVATE_KEY")
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
-    checkpoint_obj = LedgerCheckpoint.model_validate(json.loads(checkpoint.read_text(encoding="utf-8")))
-    attestation = sign_checkpoint(
-        checkpoint=checkpoint_obj,
-        private_key_text=key_text,
-        signer=signer,
-        trust_policy_id=policy_id,
-        key_id=key_id,
-        issuer=issuer,
-        audience=audience,
-        expires_at=expires_at,
-    )
+    try:
+        checkpoint_obj = LedgerCheckpoint.model_validate(json.loads(checkpoint.read_text(encoding="utf-8")))
+        attestation = sign_checkpoint(
+            checkpoint=checkpoint_obj,
+            private_key_text=key_text,
+            signer=signer,
+            trust_policy_id=policy_id,
+            key_id=key_id,
+            issuer=issuer,
+            audience=audience,
+            expires_at=expires_at,
+        )
+    except FileNotFoundError:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "checkpoint file not found", checkpoint)
+    except (OSError, json.JSONDecodeError):
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "checkpoint JSON is invalid", checkpoint)
+    except (ValidationError, ValueError):
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "checkpoint or signing key is invalid", checkpoint)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if json_out:
@@ -470,9 +496,9 @@ def verify_ledger_attestation_cmd(
     trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    checkpoint_obj = LedgerCheckpoint.model_validate(json.loads(checkpoint.read_text(encoding="utf-8")))
-    attestation_obj = LedgerCheckpointAttestation.model_validate(json.loads(attestation.read_text(encoding="utf-8")))
     try:
+        checkpoint_obj = LedgerCheckpoint.model_validate(json.loads(checkpoint.read_text(encoding="utf-8")))
+        attestation_obj = LedgerCheckpointAttestation.model_validate(json.loads(attestation.read_text(encoding="utf-8")))
         policy = None
         if trust_policy is not None:
             from redline.models import TrustPolicy
@@ -484,6 +510,12 @@ def verify_ledger_attestation_cmd(
             trusted_public_key_text=trusted_public_key,
             trust_policy=policy,
         )
+    except FileNotFoundError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc.filename}", checkpoint)
+    except (OSError, json.JSONDecodeError):
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "ledger attestation input is not valid JSON", attestation)
+    except ValidationError:
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "ledger attestation input failed schema validation", attestation)
     except ValueError:
         ok = False
     result = {
@@ -542,10 +574,45 @@ def verify_sponsor_evidence_cmd(
 @app.command("verify-sponsor-run")
 def verify_sponsor_run_cmd(
     evidence: Path,
+    receipt: Optional[Path] = typer.Option(None, "--receipt"),
+    package: Optional[Path] = typer.Option(None, "--package"),
     out_transcript: Path = typer.Option(Path("artifacts/sponsor/readback-transcript.jsonl"), "--out-transcript"),
     base_url: str = typer.Option("https://api.bitget.com", "--base-url"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
+    expected_package_hash: str | None = None
+    expected_metrics_output_hash: str | None = None
+    if receipt is not None or package is not None:
+        if receipt is None or package is None:
+            result = {
+                "ok": False,
+                "state": "RECEIPT_PACKAGE_BINDING_REQUIRED",
+                "evidence": {},
+                "reason_code": ReasonCode.DATA_MISSING.value,
+            }
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.DATA_MISSING])
+        try:
+            receipt_obj = load_receipt(receipt)
+            expected_package_hash = hash_tree(package)
+        except FileNotFoundError:
+            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.FILE_NOT_FOUND.value}
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.FILE_NOT_FOUND])
+        except Exception:
+            result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
+        if expected_package_hash != receipt_obj.package.identity_hash:
+            result = {
+                "ok": False,
+                "state": SponsorState.MISMATCH.value,
+                "evidence": {"package_hash": expected_package_hash, "expected_package_hash": receipt_obj.package.identity_hash},
+                "reason_code": ReasonCode.RECEIPT_BINDING_FAILED.value,
+            }
+            _print_json_or_table(result, json_out, evidence)
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
+        expected_metrics_output_hash = receipt_obj.result.result_hash
     access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
     secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")
     passphrase = os.environ.get("REDLINE_BITGET_PASSPHRASE") or os.environ.get("BITGET_PASSPHRASE")
@@ -565,7 +632,12 @@ def verify_sponsor_run_cmd(
         transcript_path=out_transcript,
         base_url=base_url,
     )
-    result = verify_sponsor_readback_evidence(evidence_path=evidence, adapter=adapter)
+    result = verify_sponsor_readback_evidence(
+        evidence_path=evidence,
+        adapter=adapter,
+        expected_package_hash=expected_package_hash,
+        expected_metrics_output_hash=expected_metrics_output_hash,
+    )
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
@@ -603,6 +675,18 @@ def _print_json_or_table(result: dict[str, object], json_out: bool, target: obje
         _print_envelope(str(result.get("state", "blocked")), str(result.get("reason_code", "")), target)
 
 
+def _exit_bad_input(reason_code: ReasonCode, json_out: bool, message: str, target: object) -> None:
+    result = {
+        "schema_version": "redline.cli.error.v1",
+        "ok": False,
+        "status": VerificationStatus.BAD_INPUT.value,
+        "reason_code": reason_code.value,
+        "message": message,
+    }
+    _print_json_or_table(result, json_out, target)
+    raise typer.Exit(EXIT_BY_REASON[reason_code])
+
+
 def _prepare_demo_out(out: Path) -> None:
     resolved = out.resolve()
     cwd = Path.cwd().resolve()
@@ -613,8 +697,9 @@ def _prepare_demo_out(out: Path) -> None:
     if not (_is_relative_to(resolved, artifacts_root) or _is_relative_to(resolved, temp_root)):
         raise ValueError("output path must be under artifacts/ or the system temporary directory")
     marker = resolved / ".redline-demo-output"
+    seeded_repo_demo = resolved == artifacts_root / "demo" and (resolved / "pass").is_dir() and (resolved / "withheld").is_dir()
     if resolved.exists():
-        if not marker.exists():
+        if not marker.exists() and not seeded_repo_demo:
             raise ValueError("refusing to delete a directory not created by redline make-demo")
         shutil.rmtree(resolved)
     resolved.mkdir(parents=True, exist_ok=True)

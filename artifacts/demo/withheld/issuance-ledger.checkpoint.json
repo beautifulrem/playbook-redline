@@ -1,13 +1,12 @@
 {
   "version": "redline.ledger.checkpoint.v1",
   "ledger_path": "artifacts/demo/withheld/issuance-ledger.jsonl",
-  "ledger_hash": "sha256:eb8c05543911621fcc52b7059e33b6e13bbb3013e1594d22b9e67f1469c4efe7",
-  "ledger_tail_hash": "sha256:d7f1629d3eb50940b7e8cd7fa226f512299bbe8fb6eee6d6586ac5ee6f105a47",
-  "ledger_entry_count": 2,
+  "ledger_hash": "sha256:a4379dcb786321572ab1f3f8ac0b73de02d30224f7512f0979a0e4f64da83862",
+  "ledger_tail_hash": "sha256:fabf628d2d14a3f22ddd20835457c848515aa00d3cc1b5ed890c2fdb1af53643",
+  "ledger_entry_count": 1,
   "subject_receipt_hashes": [
-    "sha256:decf289f876af25b9b8673b5ea008f331996449d6d315d4acb9e5b8a63aab86d",
-    "sha256:ea78106ea5dc3d230920cb55f69b8938dfdb487b065a1227ad2383971257973f"
+    "sha256:3d61a1cbfcfa92463b2866021a4c3759a286436f1c605f8c492c9bd1c35afc41"
   ],
   "anchor_kind": "local-artifact",
-  "checkpoint_hash": "sha256:f8e81cbe4ca6d90094870f01f2d8729ddb318f3fb5af0e75fa5be764dbe69e47"
+  "checkpoint_hash": "sha256:240f5ac2458a845b9401ea931bb03fcd0dae9e3e994dfd7ab51588065e34de47"
 }

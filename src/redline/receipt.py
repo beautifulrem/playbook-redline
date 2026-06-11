@@ -49,7 +49,7 @@ def make_decision_proof(*, envelope: DecisionEnvelope, proofs: list[Proof]) -> P
         inputs_hash=hash_obj({"proof_ids": [proof.proof_id for proof in proofs], "coverage": envelope.coverage}),
         artifact_hash=hash_obj(envelope),
         assertions=[],
-        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id}",
+        reproduce=f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>",
     )
 
 
@@ -75,6 +75,7 @@ def issue_receipt(
     spec_compiler: str = "json",
     spec_model: str | None = None,
     spec_tool_schema_hash: str | None = None,
+    spec_degraded_reason: str | None = None,
     suite_id: str,
     scenario_ids: list[str],
     suite_lock_hash: str,
@@ -120,6 +121,7 @@ def issue_receipt(
             compiler=spec_compiler,
             model=spec_model,
             tool_schema_hash=spec_tool_schema_hash,
+            degraded_reason=spec_degraded_reason,
         ),
         suite=SuiteInfo(suite_id=suite_id, scenarios=scenario_ids, suite_lock_hash=suite_lock_hash, source_path=suite_source_path),
         runner=RunnerInfo(
@@ -224,7 +226,7 @@ def _raise_on_ledger_conflict(path: Path, receipt: Receipt) -> None:
                 entry = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise IssuanceLedgerConflict("issuance ledger is not valid JSONL") from exc
-            if entry.get("key_hash") == key_hash and entry.get("status") != receipt.result.status:
+            if entry.get("key_hash") == key_hash:
                 raise IssuanceLedgerConflict(
                     f"anti-reroll conflict for {key_hash}: historical={entry.get('status')} new={receipt.result.status}"
                 )

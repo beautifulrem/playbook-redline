@@ -37,7 +37,7 @@ from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, comput
 from redline.runner import load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
-from redline.mcp_server import redline_check_receipt
+from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite
 from redline.surfaces import capture_edit_provenance, compile_spec, execute_sponsor_readback, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
 from redline.verifier import verify, verify_proof
@@ -566,14 +566,103 @@ def test_sandbox_ctypes_rejects(tmp_path: Path) -> None:
 def test_sandbox_environment_is_sanitized(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("REDLINE_SENTINEL", "do-not-leak")
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_env_leak", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
-    assert artifacts.envelope.status == Status.PASS
-    assert artifacts.receipt is not None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
 
 
 def test_sandbox_virtualenv_is_not_visible_to_candidate(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_virtualenv_leak", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
-    assert artifacts.envelope.status == Status.PASS
-    assert artifacts.receipt is not None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_indirect_dynamic_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_dynamic_entropy")
+    (package / "candidate_dynamic_entropy" / "strategy.py").write_text(
+        "def signal(bar, state, config):\n"
+        "    return getattr(__builtins__, 'eval')(\"__import__('os').urandom(1)[0] % 2\")\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_dynamic_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_runtime_file_read_leak(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_runtime_read")
+    (package / "candidate_runtime_read" / "strategy.py").write_text(
+        "import sys\n\n"
+        "def signal(bar, state, config):\n"
+        "    with open(sys.executable, 'rb') as fh:\n"
+        "        return fh.read(1)[0]\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_runtime_read",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_replay_rejects_nonpositive_or_nonfinite_market_data(tmp_path: Path) -> None:
+    suite_dir = tmp_path / "suites"
+    shutil.copytree(SUITE.parent, suite_dir)
+    suite_path = suite_dir / "demo_suite.json"
+    suite_data = json.loads(suite_path.read_text())
+    suite_data["suite_lock_hash"] = None
+    suite_path.write_text(json.dumps(suite_data), encoding="utf-8")
+    csv_path = suite_dir / "btc_crash.csv"
+    rows = csv_path.read_text(encoding="utf-8").splitlines()
+    header = rows[0].split(",")
+    close_index = header.index("close")
+    values = rows[1].split(",")
+    values[close_index] = "0"
+    rows[1] = ",".join(values)
+    csv_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=suite_path, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.DATA_MISSING
+    assert artifacts.receipt is None
+
+    values[close_index] = "NaN"
+    rows[1] = ",".join(values)
+    csv_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=suite_path, spec_path=SPEC, out_dir=tmp_path / "run-nan")
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.DATA_MISSING
+    assert artifacts.receipt is None
+
+
+def test_replay_rejects_nonfinite_leverage_without_traceback(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    (package / "candidate_good" / "config.json").write_text('{"leverage": "NaN"}\n', encoding="utf-8")
+
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.NONFINITE_VALUE
+    assert artifacts.receipt is None
 
 
 def test_sandbox_allows_stdlib_import(tmp_path: Path) -> None:
@@ -668,12 +757,13 @@ def test_worker_command_uses_macos_sandbox_when_available() -> None:
         assert "redline.engine_adapter.sandbox_worker" in cmd
 
 
-def test_verify_proof_finds_proof(tmp_path: Path) -> None:
+def test_verify_proof_requires_package_for_live_replay(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
     proof_id = artifacts.receipt.proofs[0].proof_id
     result = verify_proof(receipt_path=tmp_path / "receipt.json", proof_id=proof_id)
-    assert result.status == "proof_verified"
+    assert result.status == "proof_unreplayable"
+    assert result.reason_code == ReasonCode.DATA_MISSING
 
 
 def test_verify_proof_rejects_forged_receipt_proof(tmp_path: Path) -> None:
@@ -710,12 +800,66 @@ def test_mcp_rerun_uses_default_suite_and_spec(monkeypatch, tmp_path: Path) -> N
     assert artifacts.receipt is not None
     monkeypatch.chdir(tmp_path)
     result = redline_check_receipt(str(tmp_path / "receipt.json"), pkg_path=str(PACKAGE), rerun=True)
+    assert result["schema_version"] == "redline.mcp.check.v1"
     assert result["status"] == VerificationStatus.UNVERIFIED_NO_VERDICT.value
     assert result["reason_code"] == ReasonCode.BASELINE_GENESIS.value
     assert result["verification_level"] == VerificationLevel.REPLAYED.value
 
 
-def test_mcp_verifies_chained_receipt_with_trust_inputs(tmp_path: Path) -> None:
+def test_mcp_import_compile_run_and_export_surfaces(tmp_path: Path) -> None:
+    imported = redline_import_playbook(str(PACKAGE))
+    assert imported["schema_version"] == "redline.mcp.import.v1"
+    assert imported["identity_hash"].startswith("sha256:")
+    assert "candidate_good/strategy.py" in imported["files"]
+
+    compiled = redline_compile_spec(str(SPEC))
+    assert compiled["schema_version"] == "redline.mcp.compile.v1"
+    assert compiled["spec_hash"].startswith("sha256:")
+    assert compiled["compiler"] == "json"
+    assert compiled["spec"]["version"] == "redline.spec.v2.1"
+
+    run = redline_run_suite(
+        str(PACKAGE),
+        baseline="baseline",
+        candidate="candidate_bad",
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+    )
+    assert run["schema_version"] == "redline.mcp.run.v1"
+    assert run["envelope"]["status"] == Status.WITHHELD.value
+    assert run["envelope"]["reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
+    assert run["receipt_hash"].startswith("sha256:")
+
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    export = redline_export_if_clean(
+        str(tmp_path / "run" / "receipt.json"),
+        str(PACKAGE),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+        report_path=str(tmp_path / "run" / "report.json"),
+    )
+    assert export["schema_version"] == "redline.mcp.export_if_clean.v1"
+    assert export["export_allowed"] is False
+    assert export["verification"]["schema_version"] == "redline.mcp.check.v1"
+    assert export["verification"]["reason_code"] == ReasonCode.BASELINE_GENESIS.value
+
+
+def test_fastmcp_registers_design_tool_names() -> None:
+    server = build_server()
+    tool_names = set(server._tool_manager._tools)
+    assert {
+        "redline_check_receipt",
+        "redline_verify_receipt",
+        "redline_import_playbook",
+        "redline_compile_spec",
+        "redline_run_suite",
+        "redline_export_if_clean",
+    }.issubset(tool_names)
+    assert not any(name.endswith("_tool") for name in tool_names)
+
+
+def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
     private_key, public_key = generate_trust_keypair()
@@ -748,6 +892,34 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(tmp_path: Path) -> None:
     assert result["status"] == VerificationStatus.VERIFIED.value
     assert result["reason_code"] == ReasonCode.PASS.value
     assert result["chain_status"] == "chained"
+    untrusted_export = redline_export_if_clean(
+        str(tmp_path / "chained" / "receipt.json"),
+        str(package),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+        report_path=str(tmp_path / "chained" / "report.json"),
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert untrusted_export["export_allowed"] is False
+    assert untrusted_export["trust_source"] == "untrusted_tool_input"
+    monkeypatch.setenv("REDLINE_TRUST_POLICY_HASH", policy.policy_hash)
+    trusted_export = redline_export_if_clean(
+        str(tmp_path / "chained" / "receipt.json"),
+        str(package),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+        report_path=str(tmp_path / "chained" / "report.json"),
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert trusted_export["export_allowed"] is True
+    assert trusted_export["trust_source"] == "protected_env"
+    assert trusted_export["export"]["state"] == "ANNOTATED_PACKAGE_READY"
+    assert Path(trusted_export["annotation_path"]).exists()
+    assert Path(trusted_export["annotated_package_path"]).exists()
 
 
 def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> None:
@@ -772,6 +944,29 @@ def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> 
     )
     assert artifacts.receipt is not None
     assert artifacts.receipt.edit_provenance == provenance
+
+
+def test_import_compile_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None:
+    runner = CliRunner()
+    missing_package = runner.invoke(app, ["import", str(tmp_path / "missing-package"), "--json"])
+    assert missing_package.exit_code == 2
+    payload = json.loads(missing_package.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
+    missing_spec = runner.invoke(app, ["compile", str(tmp_path / "missing-spec.json"), "--json"])
+    assert missing_spec.exit_code == 2
+    payload = json.loads(missing_spec.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
+    malformed_spec = tmp_path / "bad-spec.json"
+    malformed_spec.write_text("{not-json", encoding="utf-8")
+    malformed = runner.invoke(app, ["compile", str(malformed_spec), "--json"])
+    assert malformed.exit_code == 2
+    payload = json.loads(malformed.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.PARSE_ERROR.value
 
 
 def test_edit_provenance_diff_mismatch_rejects(tmp_path: Path) -> None:
@@ -821,6 +1016,7 @@ def test_qwen_compile_path_records_locked_spec_metadata(tmp_path: Path) -> None:
     assert compiled.model == "qwen-test"
     assert compiled.declared_intent == text_spec.read_text(encoding="utf-8")
     assert compiled.tool_schema_hash is not None
+    assert compiled.degraded_reason is None
     assert compiled.probes[0].params["max_drawdown"] == "0.07"
 
 
@@ -834,8 +1030,50 @@ def test_qwen_compile_discards_invalid_model_output(tmp_path: Path) -> None:
 
     compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
     assert compiled.compiler == "json-fallback"
+    assert compiled.degraded_reason == "qwen_response_invalid"
     assert compiled.declared_intent == text_spec.read_text(encoding="utf-8")
     assert {probe.type for probe in compiled.probes} == {ProbeType.MAX_DRAWDOWN, ProbeType.NO_ENTRY_WHEN, ProbeType.TRADE_BUDGET}
+
+
+def test_qwen_compile_discards_semantically_extreme_thresholds(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        content = {
+            "version": "redline.spec.v2.1",
+            "spec_id": "extreme",
+            "probes": [
+                {"id": "drawdown_limit", "type": "max_drawdown", "params": {"max_drawdown": "999"}, "block": True},
+                {"id": "no_entry_when_crash", "type": "no_entry_when", "params": {"scenario_id": "btc-crash-2024-03-05", "before_bar": "4", "max_abs_position": "0"}, "block": True},
+                {"id": "trade_budget", "type": "trade_budget", "params": {"max_trades": "12"}, "block": True},
+            ],
+        }
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps(content)}}]}).encode()
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    assert compiled.compiler == "json-fallback"
+    assert compiled.degraded_reason == "qwen_semantic_sanity_failed"
+    assert compiled.probes[0].params["max_drawdown"] == "0.07"
+
+
+def test_qwen_compile_records_transport_degraded_reason(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 7%; avoid entry before bar 4; trade budget 12.", encoding="utf-8")
+
+    def http_transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 429, b'{"error":"rate limited"}'
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=http_transport)
+    assert compiled.compiler == "json-fallback"
+    assert compiled.degraded_reason == "qwen_http_429"
+
+    def failing_transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        raise TimeoutError("timeout")
+
+    compiled = compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=failing_transport)
+    assert compiled.compiler == "json-fallback"
+    assert compiled.degraded_reason == "qwen_transport_exception"
 
 
 def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes_annotation(tmp_path: Path) -> None:
@@ -1471,6 +1709,27 @@ def test_live_sponsor_readback_requires_package_binding(tmp_path: Path) -> None:
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
 
 
+def test_sponsor_run_evidence_binds_expected_receipt_package(tmp_path: Path) -> None:
+    data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text())
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(data), encoding="utf-8")
+
+    class NoPollAdapter:
+        proof_eligible = True
+
+        def poll(self, *, run_id: str):
+            raise AssertionError("package binding mismatch should be rejected before live poll")
+
+    result = verify_sponsor_readback_evidence(
+        evidence_path=evidence_path,
+        adapter=NoPollAdapter(),  # type: ignore[arg-type]
+        expected_package_hash="sha256:" + "0" * 64,
+    )
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
 def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
@@ -1542,6 +1801,11 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     assert observed_expected_hashes == [artifacts.receipt.result.result_hash]
     assert result.ok is False
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    sponsor_proofs = sorted((tmp_path / "publish" / "proofs").glob("proof_sponsor_readback_*.json"))
+    assert sponsor_proofs
+    proof = json.loads(sponsor_proofs[0].read_text())
+    assert proof["kind"] == ProofKind.SPONSOR_READBACK.value
+    assert proof["meta"]["receipt_hash"] == artifacts.receipt.receipt_hash
 
 
 def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path) -> None:
@@ -1559,6 +1823,48 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
     assert payload["state"] == "BITGET_CREDENTIALS_REQUIRED"
+
+
+def test_trust_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None:
+    runner = CliRunner()
+    bad_policy = runner.invoke(
+        app,
+        [
+            "trust-policy",
+            "--public-key",
+            "not-a-key",
+            "--key-id",
+            "k",
+            "--issuer",
+            "i",
+            "--out",
+            str(tmp_path / "bad-policy.json"),
+            "--json",
+        ],
+    )
+    assert bad_policy.exit_code == 2
+    assert json.loads(bad_policy.stdout)["reason_code"] == ReasonCode.SCHEMA_INVALID.value
+
+    missing_checkpoint = runner.invoke(
+        app,
+        [
+            "sign-ledger-checkpoint",
+            str(tmp_path / "missing-checkpoint.json"),
+            "--private-key",
+            "not-a-key",
+            "--json",
+        ],
+    )
+    assert missing_checkpoint.exit_code == 2
+    assert json.loads(missing_checkpoint.stdout)["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{not json", encoding="utf-8")
+    bad_attestation = tmp_path / "attestation.json"
+    bad_attestation.write_text("{not json", encoding="utf-8")
+    verify_bad_json = runner.invoke(app, ["verify-ledger-attestation", str(bad_attestation), str(checkpoint), "--json"])
+    assert verify_bad_json.exit_code == 2
+    assert json.loads(verify_bad_json.stdout)["reason_code"] == ReasonCode.PARSE_ERROR.value
 
 
 def test_sponsor_evidence_mismatch_rejects(tmp_path: Path) -> None:
@@ -1612,6 +1918,7 @@ def test_generated_reports_validate_against_exported_schema(tmp_path: Path) -> N
 
 def test_composite_action_runs_against_caller_workspace() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    assert 'allow-amber-baseline-genesis:' in action
     assert 'default: "false"' in action
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
@@ -1624,6 +1931,7 @@ def test_proof_reproduce_commands_are_valid_shape(tmp_path: Path) -> None:
     for proof in artifacts.receipt.proofs:
         assert proof.reproduce is not None
         assert proof.reproduce.startswith("uv run redline verify-proof receipt.json --proof-id ")
+        assert "--package <package> --suite <suite> --spec <spec>" in proof.reproduce
 
 
 def test_anti_reroll_ledger_rejects_conflicting_status(tmp_path: Path) -> None:
@@ -1646,4 +1954,30 @@ def test_anti_reroll_ledger_rejects_conflicting_status(tmp_path: Path) -> None:
         pass
     else:
         raise AssertionError("conflicting historical verdict must block receipt issuance")
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_anti_reroll_ledger_rejects_same_status_reroll(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=None)
+    assert artifacts.receipt is not None
+    receipt = artifacts.receipt
+    key_hash = hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
+    ledger = tmp_path / "issuance-ledger.jsonl"
+    ledger.write_text(
+        json.dumps({"key_hash": key_hash, "status": receipt.result.status, "receipt_hash": "sha256:" + "0" * 64}) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        atomic_write_receipt(tmp_path / "receipt.json", receipt, ledger_path=ledger)
+    except IssuanceLedgerConflict:
+        pass
+    else:
+        raise AssertionError("same-key historical verdict must block receipt issuance")
     assert not (tmp_path / "receipt.json").exists()

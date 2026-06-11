@@ -4,6 +4,18 @@ Crash-test receipts for AI-edited Bitget Playbooks.
 
 Playbook Redline is a backend proof kernel and verifier for checking whether an edited trading playbook still passes a fixed crash-test suite before it is trusted or published. The core rule is simple: no proof, no verdict.
 
+## Why Now
+
+AI-edited trading playbooks can move faster than manual review, but every edit also changes risk exposure. Playbook Redline makes the handoff from "generated strategy" to "publishable Bitget playbook" auditable: deterministic replay, fixed crash tapes, receipt hashes, proof sidecars, and sponsor read-back all have to line up before a package can be exported.
+
+## Hackathon Fit
+
+- Bitget relevance: focuses on copy-trading/playbook safety before publication, with a sponsor read-back path for live run verification.
+- Technical depth: combines deterministic replay, canonical hashing, proof coverage, sandboxing, signed ledger checkpoints, MCP tools, JSON schemas, and CI integration.
+- Product clarity: the primary user is a strategy author or reviewer who needs a yes/no publish gate plus machine-checkable evidence, not another dashboard without enforceable provenance.
+- Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --rerun` let judges replay the evidence locally.
+- Extensibility: probe definitions, suites, package import, report rendering, MCP access, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel.
+
 ## What Is Included
 
 - Deterministic replay engine for fixture playbooks

@@ -60,6 +60,18 @@
       "default": null,
       "title": "Declared Intent"
     },
+    "degraded_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Degraded Reason"
+    },
     "model": {
       "anyOf": [
         {

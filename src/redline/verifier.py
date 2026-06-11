@@ -223,6 +223,8 @@ def verify_proof(
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
     if external != receipt_proof:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    if package is None:
+        return ProofVerification(status="proof_unreplayable", proof_id=proof_id, artifact_hash=receipt_proof.artifact_hash, reason_code=ReasonCode.DATA_MISSING)
     if package is not None:
         if suite_path is None or spec_path is None:
             return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.DATA_MISSING)

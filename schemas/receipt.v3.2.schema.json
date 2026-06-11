@@ -152,6 +152,18 @@
         "mode": {
           "title": "Mode",
           "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
         }
       },
       "required": [
@@ -597,6 +609,18 @@
           "default": "json",
           "title": "Compiler",
           "type": "string"
+        },
+        "degraded_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degraded Reason"
         },
         "model": {
           "anyOf": [

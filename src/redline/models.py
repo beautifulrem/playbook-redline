@@ -99,6 +99,7 @@ class VerificationStatus(StrEnum):
 class Capability(RedlineModel):
     mode: str
     degraded: bool = False
+    reason: str | None = None
 
 
 class Capabilities(RedlineModel):
@@ -124,6 +125,7 @@ class RedlineSpec(RedlineModel):
     declared_intent: str | None = None
     model: str | None = None
     tool_schema_hash: str | None = None
+    degraded_reason: str | None = None
 
 
 class Scenario(RedlineModel):
@@ -349,6 +351,7 @@ class SpecInfo(RedlineModel):
     compiler: str = "json"
     model: str | None = None
     tool_schema_hash: str | None = None
+    degraded_reason: str | None = None
 
 
 class SuiteInfo(RedlineModel):

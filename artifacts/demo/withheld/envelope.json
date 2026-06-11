@@ -5,7 +5,7 @@
   "chain_status": "genesis",
   "required_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:0e1f3e7fc75c38a7959f792c",
+    "proof:decision:304c83a6a5cc79b66f2f954c",
     "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
     "proof:probe:1ea0185c616b3d37f783091d",
     "proof:probe:2b0b31d7e8e89665ae2fab01",
@@ -19,7 +19,7 @@
   ],
   "satisfied_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:0e1f3e7fc75c38a7959f792c",
+    "proof:decision:304c83a6a5cc79b66f2f954c",
     "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
     "proof:probe:1ea0185c616b3d37f783091d",
     "proof:probe:2b0b31d7e8e89665ae2fab01",
@@ -65,16 +65,19 @@
   "capabilities": {
     "engine": {
       "mode": "deterministic",
-      "degraded": false
+      "degraded": false,
+      "reason": null
     },
     "scenario_count": 2,
     "qwen_compile": {
       "mode": "json",
-      "degraded": true
+      "degraded": true,
+      "reason": "qwen_not_used"
     },
     "sponsor_readback": {
       "mode": "unavailable",
-      "degraded": true
+      "degraded": true,
+      "reason": null
     },
     "llm_in_verdict": false
   }
