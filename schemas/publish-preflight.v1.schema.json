@@ -45,6 +45,30 @@
       "default": null,
       "title": "Annotation Hash"
     },
+    "ledger_checkpoint_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ledger Checkpoint Hash"
+    },
+    "ledger_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ledger Hash"
+    },
     "ok": {
       "title": "Ok",
       "type": "boolean"
@@ -83,6 +107,18 @@
       ],
       "default": null,
       "title": "Receipt Hash"
+    },
+    "report_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Report Hash"
     },
     "schema_version": {
       "const": "redline.publish_preflight.v1",

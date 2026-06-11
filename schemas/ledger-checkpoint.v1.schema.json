@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "anchor_kind": {
+      "default": "local-artifact",
+      "enum": [
+        "local-artifact",
+        "external-trust-root"
+      ],
+      "title": "Anchor Kind",
+      "type": "string"
+    },
+    "checkpoint_hash": {
+      "title": "Checkpoint Hash",
+      "type": "string"
+    },
+    "ledger_entry_count": {
+      "title": "Ledger Entry Count",
+      "type": "integer"
+    },
+    "ledger_hash": {
+      "title": "Ledger Hash",
+      "type": "string"
+    },
+    "ledger_path": {
+      "title": "Ledger Path",
+      "type": "string"
+    },
+    "ledger_tail_hash": {
+      "title": "Ledger Tail Hash",
+      "type": "string"
+    },
+    "subject_receipt_hashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Subject Receipt Hashes",
+      "type": "array"
+    },
+    "version": {
+      "const": "redline.ledger.checkpoint.v1",
+      "default": "redline.ledger.checkpoint.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ledger_path",
+    "ledger_hash",
+    "ledger_tail_hash",
+    "ledger_entry_count",
+    "subject_receipt_hashes",
+    "checkpoint_hash"
+  ],
+  "title": "LedgerCheckpoint",
+  "type": "object"
+}

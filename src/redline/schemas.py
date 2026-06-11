@@ -3,7 +3,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from redline.models import DecisionEnvelope, EditProvenance, PackageImportResult, Proof, PublishPreflightResult, Receipt, RedlineSpec, ReportJson, Suite, VerificationResult
+from redline.models import (
+    DecisionEnvelope,
+    EditProvenance,
+    LedgerCheckpoint,
+    PackageAnnotation,
+    PackageImportResult,
+    Proof,
+    PublishPreflightResult,
+    Receipt,
+    RedlineSpec,
+    ReportJson,
+    Suite,
+    VerificationResult,
+)
 from redline.models import ProofVerification
 from redline.sponsor.bitget import SponsorReadbackEvidence, SponsorStepResult
 
@@ -13,6 +26,8 @@ def export_schemas(out_dir: Path) -> None:
     models = {
         "decision-envelope.v1.schema.json": DecisionEnvelope,
         "edit-provenance.v1.schema.json": EditProvenance,
+        "ledger-checkpoint.v1.schema.json": LedgerCheckpoint,
+        "package-annotation.v1.schema.json": PackageAnnotation,
         "package-import.v1.schema.json": PackageImportResult,
         "proof.v1.schema.json": Proof,
         "proof-verification.v1.schema.json": ProofVerification,

@@ -5,7 +5,11 @@ import shutil
 from decimal import Decimal
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+from typer.testing import CliRunner
+
 from redline.canonical import CanonicalizationError, canonical_number, hash_obj
+from redline.cli import app
 from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
 from redline.models import (
@@ -16,6 +20,7 @@ from redline.models import (
     ProbeType,
     ProofKind,
     ReasonCode,
+    ReportJson,
     Receipt,
     ReplayTrace,
     Status,
@@ -29,7 +34,7 @@ from redline.runner import load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import SponsorState, validate_sponsor_evidence_shape
 from redline.mcp_server import redline_check_receipt
-from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html
+from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.verifier import verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,6 +105,8 @@ def test_bad_candidate_withheld_and_good_candidate_pass(tmp_path: Path) -> None:
     assert good.envelope.status == Status.PASS
     assert good.receipt is not None
     assert good.receipt.report.report_hash == good.report_json["report_hash"]
+    assert (tmp_path / "good" / "issuance-ledger.checkpoint.json").exists()
+    ReportJson.model_validate(good.report_json)
     assert good.report_json["proofs"]
     assert good.report_json["edit_provenance"]["diff_hash"] == good.receipt.edit_provenance.diff_hash
 
@@ -185,7 +192,8 @@ def test_replayed_verification_reruns_package(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
     result = verify(receipt_path=tmp_path / "run" / "receipt.json", package=package, suite_path=SUITE, spec_path=SPEC, level=VerificationLevel.REPLAYED)
-    assert result.status == VerificationStatus.VERIFIED
+    assert result.status == VerificationStatus.UNVERIFIED_NO_VERDICT
+    assert result.reason_code == ReasonCode.BASELINE_GENESIS
     assert result.verification_level == VerificationLevel.REPLAYED
 
 
@@ -336,6 +344,39 @@ def test_replayed_rejects_legacy_or_forged_ledger_entry(tmp_path: Path) -> None:
     result = verify(receipt_path=tmp_path / "run" / "receipt.json", package=package, suite_path=SUITE, spec_path=SPEC, level=VerificationLevel.REPLAYED)
     assert result.status == VerificationStatus.REJECTED
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_replayed_rejects_external_ledger_override_and_bad_checkpoint(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    external_ledger = tmp_path / "external-ledger.jsonl"
+    shutil.copyfile(tmp_path / "run" / "issuance-ledger.jsonl", external_ledger)
+    override = verify(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        ledger_path=external_ledger,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert override.status == VerificationStatus.REJECTED
+    assert override.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+    checkpoint = tmp_path / "run" / "issuance-ledger.checkpoint.json"
+    data = json.loads(checkpoint.read_text())
+    data["ledger_tail_hash"] = "sha256:" + "0" * 64
+    checkpoint.write_text(json.dumps(data), encoding="utf-8")
+    bad_checkpoint = verify(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert bad_checkpoint.status == VerificationStatus.REJECTED
+    assert bad_checkpoint.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
 def test_duplicate_singleton_proof_rejects(tmp_path: Path) -> None:
@@ -563,11 +604,13 @@ def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
     assert mismatch.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
-def test_mcp_rerun_uses_default_suite_and_spec(tmp_path: Path) -> None:
+def test_mcp_rerun_uses_default_suite_and_spec(monkeypatch, tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
+    monkeypatch.chdir(tmp_path)
     result = redline_check_receipt(str(tmp_path / "receipt.json"), pkg_path=str(PACKAGE), rerun=True)
-    assert result["status"] == VerificationStatus.VERIFIED.value
+    assert result["status"] == VerificationStatus.UNVERIFIED_NO_VERDICT.value
+    assert result["reason_code"] == ReasonCode.BASELINE_GENESIS.value
     assert result["verification_level"] == VerificationLevel.REPLAYED.value
 
 
@@ -595,7 +638,7 @@ def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> 
     assert artifacts.receipt.edit_provenance == provenance
 
 
-def test_publish_preflight_writes_annotation_for_pass_and_blocks_withheld(tmp_path: Path) -> None:
+def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes_annotation(tmp_path: Path) -> None:
     good = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "good")
     assert good.receipt is not None
     good_result = publish_preflight(
@@ -605,8 +648,45 @@ def test_publish_preflight_writes_annotation_for_pass_and_blocks_withheld(tmp_pa
         spec_path=SPEC,
         out_dir=tmp_path / "publish-good",
     )
-    assert good_result.ok is True
-    assert (tmp_path / "publish-good" / "redline-annotation.json").exists()
+    assert good_result.ok is False
+    assert good_result.state == "CHAINED_PASS_REQUIRED"
+    assert good_result.reason_code == ReasonCode.BASELINE_GENESIS
+    demo_result = publish_preflight(
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-demo",
+        allow_demo_baseline_genesis=True,
+    )
+    assert demo_result.ok is True
+    assert demo_result.state == "DEMO_ANNOTATION_READY"
+    annotation_path = tmp_path / "publish-demo" / "redline-annotation.json"
+    assert annotation_path.exists()
+    annotation_verify = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        report_path=tmp_path / "good" / "report.json",
+        ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+    )
+    assert annotation_verify.ok is True
+    assert annotation_verify.reason_code == ReasonCode.BASELINE_GENESIS
+    bare_verify = verify_annotation(annotation_path=annotation_path)
+    assert bare_verify.ok is False
+    assert bare_verify.state == "ANNOTATION_BINDINGS_REQUIRED"
+    tampered = json.loads(annotation_path.read_text())
+    tampered["report_hash"] = "sha256:" + "0" * 64
+    annotation_path.write_text(json.dumps(tampered), encoding="utf-8")
+    tampered_verify = verify_annotation(
+        annotation_path=annotation_path,
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        report_path=tmp_path / "good" / "report.json",
+        ledger_checkpoint_path=tmp_path / "good" / "issuance-ledger.checkpoint.json",
+    )
+    assert tampered_verify.ok is False
+    assert tampered_verify.state == "ANNOTATION_HASH_MISMATCH"
     bad = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_bad", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "bad")
     assert bad.receipt is not None
     bad_result = publish_preflight(
@@ -625,14 +705,76 @@ def test_report_html_is_static_escaped_render(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
     report_path = tmp_path / "run" / "report.json"
+    forged_preview = tmp_path / "forged-preview.json"
     data = json.loads(report_path.read_text())
     data["strength_summary"] = "<script>alert(1)</script>"
-    report_path.write_text(json.dumps(data), encoding="utf-8")
+    data["report_hash"] = hash_obj({key: value for key, value in {**data, "receipt_hash": None}.items() if key != "report_hash"})
+    forged_preview.write_text(json.dumps(data), encoding="utf-8")
     out = tmp_path / "report.html"
-    render_report_html(report_path, out)
+    render_report_html(forged_preview, out)
     html = out.read_text(encoding="utf-8")
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "UNVERIFIED PREVIEW" in html
+    try:
+        render_report_html(
+            tmp_path / "run" / "report.json",
+            tmp_path / "verified.html",
+            receipt_path=tmp_path / "run" / "receipt.json",
+            package=PACKAGE,
+            suite_path=SUITE,
+            spec_path=SPEC,
+            require_verified=True,
+        )
+    except ValueError as exc:
+        assert "BASELINE_GENESIS" in str(exc)
+    else:
+        raise AssertionError("genesis report must not render with --verified")
+
+
+def test_report_html_rejects_stale_report_hash(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    report_path = tmp_path / "run" / "report.json"
+    data = json.loads(report_path.read_text())
+    data["envelope"]["status"] = "withheld"
+    report_path.write_text(json.dumps(data), encoding="utf-8")
+    try:
+        render_report_html(report_path, tmp_path / "forged.html")
+    except ValueError as exc:
+        assert "report_hash mismatch" in str(exc)
+    else:
+        raise AssertionError("stale report_hash must not render")
+
+
+def test_publish_execute_writes_final_state_to_stdout_and_file(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    out_dir = tmp_path / "publish"
+    result = CliRunner().invoke(
+        app,
+        [
+            "publish",
+            str(PACKAGE),
+            str(tmp_path / "run" / "receipt.json"),
+            "--suite",
+            str(SUITE),
+            "--spec",
+            str(SPEC),
+            "--out",
+            str(out_dir),
+            "--execute",
+            "--yes-i-understand-redline-is-wrapper-only",
+            "--allow-demo-baseline-genesis",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 6
+    stdout = json.loads(result.stdout)
+    disk = json.loads((out_dir / "publish-preflight.json").read_text())
+    assert stdout == disk
+    assert stdout["ok"] is False
+    assert stdout["state"] == "LIVE_SPONSOR_ADAPTER_UNAVAILABLE"
 
 
 def test_sponsor_evidence_verifier() -> None:
@@ -657,6 +799,8 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
     expected = {
         "decision-envelope.v1.schema.json",
         "edit-provenance.v1.schema.json",
+        "ledger-checkpoint.v1.schema.json",
+        "package-annotation.v1.schema.json",
         "package-import.v1.schema.json",
         "proof.v1.schema.json",
         "proof-verification.v1.schema.json",
@@ -670,6 +814,23 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
         "verification-result.v1.schema.json",
     }
     assert {path.name for path in tmp_path.iterdir()} == expected
+
+
+def test_generated_reports_validate_against_exported_schema(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    schema_dir = tmp_path / "schemas"
+    export_schemas(schema_dir)
+    schema = json.loads((schema_dir / "report.v1.schema.json").read_text())
+    Draft202012Validator(schema).validate(json.loads((tmp_path / "run" / "report.json").read_text()))
+
+
+def test_composite_action_runs_against_caller_workspace() -> None:
+    action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    assert 'default: "false"' in action
+    assert "working-directory: ${{ github.workspace }}" in action
+    assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
+    assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
 
 
 def test_proof_reproduce_commands_are_valid_shape(tmp_path: Path) -> None:

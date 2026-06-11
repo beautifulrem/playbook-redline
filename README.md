@@ -10,8 +10,9 @@ Playbook Redline is a backend proof kernel and verifier for checking whether an 
 - Blocking probes for drawdown, no-entry, and trade budget checks
 - Decision kernel with closed reason codes
 - Receipt issuer and verifier
+- Ledger checkpoint artifact for replay verification
 - Proof-level verification command
-- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, sponsor evidence, and verification results
+- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, ledger checkpoints, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
 
@@ -47,6 +48,7 @@ max drawdown, crash-window no-entry, and trade budget.
 
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
 Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses `--rerun` with the package, suite, and spec inputs.
+Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an externally trusted ledger checkpoint hash.
 
 ## CLI
 
@@ -68,8 +70,27 @@ uv run redline verify-proof artifacts/demo/pass/receipt.json \
 
 uv run redline import fixtures/demo_pack --json
 uv run redline compile fixtures/specs/redline_spec.json --json
+uv run redline report artifacts/demo/pass/report.json \
+  --receipt artifacts/demo/pass/receipt.json \
+  --package fixtures/demo_pack
+
 uv run redline publish fixtures/demo_pack artifacts/demo/pass/receipt.json --json
 ```
+
+`redline report` without `--verified` renders only an `UNVERIFIED PREVIEW`.
+`--verified` is reserved for receipts that are replayed, chained, and backed by
+an externally trusted ledger checkpoint; the bundled genesis fixture is not one.
+`redline publish` is fail-closed: the fixture pass receipt is still blocked as
+`BASELINE_GENESIS` unless `--allow-demo-baseline-genesis` is supplied for a demo
+annotation. That demo annotation is not final publish evidence. For a production
+publish preflight, pass `--trusted-ledger-checkpoint-hash` or set
+`REDLINE_TRUSTED_LEDGER_CHECKPOINT_HASH` to a checkpoint hash anchored outside the
+local artifact folder, for example a CI artifact digest, signed checkpoint, Git
+commit attestation, or sponsor read-back record.
+
+The Python wheel installs the CLI and library only. The bundled fixture package,
+schemas, GitHub Action, and checked-in demo artifacts are repository assets; use
+a repository checkout for the complete demo.
 
 ## Verification Script
 

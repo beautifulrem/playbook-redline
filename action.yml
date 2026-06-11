@@ -13,7 +13,7 @@ inputs:
     default: candidate_good
   allow-amber-baseline-genesis:
     description: Treat BASELINE_GENESIS exit 10 as a successful CI outcome.
-    default: "true"
+    default: "false"
   suite:
     description: Redline suite JSON path.
     default: fixtures/suites/demo_suite.json
@@ -39,15 +39,15 @@ runs:
     - name: Run Redline
       id: redline
       shell: bash
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ github.workspace }}
       run: |
         set +e
-        uv run redline run "${{ inputs.package }}" \
+        uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}" \
           --baseline "${{ inputs.baseline }}" \
           --candidate "${{ inputs.candidate }}" \
-          --suite "${{ inputs.suite }}" \
-          --spec "${{ inputs.spec }}" \
-          --out "${{ inputs.out }}" \
+          --suite "${{ github.workspace }}/${{ inputs.suite }}" \
+          --spec "${{ github.workspace }}/${{ inputs.spec }}" \
+          --out "${{ github.workspace }}/${{ inputs.out }}" \
           --json
         code=$?
         echo "exit_code=$code" >> "$GITHUB_OUTPUT"
@@ -56,7 +56,7 @@ runs:
       if: always()
       with:
         name: redline-artifacts
-        path: ${{ github.action_path }}/${{ inputs.out }}
+        path: ${{ github.workspace }}/${{ inputs.out }}
     - name: Enforce Redline result
       shell: bash
       run: |

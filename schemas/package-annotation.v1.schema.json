@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "ChainStatus": {
+      "enum": [
+        "chained",
+        "genesis",
+        "unchained"
+      ],
+      "title": "ChainStatus",
+      "type": "string"
+    },
+    "VerificationLevel": {
+      "enum": [
+        "hash_only",
+        "replayed"
+      ],
+      "title": "VerificationLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "annotation_hash": {
+      "title": "Annotation Hash",
+      "type": "string"
+    },
+    "annotation_kind": {
+      "default": "publish-preflight",
+      "enum": [
+        "demo-preview",
+        "publish-preflight"
+      ],
+      "title": "Annotation Kind",
+      "type": "string"
+    },
+    "chain_status": {
+      "$ref": "#/$defs/ChainStatus"
+    },
+    "ledger_checkpoint_hash": {
+      "title": "Ledger Checkpoint Hash",
+      "type": "string"
+    },
+    "ledger_hash": {
+      "title": "Ledger Hash",
+      "type": "string"
+    },
+    "package_hash": {
+      "title": "Package Hash",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "receipt_path": {
+      "title": "Receipt Path",
+      "type": "string"
+    },
+    "report_hash": {
+      "title": "Report Hash",
+      "type": "string"
+    },
+    "strength_summary": {
+      "title": "Strength Summary",
+      "type": "string"
+    },
+    "trusted_ledger_checkpoint_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trusted Ledger Checkpoint Hash"
+    },
+    "verification_level": {
+      "$ref": "#/$defs/VerificationLevel"
+    },
+    "version": {
+      "const": "redline.package.annotation.v1",
+      "default": "redline.package.annotation.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_path",
+    "receipt_hash",
+    "report_hash",
+    "package_hash",
+    "ledger_hash",
+    "ledger_checkpoint_hash",
+    "strength_summary",
+    "chain_status",
+    "verification_level",
+    "annotation_hash"
+  ],
+  "title": "PackageAnnotation",
+  "type": "object"
+}

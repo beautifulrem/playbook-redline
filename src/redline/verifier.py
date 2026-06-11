@@ -5,9 +5,10 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_obj, hash_tree
+from redline.canonical import hash_file, hash_obj, hash_tree
 from redline.models import (
     DecisionEnvelope,
+    LedgerCheckpoint,
     Proof,
     ProofKind,
     ProofVerification,
@@ -51,6 +52,8 @@ def verify(
     spec_path: Path | None = None,
     report_path: Path | None = None,
     ledger_path: Path | None = None,
+    ledger_checkpoint_path: Path | None = None,
+    trusted_ledger_checkpoint_hash: str | None = None,
 ) -> VerificationResult:
     level = level or VerificationLevel.HASH_ONLY
     try:
@@ -86,7 +89,16 @@ def verify(
     binding_error = _receipt_binding_error(receipt)
     if binding_error is not None:
         return _reject(receipt, binding_error, level)
-    ledger_error = _ledger_error(receipt=receipt, ledger_path=ledger_path or receipt_path.parent / "issuance-ledger.jsonl")
+    default_ledger_path = receipt_path.parent / "issuance-ledger.jsonl"
+    default_checkpoint_path = receipt_path.parent / "issuance-ledger.checkpoint.json"
+    if level == VerificationLevel.REPLAYED and ledger_path is not None and ledger_path.resolve() != default_ledger_path.resolve():
+        return _reject(receipt, ReasonCode.RECEIPT_MISMATCH, level)
+    ledger_error = _ledger_error(
+        receipt=receipt,
+        ledger_path=ledger_path or default_ledger_path,
+        checkpoint_path=(ledger_checkpoint_path or default_checkpoint_path) if level == VerificationLevel.REPLAYED else ledger_checkpoint_path,
+        trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+    )
     if ledger_error is not None:
         return _reject(receipt, ledger_error, level)
     if not receipt.coverage.complete:
@@ -155,6 +167,10 @@ def verify(
         )
         if replay_error is not None:
             return _reject(receipt, replay_error, level)
+    if receipt.decision.reason_code == ReasonCode.BASELINE_GENESIS:
+        return _unverified(receipt, ReasonCode.BASELINE_GENESIS, level)
+    if Status(receipt.result.status) == Status.PASS and trusted_ledger_checkpoint_hash is None:
+        return _unverified(receipt, ReasonCode.BASELINE_UNCHAINED, level)
     return VerificationResult(
         status=VerificationStatus.VERIFIED,
         reason_code=receipt.decision.reason_code,
@@ -338,7 +354,13 @@ def _single_proof(receipt: Receipt, kind: ProofKind) -> Proof | None:
     return matches[0]
 
 
-def _ledger_error(*, receipt: Receipt, ledger_path: Path) -> ReasonCode | None:
+def _ledger_error(
+    *,
+    receipt: Receipt,
+    ledger_path: Path,
+    checkpoint_path: Path | None = None,
+    trusted_ledger_checkpoint_hash: str | None = None,
+) -> ReasonCode | None:
     if not ledger_path.exists():
         return ReasonCode.RECEIPT_MISMATCH
     key_hash = hash_obj(
@@ -351,11 +373,13 @@ def _ledger_error(*, receipt: Receipt, ledger_path: Path) -> ReasonCode | None:
     )
     matched = False
     previous_entry_hash = "sha256:genesis"
+    entry_count = 0
     try:
         with ledger_path.open(encoding="utf-8") as fh:
             for line in fh:
                 if not line.strip():
                     continue
+                entry_count += 1
                 entry = json.loads(line)
                 entry_hash = entry.get("entry_hash")
                 if not isinstance(entry_hash, str):
@@ -372,7 +396,49 @@ def _ledger_error(*, receipt: Receipt, ledger_path: Path) -> ReasonCode | None:
                     matched = True
     except (OSError, json.JSONDecodeError):
         return ReasonCode.RECEIPT_MISMATCH
-    return None if matched else ReasonCode.RECEIPT_MISMATCH
+    if not matched:
+        return ReasonCode.RECEIPT_MISMATCH
+    if checkpoint_path is not None:
+        checkpoint_error = _ledger_checkpoint_error(
+            receipt=receipt,
+            ledger_path=ledger_path,
+            checkpoint_path=checkpoint_path,
+            ledger_tail_hash=previous_entry_hash,
+            ledger_entry_count=entry_count,
+            trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
+        )
+        if checkpoint_error is not None:
+            return checkpoint_error
+    return None
+
+
+def _ledger_checkpoint_error(
+    *,
+    receipt: Receipt,
+    ledger_path: Path,
+    checkpoint_path: Path,
+    ledger_tail_hash: str,
+    ledger_entry_count: int,
+    trusted_ledger_checkpoint_hash: str | None,
+) -> ReasonCode | None:
+    if not checkpoint_path.exists():
+        return ReasonCode.RECEIPT_MISMATCH
+    try:
+        checkpoint = LedgerCheckpoint.model_validate(json.loads(checkpoint_path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, ValidationError):
+        return ReasonCode.RECEIPT_MISMATCH
+    expected_checkpoint_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
+    if checkpoint.checkpoint_hash != expected_checkpoint_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    if trusted_ledger_checkpoint_hash is not None and checkpoint.checkpoint_hash != trusted_ledger_checkpoint_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    if checkpoint.ledger_hash != hash_file(ledger_path):
+        return ReasonCode.RECEIPT_MISMATCH
+    if checkpoint.ledger_tail_hash != ledger_tail_hash or checkpoint.ledger_entry_count != ledger_entry_count:
+        return ReasonCode.RECEIPT_MISMATCH
+    if receipt.receipt_hash not in checkpoint.subject_receipt_hashes:
+        return ReasonCode.RECEIPT_MISMATCH
+    return None
 
 
 def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode | None:
@@ -411,6 +477,20 @@ def _external_report_error(*, report_path: Path, expected_report: dict, receipt:
 
 def _bad(reason: ReasonCode, level: VerificationLevel) -> VerificationResult:
     return VerificationResult(status=VerificationStatus.BAD_INPUT, reason_code=reason, verification_level=level)
+
+
+def _unverified(receipt: Receipt, reason: ReasonCode, level: VerificationLevel) -> VerificationResult:
+    return VerificationResult(
+        status=VerificationStatus.UNVERIFIED_NO_VERDICT,
+        reason_code=reason,
+        verification_level=level,
+        receipt_hash=receipt.receipt_hash,
+        strength_summary=receipt.strength_summary,
+        chain_status=receipt.baseline.chain_status,
+        edit_provenance_present=True,
+        proof_coverage="complete" if receipt.coverage.complete else "incomplete",
+        missing_proof_ids=receipt.coverage.missing,
+    )
 
 
 def _reject(receipt: Receipt, reason: ReasonCode, level: VerificationLevel) -> VerificationResult:

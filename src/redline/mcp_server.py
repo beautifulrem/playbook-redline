@@ -29,6 +29,7 @@ def redline_check_receipt(
     if rerun:
         suite_path, spec_path = _rerun_paths_from_receipt(
             receipt_path=Path(receipt_path),
+            pkg_path=Path(pkg_path) if pkg_path else None,
             suite_path=suite_path,
             spec_path=spec_path,
         )
@@ -44,7 +45,13 @@ def redline_check_receipt(
     return result.model_dump(mode="json")
 
 
-def _rerun_paths_from_receipt(*, receipt_path: Path, suite_path: str | None, spec_path: str | None) -> tuple[str, str]:
+def _rerun_paths_from_receipt(
+    *,
+    receipt_path: Path,
+    pkg_path: Path | None,
+    suite_path: str | None,
+    spec_path: str | None,
+) -> tuple[str, str]:
     if suite_path is not None and spec_path is not None:
         return suite_path, spec_path
     try:
@@ -52,9 +59,23 @@ def _rerun_paths_from_receipt(*, receipt_path: Path, suite_path: str | None, spe
     except Exception:
         return suite_path or "fixtures/suites/demo_suite.json", spec_path or "fixtures/specs/redline_spec.json"
     return (
-        suite_path or receipt.get("suite", {}).get("source_path") or "fixtures/suites/demo_suite.json",
-        spec_path or receipt.get("spec", {}).get("source_path") or "fixtures/specs/redline_spec.json",
+        str(_resolve_source_path(suite_path or receipt.get("suite", {}).get("source_path") or "fixtures/suites/demo_suite.json", receipt_path, pkg_path)),
+        str(_resolve_source_path(spec_path or receipt.get("spec", {}).get("source_path") or "fixtures/specs/redline_spec.json", receipt_path, pkg_path)),
     )
+
+
+def _resolve_source_path(value: str, receipt_path: Path, pkg_path: Path | None) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    candidates = [Path.cwd() / path, receipt_path.resolve().parent / path]
+    if pkg_path is not None:
+        resolved_pkg = pkg_path.resolve()
+        candidates.extend(parent / path for parent in resolved_pkg.parents)
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return (receipt_path.resolve().parent / path).resolve()
 
 
 def build_server():

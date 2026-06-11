@@ -4,8 +4,9 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
-from redline.canonical import hash_obj
+from redline.canonical import hash_file, hash_obj
 from redline.models import (
     Assertion,
     BaselineInfo,
@@ -13,6 +14,7 @@ from redline.models import (
     CoverageManifest,
     DecisionEnvelope,
     EditProvenance,
+    LedgerCheckpoint,
     PackageInfo,
     Proof,
     ProofKind,
@@ -128,7 +130,13 @@ def issue_receipt(
     return receipt
 
 
-def atomic_write_receipt(path: Path, receipt: Receipt, *, ledger_path: Path | None = None) -> None:
+def atomic_write_receipt(
+    path: Path,
+    receipt: Receipt,
+    *,
+    ledger_path: Path | None = None,
+    checkpoint_path: Path | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if ledger_path is not None:
         _raise_on_ledger_conflict(ledger_path, receipt)
@@ -142,6 +150,37 @@ def atomic_write_receipt(path: Path, receipt: Receipt, *, ledger_path: Path | No
     os.replace(tmp, path)
     if ledger_path is not None:
         _append_ledger(ledger_path, receipt)
+        create_ledger_checkpoint(
+            ledger_path=ledger_path,
+            checkpoint_path=checkpoint_path,
+            subject_receipt_hashes=[receipt.receipt_hash],
+        )
+
+
+def create_ledger_checkpoint(
+    *,
+    ledger_path: Path,
+    checkpoint_path: Path | None = None,
+    subject_receipt_hashes: list[str] | None = None,
+    anchor_kind: Literal["local-artifact", "external-trust-root"] = "local-artifact",
+) -> LedgerCheckpoint:
+    entries = _read_ledger_entries(ledger_path)
+    ledger_tail_hash = entries[-1]["entry_hash"] if entries else "sha256:genesis"
+    ledger_receipt_hashes = [entry["receipt_hash"] for entry in entries if isinstance(entry.get("receipt_hash"), str)]
+    checkpoint = LedgerCheckpoint(
+        ledger_path=str(ledger_path),
+        ledger_hash=hash_file(ledger_path),
+        ledger_tail_hash=ledger_tail_hash,
+        ledger_entry_count=len(entries),
+        subject_receipt_hashes=sorted(set([*(subject_receipt_hashes or []), *ledger_receipt_hashes])),
+        anchor_kind=anchor_kind,
+        checkpoint_hash="",
+    )
+    checkpoint = checkpoint.model_copy(update={"checkpoint_hash": hash_obj(checkpoint)})
+    if checkpoint_path is not None:
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.write_text(checkpoint.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return checkpoint
 
 
 def _append_ledger(path: Path, receipt: Receipt) -> None:
@@ -193,6 +232,14 @@ def _last_ledger_entry_hash(path: Path) -> str:
     previous = "sha256:genesis"
     if not path.exists():
         return previous
+    for entry in _read_ledger_entries(path):
+        previous = entry["entry_hash"]
+    return previous
+
+
+def _read_ledger_entries(path: Path) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    previous_entry_hash = "sha256:genesis"
     with path.open(encoding="utf-8") as fh:
         for line in fh:
             if not line.strip():
@@ -201,8 +248,12 @@ def _last_ledger_entry_hash(path: Path) -> str:
             entry_hash = entry.get("entry_hash")
             if not isinstance(entry_hash, str):
                 raise IssuanceLedgerConflict("issuance ledger entry is missing entry_hash")
-            previous = entry_hash
-    return previous
+            expected_entry_hash = hash_obj({key: value for key, value in entry.items() if key != "entry_hash"})
+            if entry_hash != expected_entry_hash or entry.get("previous_entry_hash") != previous_entry_hash:
+                raise IssuanceLedgerConflict("issuance ledger hash chain is invalid")
+            previous_entry_hash = entry_hash
+            entries.append(entry)
+    return entries
 
 
 def _strength_summary(proofs: list[Proof], scenario_count: int) -> str:

@@ -14,7 +14,7 @@ from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel
 from redline.runner import run_redline
 from redline.schemas import export_schemas as export_schema_files
 from redline.sponsor.bitget import validate_sponsor_evidence_shape
-from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html
+from redline.surfaces import capture_edit_provenance, compile_spec, import_package, publish_preflight, render_report_html, verify_annotation
 from redline.verifier import verify, verify_proof
 
 app = typer.Typer(no_args_is_help=True)
@@ -159,6 +159,8 @@ def check(
     spec: Path = Path("fixtures/specs/redline_spec.json"),
     report: Optional[Path] = None,
     ledger: Optional[Path] = None,
+    ledger_checkpoint: Optional[Path] = typer.Option(None, "--ledger-checkpoint"),
+    trusted_ledger_checkpoint_hash: Optional[str] = typer.Option(None, "--trusted-ledger-checkpoint-hash"),
     rerun: bool = False,
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -171,6 +173,8 @@ def check(
         spec_path=spec if rerun else None,
         report_path=report,
         ledger_path=ledger,
+        ledger_checkpoint_path=ledger_checkpoint,
+        trusted_ledger_checkpoint_hash=trusted_ledger_checkpoint_hash,
     )
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
@@ -185,8 +189,25 @@ def check(
 def report(
     report_json: Path,
     out: Path = typer.Option(Path("artifacts/report.html"), "--out"),
+    receipt: Optional[Path] = typer.Option(None, "--receipt"),
+    package: Optional[Path] = typer.Option(None, "--package"),
+    suite: Path = typer.Option(Path("fixtures/suites/demo_suite.json"), "--suite"),
+    spec: Path = typer.Option(Path("fixtures/specs/redline_spec.json"), "--spec"),
+    verified: bool = typer.Option(False, "--verified"),
 ) -> None:
-    render_report_html(report_json, out)
+    try:
+        render_report_html(
+            report_json,
+            out,
+            receipt_path=receipt,
+            package=package,
+            suite_path=suite if receipt is not None and package is not None else None,
+            spec_path=spec if receipt is not None and package is not None else None,
+            require_verified=verified,
+        )
+    except ValueError as exc:
+        console.print(f"report rejected: {exc}")
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH]) from exc
     console.print(f"report written: {out}")
 
 
@@ -201,6 +222,8 @@ def publish(
     final_publish: bool = typer.Option(False, "--final-publish"),
     yes_wrapper_only: bool = typer.Option(False, "--yes-i-understand-redline-is-wrapper-only"),
     yes_final_publish: bool = typer.Option(False, "--yes-final-publish"),
+    allow_demo_baseline_genesis: bool = typer.Option(False, "--allow-demo-baseline-genesis"),
+    trusted_ledger_checkpoint_hash: Optional[str] = typer.Option(None, "--trusted-ledger-checkpoint-hash"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     if final_publish and (not yes_final_publish or os.environ.get("REDLINE_ALLOW_FINAL_PUBLISH") != "1"):
@@ -221,17 +244,49 @@ def publish(
         }
         _print_json_or_table(result, json_out, out)
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED])
-    result = publish_preflight(receipt_path=receipt, package=package, suite_path=suite, spec_path=spec, out_dir=out)
+    trusted_checkpoint = trusted_ledger_checkpoint_hash or os.environ.get("REDLINE_TRUSTED_LEDGER_CHECKPOINT_HASH")
+    result = publish_preflight(
+        receipt_path=receipt,
+        package=package,
+        suite_path=suite,
+        spec_path=spec,
+        out_dir=out,
+        trusted_ledger_checkpoint_hash=trusted_checkpoint,
+        allow_demo_baseline_genesis=allow_demo_baseline_genesis,
+    )
+    if execute:
+        result = result.model_copy(update={"ok": False, "state": "LIVE_SPONSOR_ADAPTER_UNAVAILABLE", "reason_code": ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED})
     result_path = out / "publish-preflight.json"
     out.mkdir(parents=True, exist_ok=True)
     result_path.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    if execute:
-        result = result.model_copy(update={"ok": False, "state": "LIVE_SPONSOR_ADAPTER_UNAVAILABLE", "reason_code": ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED})
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:
         _print_envelope("ready" if result.ok else "blocked", (result.reason_code or ReasonCode.PASS).value, result_path)
     raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code or ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED])
+
+
+@app.command("verify-annotation")
+def verify_annotation_cmd(
+    annotation: Path,
+    receipt: Optional[Path] = typer.Option(None, "--receipt"),
+    package: Optional[Path] = typer.Option(None, "--package"),
+    report: Optional[Path] = typer.Option(None, "--report"),
+    ledger_checkpoint: Optional[Path] = typer.Option(None, "--ledger-checkpoint"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = verify_annotation(
+        annotation_path=annotation,
+        receipt_path=receipt,
+        package=package,
+        report_path=report,
+        ledger_checkpoint_path=ledger_checkpoint,
+    )
+    if json_out:
+        console.print_json(data=result.model_dump(mode="json"))
+    else:
+        _print_envelope("verified" if result.ok else "rejected", (result.reason_code or ReasonCode.PASS).value, annotation)
+    raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code or ReasonCode.RECEIPT_MISMATCH])
 
 
 @app.command("verify-proof")

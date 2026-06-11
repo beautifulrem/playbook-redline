@@ -265,7 +265,12 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path) -> None:
     for proof in proofs:
         (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")
     if artifacts.receipt is not None:
-        atomic_write_receipt(out_dir / "receipt.json", artifacts.receipt, ledger_path=out_dir / "issuance-ledger.jsonl")
+        atomic_write_receipt(
+            out_dir / "receipt.json",
+            artifacts.receipt,
+            ledger_path=out_dir / "issuance-ledger.jsonl",
+            checkpoint_path=out_dir / "issuance-ledger.checkpoint.json",
+        )
 
 
 def _simple_proof(

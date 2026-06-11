@@ -10,7 +10,7 @@
     "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
     "diff_hash": "sha256:f53240af72989c573be6117b64dc1db4bc0e0ddf89579927fd8e40d73a693f55",
     "locked_by": "author",
-    "captured_at": "2026-06-10T18:58:53Z"
+    "captured_at": "2026-06-11T06:26:21Z"
   },
   "baseline": {
     "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
@@ -471,7 +471,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:62fd2962e5c26d4341eeeea58116cdbcbe9f3b2d1841b5c02dd3c90b80f8ad32",
+    "report_hash": "sha256:0afda46ba313d293f0e59772af6df587767ef05893c0fc92f9c58f3ef6963567",
     "attribution_report_hash": null
   },
   "publish": {
@@ -484,5 +484,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:de3e238adae11566470d4f1ef19122c94d9d23f03edbac5318e1046b649c0425"
+  "receipt_hash": "sha256:6aef139fec5d412c7489bd7d41ccf5b7565f0e81574b336be7755dfec07bdfbb"
 }

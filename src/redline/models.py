@@ -248,8 +248,38 @@ class PublishPreflightResult(RedlineModel):
     state: str
     receipt_hash: str | None = None
     package_hash: str | None = None
+    report_hash: str | None = None
+    ledger_hash: str | None = None
+    ledger_checkpoint_hash: str | None = None
     annotation_hash: str | None = None
     reason_code: ReasonCode | None = None
+
+
+class LedgerCheckpoint(RedlineModel):
+    version: Literal["redline.ledger.checkpoint.v1"] = "redline.ledger.checkpoint.v1"
+    ledger_path: str
+    ledger_hash: str
+    ledger_tail_hash: str
+    ledger_entry_count: int
+    subject_receipt_hashes: list[str]
+    anchor_kind: Literal["local-artifact", "external-trust-root"] = "local-artifact"
+    checkpoint_hash: str
+
+
+class PackageAnnotation(RedlineModel):
+    version: Literal["redline.package.annotation.v1"] = "redline.package.annotation.v1"
+    annotation_kind: Literal["demo-preview", "publish-preflight"] = "publish-preflight"
+    receipt_path: str
+    receipt_hash: str
+    report_hash: str
+    package_hash: str
+    ledger_hash: str
+    ledger_checkpoint_hash: str
+    strength_summary: str
+    chain_status: ChainStatus
+    verification_level: VerificationLevel
+    trusted_ledger_checkpoint_hash: str | None = None
+    annotation_hash: str
 
 
 class BaselineInfo(RedlineModel):
