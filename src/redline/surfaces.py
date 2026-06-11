@@ -302,6 +302,7 @@ def verify_annotation(
     ledger_checkpoint_path: Path | None = None,
     ledger_attestation_path: Path | None = None,
     trust_policy_path: Path | None = None,
+    trust_policy_hash: str | None = None,
     baseline_receipt_path: Path | None = None,
     allow_demo_preview: bool = False,
 ) -> PublishPreflightResult:
@@ -400,6 +401,13 @@ def verify_annotation(
         attestation = _load_attestation(ledger_attestation_path)
         if attestation is None or annotation.ledger_attestation_hash != attestation.attestation_hash:
             return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
+        if annotation.trust_policy_id != attestation.trust_policy_id or annotation.trusted_ledger_key_id != attestation.key_id:
+            return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
+        if annotation.annotation_kind == "publish-preflight" and not _trust_policy_matches(
+            trust_policy_path=trust_policy_path,
+            trust_policy_hash=trust_policy_hash,
+        ):
+            return PublishPreflightResult(ok=False, state="ANNOTATION_TRUST_POLICY_REQUIRED", reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED)
         checkpoint = _load_checkpoint(ledger_checkpoint_path) if ledger_checkpoint_path is not None else None
         if checkpoint is None or not _verify_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy_path=trust_policy_path):
             return PublishPreflightResult(ok=False, state="ANNOTATION_ATTESTATION_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
@@ -430,6 +438,7 @@ def execute_sponsor_readback(
     spec_path: Path | None = None,
     ledger_attestation_path: Path | None = None,
     trust_policy_path: Path | None = None,
+    trust_policy_hash: str | None = None,
     baseline_receipt_path: Path | None = None,
 ) -> SponsorStepResult:
     receipt = load_receipt(receipt_path)
@@ -450,6 +459,7 @@ def execute_sponsor_readback(
     trust_policy_path = trust_policy_path or (
         Path(os.environ["REDLINE_TRUST_POLICY"]) if os.environ.get("REDLINE_TRUST_POLICY") else None
     )
+    trust_policy_hash = trust_policy_hash or os.environ.get("REDLINE_TRUST_POLICY_HASH")
     annotation_result = verify_annotation(
         annotation_path=annotation_path,
         receipt_path=receipt_path,
@@ -460,6 +470,7 @@ def execute_sponsor_readback(
         ledger_checkpoint_path=receipt_path.parent / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json",
         trust_policy_path=trust_policy_path,
+        trust_policy_hash=trust_policy_hash,
         baseline_receipt_path=baseline_receipt_path,
     )
     if not annotation_result.ok:

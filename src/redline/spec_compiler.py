@@ -94,7 +94,9 @@ def _compile_with_openai_compatible_qwen(
         content = response["choices"][0]["message"]["content"]
         proposed_payload = json.loads(content) if isinstance(content, str) else content
         spec = RedlineSpec.model_validate(proposed_payload)
-    except (KeyError, IndexError, TypeError, UnicodeDecodeError, json.JSONDecodeError, ValidationError):
+    except ValidationError as exc:
+        return None, _qwen_validation_reason(exc)
+    except (KeyError, IndexError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
         return None, "qwen_response_invalid"
     if not _qwen_spec_is_semantically_sane(spec):
         return None, "qwen_semantic_sanity_failed"
@@ -132,6 +134,20 @@ def _qwen_spec_is_semantically_sane(spec: RedlineSpec) -> bool:
             if not probe.params.get("scenario_id"):
                 return False
     return True
+
+
+def _qwen_validation_reason(exc: ValidationError) -> str:
+    semantic_markers = (
+        "max_drawdown must be finite",
+        "max_trades must be a finite",
+        "no_entry_when requires",
+        "no_entry_when before_bar",
+        "no_entry_when max_abs_position",
+    )
+    for error in exc.errors():
+        if any(marker in str(error.get("msg", "")) for marker in semantic_markers):
+            return "qwen_semantic_sanity_failed"
+    return "qwen_response_invalid"
 
 
 def _decimal_param(params: dict[str, str], key: str) -> Decimal | None:

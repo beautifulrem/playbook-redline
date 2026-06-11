@@ -416,6 +416,7 @@ def publish(
                 spec_path=spec,
                 ledger_attestation_path=ledger_attestation,
                 trust_policy_path=trust_policy_path,
+                trust_policy_hash=trust_policy_hash,
                 baseline_receipt_path=baseline_receipt,
             )
             result = result.model_copy(
@@ -452,6 +453,7 @@ def verify_annotation_cmd(
     allow_demo_preview: bool = typer.Option(False, "--allow-demo-preview"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
+    trust_policy_hash = os.environ.get("REDLINE_TRUST_POLICY_HASH")
     result = verify_annotation(
         annotation_path=annotation,
         receipt_path=receipt,
@@ -462,6 +464,7 @@ def verify_annotation_cmd(
         ledger_checkpoint_path=ledger_checkpoint,
         ledger_attestation_path=ledger_attestation,
         trust_policy_path=trust_policy,
+        trust_policy_hash=trust_policy_hash,
         baseline_receipt_path=baseline_receipt,
         allow_demo_preview=allow_demo_preview,
     )
@@ -656,6 +659,13 @@ def verify_sponsor_run_cmd(
     evidence: Path,
     receipt: Optional[Path] = typer.Option(None, "--receipt"),
     package: Optional[Path] = typer.Option(None, "--package"),
+    suite: Path = typer.Option(Path("fixtures/suites/demo_suite.json"), "--suite"),
+    spec: Path = typer.Option(Path("fixtures/specs/redline_spec.json"), "--spec"),
+    report: Optional[Path] = typer.Option(None, "--report"),
+    ledger_checkpoint: Optional[Path] = typer.Option(None, "--ledger-checkpoint"),
+    ledger_attestation: Optional[Path] = typer.Option(None, "--ledger-attestation"),
+    trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
+    baseline_receipt: Optional[Path] = typer.Option(None, "--baseline-receipt"),
     out_transcript: Path = typer.Option(Path("artifacts/sponsor/readback-transcript.jsonl"), "--out-transcript"),
     base_url: str = typer.Option("https://api.bitget.com", "--base-url"),
     json_out: bool = typer.Option(False, "--json"),
@@ -700,6 +710,35 @@ def verify_sponsor_run_cmd(
         }
         _print_json_or_table(result, json_out, evidence)
         raise typer.Exit(EXIT_BY_REASON[receipt_check.reason_code])
+    replayed_check = verify(
+        receipt_path=receipt,
+        package=package,
+        suite_path=suite,
+        spec_path=spec,
+        report_path=report or receipt.parent / "report.json",
+        ledger_checkpoint_path=ledger_checkpoint,
+        ledger_attestation_path=ledger_attestation,
+        trust_policy_path=trust_policy,
+        baseline_receipt_path=baseline_receipt,
+        level=VerificationLevel.REPLAYED,
+    )
+    if (
+        replayed_check.status in {VerificationStatus.BAD_INPUT, VerificationStatus.REJECTED}
+        or replayed_check.proof_coverage != "complete"
+        or replayed_check.missing_proof_ids
+    ):
+        result = {
+            "ok": False,
+            "state": SponsorState.MISMATCH.value,
+            "evidence": {
+                "verification_status": replayed_check.status.value,
+                "proof_coverage": replayed_check.proof_coverage,
+                "receipt_hash": replayed_check.receipt_hash or "",
+            },
+            "reason_code": replayed_check.reason_code.value,
+        }
+        _print_json_or_table(result, json_out, evidence)
+        raise typer.Exit(EXIT_BY_REASON[replayed_check.reason_code])
     try:
         receipt_obj = load_receipt(receipt)
         expected_package_hash = hash_tree(package)

@@ -56,4 +56,10 @@ uv run redline verify-sponsor-run "$evidence_path" --receipt "$receipt_path" --p
 sponsor_code=$?
 set -e
 emit_bundle "$sponsor_code"
-exit "$sponsor_code"
+if [ "$sponsor_code" -ne 0 ]; then
+  exit "$sponsor_code"
+fi
+if [ "$receipt_code" -ne 0 ]; then
+  exit "$receipt_code"
+fi
+exit 0

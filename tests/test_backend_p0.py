@@ -112,6 +112,7 @@ def _make_chained_pass_fixture(tmp_path: Path, *, policy_id: str = "test-policy"
     assert chained.receipt is not None
     assert chained.envelope.status == Status.PASS
     assert chained.envelope.reason_code == ReasonCode.PASS
+    _sign_run_checkpoint(tmp_path / "run", private_key, policy_id=policy_id, key_id=key_id, issuer=issuer)
     return package, chained
 
 
@@ -250,6 +251,14 @@ def test_package_canonicalization_rejects_symlink_escape(tmp_path: Path) -> None
         assert exc.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
     else:
         raise AssertionError("package archives must share the canonical symlink policy")
+
+
+def test_package_archive_output_must_stay_outside_package(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    with pytest.raises(CanonicalizationError) as exc:
+        make_package_archive(package_dir=package, out_path=package / "package.tar.gz")
+    assert exc.value.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
 
 
 def test_candidate_entropy_source_is_sandbox_violation(tmp_path: Path) -> None:
@@ -778,6 +787,39 @@ def test_empty_suite_and_nonblocking_spec_are_schema_invalid(tmp_path: Path) -> 
     nonblocking_spec.write_text(json.dumps(spec_data), encoding="utf-8")
     with pytest.raises(ValidationError):
         load_spec(nonblocking_spec)
+
+
+def test_probe_parameter_semantics_are_schema_invalid(tmp_path: Path) -> None:
+    spec_data = json.loads(SPEC.read_text())
+    spec_data["probes"][0]["params"]["max_drawdown"] = "999"
+    bad_drawdown_spec = tmp_path / "bad-drawdown-spec.json"
+    bad_drawdown_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(bad_drawdown_spec)
+
+    spec_data = json.loads(SPEC.read_text())
+    spec_data["probes"][2]["params"]["max_trades"] = "999999"
+    bad_budget_spec = tmp_path / "bad-budget-spec.json"
+    bad_budget_spec.write_text(json.dumps(spec_data), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_spec(bad_budget_spec)
+
+    text_spec = tmp_path / "unsafe-redline.txt"
+    text_spec.write_text("Max drawdown <= 999%; no entry before bar 3; trade budget 20.", encoding="utf-8")
+    with pytest.raises(ValidationError):
+        compile_spec(text_spec)
+
+
+def test_no_entry_when_unknown_scenario_fails_closed(tmp_path: Path) -> None:
+    spec_data = json.loads(SPEC.read_text())
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"]["scenario_id"] = "not-in-suite"
+    spec_path = tmp_path / "unknown-scenario-spec.json"
+    spec_path.write_text(json.dumps(spec_data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unknown scenario_id"):
+        run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=spec_path, out_dir=tmp_path / "run")
 
 
 def test_duplicate_suite_scenario_and_probe_ids_are_schema_invalid(tmp_path: Path) -> None:
@@ -1912,9 +1954,46 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
         ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=attestation_path,
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert annotation_result.ok is True
     assert annotation_result.reason_code == ReasonCode.PASS
+    unpinned_annotation_result = verify_annotation(
+        annotation_path=tmp_path / "publish" / "redline-annotation.json",
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+    )
+    assert unpinned_annotation_result.ok is False
+    assert unpinned_annotation_result.state == "ANNOTATION_TRUST_POLICY_REQUIRED"
+    tampered_annotation_path = tmp_path / "tampered-trust-annotation.json"
+    tampered_annotation = PackageAnnotation.model_validate(json.loads((tmp_path / "publish" / "redline-annotation.json").read_text()))
+    tampered_annotation = tampered_annotation.model_copy(
+        update={"trust_policy_id": "forged-policy", "trusted_ledger_key_id": "forged-key", "annotation_hash": ""}
+    )
+    tampered_annotation = tampered_annotation.model_copy(update={"annotation_hash": hash_obj(tampered_annotation)})
+    tampered_annotation_path.write_text(tampered_annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    tampered_annotation_result = verify_annotation(
+        annotation_path=tampered_annotation_path,
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert tampered_annotation_result.ok is False
+    assert tampered_annotation_result.state == "ANNOTATION_ATTESTATION_MISMATCH"
     proof_backup = tmp_path / "proof-backup"
     shutil.copytree(tmp_path / "chained" / "proofs", proof_backup)
     shutil.rmtree(tmp_path / "chained" / "proofs")
@@ -1929,6 +2008,7 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
         ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=attestation_path,
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert missing_sidecar_result.ok is False
     assert missing_sidecar_result.state == "ANNOTATION_RECEIPT_INVALID"
@@ -1953,6 +2033,7 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
         ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=attestation_path,
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert forged_result.ok is False
     assert forged_result.state == "ANNOTATION_ATTESTATION_REQUIRED"
@@ -2051,6 +2132,7 @@ def test_verify_annotation_rejects_withheld_publish_annotation(tmp_path: Path) -
         ledger_checkpoint_path=tmp_path / "withheld" / "issuance-ledger.checkpoint.json",
         ledger_attestation_path=tmp_path / "withheld" / "issuance-ledger.attestation.json",
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert result.ok is False
     assert result.state == "ANNOTATION_LOCAL_PASS_REQUIRED"
@@ -2450,6 +2532,7 @@ def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
     assert result.ok is False
     assert result.state == SponsorState.MISMATCH
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert result.evidence["transcript_hash"] == sha256_bytes((tmp_path / "transcript.jsonl").read_bytes())
 
 
 def test_sponsor_evidence_verifier() -> None:
@@ -2664,6 +2747,10 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
             str(tmp_path / "run" / "receipt.json"),
             "--package",
             str(package),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--trust-policy",
+            str(tmp_path / "trust-policy.json"),
             "--json",
         ],
     )
@@ -2671,6 +2758,92 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
     assert payload["state"] == SponsorState.READBACK_VERIFIED.value
+
+
+def test_verify_sponsor_run_cli_replays_report_and_proof_sidecars_before_credentials(monkeypatch, tmp_path: Path) -> None:
+    for key in [
+        "REDLINE_BITGET_ACCESS_KEY",
+        "REDLINE_BITGET_SECRET_KEY",
+        "REDLINE_BITGET_PASSPHRASE",
+        "BITGET_ACCESS_KEY",
+        "BITGET_SECRET_KEY",
+        "BITGET_PASSPHRASE",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "archive" / "redline-annotation.json",
+        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
+    )
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-live-1",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": sha256_bytes(archive.read_bytes()),
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    proof_sidecar = next((tmp_path / "run" / "proofs").glob("proof_probe_*.json"))
+    proof_backup = proof_sidecar.read_text(encoding="utf-8")
+    proof_sidecar.unlink()
+    missing_sidecar = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(package),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--trust-policy",
+            str(tmp_path / "trust-policy.json"),
+            "--json",
+        ],
+    )
+    assert missing_sidecar.exit_code == 4
+    missing_payload = json.loads(missing_sidecar.stdout)
+    assert missing_payload["state"] == SponsorState.MISMATCH.value
+    assert missing_payload["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
+
+    proof_sidecar.write_text(proof_backup, encoding="utf-8")
+    report_path = tmp_path / "run" / "report.json"
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    report_payload["receipt_hash"] = "sha256:" + "0" * 64
+    report_path.write_text(json.dumps(report_payload), encoding="utf-8")
+    tampered_report = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(package),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--trust-policy",
+            str(tmp_path / "trust-policy.json"),
+            "--json",
+        ],
+    )
+    assert tampered_report.exit_code == 4
+    tampered_payload = json.loads(tampered_report.stdout)
+    assert tampered_payload["state"] == SponsorState.MISMATCH.value
+    assert tampered_payload["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
 
 
 def test_verify_sponsor_run_cli_requires_receipt_package_binding(monkeypatch) -> None:
@@ -2799,6 +2972,10 @@ def test_verify_sponsor_run_cli_local_base_url_is_not_live_proof(monkeypatch, tm
             str(tmp_path / "run" / "receipt.json"),
             "--package",
             str(package),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--trust-policy",
+            str(tmp_path / "trust-policy.json"),
             "--out-transcript",
             str(tmp_path / "transcript.jsonl"),
             "--base-url",
@@ -2908,6 +3085,7 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
         baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert observed_expected_hashes == [artifacts.receipt.result.result_hash]
     assert result.ok is False
@@ -2917,6 +3095,105 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     proof = json.loads(sponsor_proofs[0].read_text())
     assert proof["kind"] == ProofKind.SPONSOR_READBACK.value
     assert proof["meta"]["receipt_hash"] == artifacts.receipt.receipt_hash
+
+
+def test_execute_sponsor_readback_final_publish_uses_publish_transcript_hash(monkeypatch, tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="sponsor-policy", key_id="sponsor-key", public_key=public_key, issuer="sponsor-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
+    assert baseline.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert artifacts.receipt is not None
+    _sign_run_checkpoint(tmp_path / "run", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    publish = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert publish.ok is True
+
+    class FakeAdapter:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def upload(self, *, envelope, package_hash: str, package_archive: Path, idempotency_key: str | None = None):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.UPLOAD_ACCEPTED,
+                evidence={"version_id": "version-1", "draft_id": "draft-1", "package_archive_hash": "sha256:" + "4" * 64},
+            )
+
+        def run(self, *, version_id: str):
+            return surfaces_module.SponsorStepResult(ok=True, state=SponsorState.RUN_STARTED, evidence={"run_id": "run-1"})
+
+        def readback(
+            self,
+            *,
+            run_id: str,
+            expected_version_id: str | None = None,
+            expected_metrics_output_hash: str | None = None,
+            expected_package_hash: str | None = None,
+            expected_package_archive_hash: str | None = None,
+        ):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.READBACK_VERIFIED,
+                evidence={
+                    "run_id": run_id,
+                    "version_id": expected_version_id or "",
+                    "metrics_output_hash": expected_metrics_output_hash or "",
+                    "package_hash": expected_package_hash or "",
+                    "package_archive_hash": expected_package_archive_hash or "",
+                    "transcript_hash": "sha256:" + "1" * 64,
+                },
+            )
+
+        def publish(self, *, draft_id: str, bump_type: str = "patch"):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.PUBLISHED,
+                evidence={"publish_id": "publish-1", "draft_id": draft_id, "transcript_hash": "sha256:" + "2" * 64},
+            )
+
+    monkeypatch.setattr(surfaces_module, "BitgetSponsorAdapter", FakeAdapter)
+    result = execute_sponsor_readback(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        out_dir=tmp_path / "publish",
+        access_key="access",
+        secret_key="secret",
+        passphrase="pass",
+        final_publish=True,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert result.ok is True
+    assert result.state == SponsorState.PUBLISHED
+    assert result.evidence["transcript_hash"] == "sha256:" + "2" * 64
 
 
 def test_execute_sponsor_readback_rejects_tampered_receipt_before_adapter(monkeypatch, tmp_path: Path) -> None:
@@ -2975,6 +3252,7 @@ def test_execute_sponsor_readback_rejects_tampered_receipt_before_adapter(monkey
         baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
         ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
         trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
     )
     assert result.ok is False
     assert result.state == SponsorState.LOCAL_PASS_REQUIRED
@@ -3075,6 +3353,47 @@ def test_verify_sponsor_script_emits_single_json_document(monkeypatch) -> None:
     assert payload["sponsor_exit_code"] == 6
     assert payload["receipt_check"]["schema_version"] == "redline.verify.v1"
     assert payload["sponsor_readback"]["state"] == "BITGET_CREDENTIALS_REQUIRED"
+
+
+def test_verify_sponsor_script_preserves_amber_exit_after_successful_sponsor(tmp_path: Path) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_uv = fake_bin / "uv"
+    fake_uv.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "if [ \"$1 $2 $3\" = \"run redline check\" ]; then\n"
+        "  printf '%s\\n' '{\"schema_version\":\"redline.verify.v1\",\"status\":\"unverified_no_verdict\",\"reason_code\":\"BASELINE_GENESIS\"}'\n"
+        "  exit 10\n"
+        "fi\n"
+        "if [ \"$1 $2 $3\" = \"run redline verify-sponsor-run\" ]; then\n"
+        "  printf '%s\\n' '{\"ok\":true,\"state\":\"READBACK_VERIFIED\",\"reason_code\":\"PASS\"}'\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 99\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        [
+            str(ROOT / "scripts/verify-sponsor-run.sh"),
+            "evidence.json",
+            "receipt.json",
+            "package",
+        ],
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 10
+    payload = json.loads(result.stdout)
+    assert payload["receipt_exit_code"] == 10
+    assert payload["sponsor_exit_code"] == 0
+    assert payload["sponsor_readback"]["state"] == "READBACK_VERIFIED"
 
 
 def test_verify_sponsor_run_cli_checks_evidence_before_credentials(monkeypatch, tmp_path: Path) -> None:

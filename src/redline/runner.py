@@ -25,6 +25,7 @@ from redline.models import (
     Scenario,
     Status,
     Suite,
+    ProbeType,
     EditProvenance,
     Capability,
     LedgerCheckpoint,
@@ -123,6 +124,7 @@ def run_redline(
     candidate_dir = resolve_package_role_dir(package_dir, candidate)
     spec = load_spec(spec_path)
     suite = load_suite(suite_path)
+    _validate_spec_suite_bindings(spec, suite)
     spec_hash = hash_obj(spec)
     package_hash = hash_tree(package_dir)
     baseline_hash = hash_tree(baseline_dir)
@@ -479,13 +481,27 @@ def _candidate_absolute_assertions(assertions: list[Assertion]) -> list[Assertio
 
 def parse_run_inputs(package_dir: Path, suite_path: Path, spec_path: Path) -> tuple[Path, Path, Path]:
     try:
-        load_suite(suite_path)
-        load_spec(spec_path)
+        suite = load_suite(suite_path)
+        spec = load_spec(spec_path)
+        _validate_spec_suite_bindings(spec, suite)
     except (OSError, json.JSONDecodeError, ValidationError) as exc:
         raise ValueError(str(exc)) from exc
     if not package_dir.exists():
         raise ValueError(f"package not found: {package_dir}")
     return package_dir, suite_path, spec_path
+
+
+def _validate_spec_suite_bindings(spec: RedlineSpec, suite: Suite) -> None:
+    scenario_ids = {scenario.id for scenario in suite.scenarios}
+    unknown = sorted(
+        {
+            str(probe.params.get("scenario_id"))
+            for probe in spec.probes
+            if probe.type == ProbeType.NO_ENTRY_WHEN and str(probe.params.get("scenario_id")) not in scenario_ids
+        }
+    )
+    if unknown:
+        raise ValueError(f"spec references unknown scenario_id: {', '.join(unknown)}")
 
 
 def _baseline_chain(

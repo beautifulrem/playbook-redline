@@ -17,7 +17,7 @@ from typing import Callable, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from redline.canonical import hash_obj, iter_canonical_files, sha256_bytes
+from redline.canonical import CanonicalizationError, hash_obj, iter_canonical_files, sha256_bytes
 from redline.models import DecisionEnvelope, ReasonCode, Status
 
 
@@ -605,6 +605,7 @@ class BitgetSponsorAdapter:
         evidence = {
             "source_kind": self.credentials.source_kind,
             "proof_eligible": str(self.proof_eligible).lower(),
+            "transcript_hash": self.transcript.transcript_hash,
         }
         evidence.update({str(key): str(value) for key, value in payload.items() if key != "metrics_output"})
         if "metrics_output" in payload:
@@ -633,6 +634,9 @@ def make_annotated_package_archive(*, package_dir: Path, annotation_path: Path, 
 
 def _write_package_archive(*, package_dir: Path, out_path: Path, annotation_path: Path | None) -> Path:
     root = package_dir.resolve()
+    resolved_out = out_path.resolve()
+    if resolved_out == root or root in resolved_out.parents:
+        raise CanonicalizationError("package archive output must be outside package root", ReasonCode.RECEIPT_BINDING_FAILED)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:

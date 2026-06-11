@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
@@ -115,6 +115,30 @@ class ProbeSpec(RedlineModel):
     type: ProbeType
     params: dict[str, str]
     block: bool = True
+
+    @model_validator(mode="after")
+    def require_semantic_params(self) -> ProbeSpec:
+        if self.type == ProbeType.MAX_DRAWDOWN:
+            value = _decimal_param(self.params, "max_drawdown")
+            if value is None or value <= 0 or value > Decimal("1"):
+                raise ValueError("max_drawdown must be finite and in (0, 1]")
+        elif self.type == ProbeType.TRADE_BUDGET:
+            value = _decimal_param(self.params, "max_trades")
+            if value is None or value < 0 or value != value.to_integral_value() or value > Decimal("1000"):
+                raise ValueError("max_trades must be a finite integer in [0, 1000]")
+        elif self.type == ProbeType.NO_ENTRY_WHEN:
+            scenario_id = self.params.get("scenario_id")
+            if not isinstance(scenario_id, str) or not scenario_id.strip():
+                raise ValueError("no_entry_when requires a non-empty scenario_id")
+            before_bar = _decimal_param(self.params, "before_bar")
+            if before_bar is None:
+                before_bar = _decimal_param(self.params, "bar_lt")
+            if before_bar is None or before_bar < 0 or before_bar != before_bar.to_integral_value() or before_bar > Decimal("100000"):
+                raise ValueError("no_entry_when before_bar must be a finite integer in [0, 100000]")
+            max_abs_position = _decimal_param(self.params, "max_abs_position")
+            if max_abs_position is None or max_abs_position < 0 or max_abs_position > Decimal("1"):
+                raise ValueError("no_entry_when max_abs_position must be finite and in [0, 1]")
+        return self
 
 
 class RedlineSpec(RedlineModel):
@@ -233,6 +257,14 @@ def _ensure_unique_ids(kind: str, ids: list[str]) -> None:
     duplicates = sorted({item for item in ids if ids.count(item) > 1})
     if duplicates:
         raise ValueError(f"duplicate {kind} id: {', '.join(duplicates)}")
+
+
+def _decimal_param(params: dict[str, str], key: str) -> Decimal | None:
+    try:
+        value = Decimal(params[key])
+    except (KeyError, InvalidOperation):
+        return None
+    return value if value.is_finite() else None
 
 
 class Proof(RedlineModel):
