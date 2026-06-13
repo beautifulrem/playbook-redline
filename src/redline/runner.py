@@ -122,6 +122,10 @@ def run_redline(
     ledger_path_label: str | None = None,
 ) -> RunArtifacts:
     package_dir = package_dir.resolve()
+    if out_dir is not None:
+        resolved_out_dir = out_dir.resolve()
+        if resolved_out_dir == package_dir or package_dir in resolved_out_dir.parents:
+            raise CanonicalizationError("run output must be outside package root", ReasonCode.RECEIPT_BINDING_FAILED)
     suite_path = suite_path.resolve()
     spec_path = spec_path.resolve()
     baseline_dir = resolve_package_role_dir(package_dir, baseline)

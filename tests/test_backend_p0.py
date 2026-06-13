@@ -2259,6 +2259,38 @@ def test_verdict_path_ctypes_violation_rejects(monkeypatch, tmp_path: Path) -> N
     assert artifacts.receipt is None
 
 
+def test_verdict_path_import_gate_passes_current_repo() -> None:
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check-verdict-path-imports.py"), str(ROOT)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "verdict path import gate passed" in result.stdout
+
+
+def test_verdict_path_import_gate_rejects_forbidden_imports(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    (root / "src/redline/probes").mkdir(parents=True)
+    (root / "src/redline/probes/__init__.py").write_text("", encoding="utf-8")
+    (root / "src/redline/proof_kernel.py").write_text("import requests\n", encoding="utf-8")
+    (root / "src/redline/verifier.py").write_text("__import__('openai')\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check-verdict-path-imports.py"), str(root)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden import requests" in result.stderr
+    assert "forbidden dynamic import openai" in result.stderr
+
+
 def test_replay_hash_is_stable() -> None:
     suite = load_suite(SUITE)
     engine = DeterministicReplayEngine()
@@ -4268,6 +4300,20 @@ def test_run_rejects_package_role_escape_without_receipt(tmp_path: Path) -> None
     assert not (out_dir / "receipt.json").exists()
 
 
+def test_run_rejects_output_inside_package_before_write(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    out_dir = package / "redline-out"
+
+    result = CliRunner().invoke(app, ["run", str(package), "--candidate", "candidate_good", "--out", str(out_dir), "--json"])
+
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "redline.cli.error.v1"
+    assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+    assert not out_dir.exists()
+
+
 def test_run_same_out_dir_preserves_ledger_conflict(tmp_path: Path) -> None:
     runner = CliRunner()
     out_dir = tmp_path / "run"
@@ -4328,7 +4374,7 @@ def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> N
                 "status": artifacts.receipt.result.status,
                 "breaches": [assertion.model_dump(mode="json") for assertion in artifacts.receipt.result.new_breaches],
             }
-            return 200, json.dumps({"run_id": "run-1", "version_id": "version-1", "status": "completed", "metrics_output": metrics_output}).encode()
+            return 200, json.dumps({"run_id": "run-1", "version_id": "draft-1", "status": "completed", "metrics_output": metrics_output}).encode()
         return 404, b"{}"
 
     adapter = BitgetSponsorAdapter(
@@ -4340,12 +4386,11 @@ def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> N
     )
     upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive_a)
     assert upload.ok is True
-    run = adapter.run(version_id=upload.evidence["version_id"])
+    run = adapter.run(version_id=upload.evidence["draft_id"])
     assert run.ok is True
     readback = adapter.readback(
         run_id=run.evidence["run_id"],
-        expected_version_id=upload.evidence["version_id"],
-        expected_metrics_output_hash=artifacts.receipt.result.result_hash,
+        expected_version_id=upload.evidence["draft_id"],
         expected_package_hash=artifacts.receipt.package.identity_hash,
         expected_package_archive_hash=upload.evidence["package_archive_hash"],
     )
@@ -4436,6 +4481,64 @@ def test_bitget_sponsor_http_failures_fail_closed(tmp_path: Path, case: str, exp
     assert result.evidence["transcript_hash"] == sha256_bytes((tmp_path / f"{case}-transcript.jsonl").read_bytes())
 
 
+def test_bitget_sponsor_upload_rejects_request_hash_mismatch(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        assert url.endswith("/api/v1/playbook/upload")
+        return 200, json.dumps({"draft_id": "draft-1", "request_hash": "sha256:" + "0" * 64}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="request-access-key",
+        secret_key="request-secret-key",
+        passphrase="request-passphrase",
+        transcript_path=tmp_path / "request-transcript.jsonl",
+        transport=transport,
+    )
+
+    result = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert result.evidence["request_hash"].startswith("sha256:")
+    assert result.evidence["response_request_hash"] == "sha256:" + "0" * 64
+
+
+def test_bitget_sponsor_run_rejects_request_hash_mismatch(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+    calls: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append(url)
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1"}).encode()
+        if url.endswith("/api/v1/playbook/run"):
+            return 200, json.dumps({"run_id": "run-1", "request_hash": "sha256:" + "0" * 64}).encode()
+        raise AssertionError(url)
+
+    adapter = BitgetSponsorAdapter(
+        access_key="request-access-key",
+        secret_key="request-secret-key",
+        passphrase="request-passphrase",
+        transcript_path=tmp_path / "request-transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    assert upload.ok is True
+
+    result = adapter.run(version_id="draft-1")
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert len(calls) == 2
+
+
 def test_bitget_sponsor_session_identity_mismatch_fails_before_next_request(tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
@@ -4463,7 +4566,7 @@ def test_bitget_sponsor_session_identity_mismatch_fails_before_next_request(tmp_
     assert run.ok is False
     assert run.state == SponsorState.MISMATCH
     assert run.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
-    assert run.evidence["expected_version_id"] == "version-1"
+    assert run.evidence["expected_version_id"] == "draft-1"
     assert calls == ["https://api.bitget.com/api/v1/playbook/upload"]
 
 
@@ -4478,7 +4581,7 @@ def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None
         if url.endswith("/api/v1/playbook/run") and method == "POST":
             return 200, json.dumps({"run_id": "run-1", "status": "started"}).encode()
         if "/api/v1/playbook/run?" in url and method == "GET":
-            return 200, json.dumps({"run_id": "run-1", "version_id": "version-1", "status": "completed", "metrics_output": {"unexpected": True}}).encode()
+            return 200, json.dumps({"run_id": "run-1", "version_id": "draft-1", "status": "completed", "metrics_output": {"unexpected": True}}).encode()
         return 404, b"{}"
 
     adapter = BitgetSponsorAdapter(
@@ -4489,10 +4592,10 @@ def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None
         transport=transport,
     )
     upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
-    run = adapter.run(version_id=upload.evidence["version_id"])
+    run = adapter.run(version_id=upload.evidence["draft_id"])
     readback = adapter.readback(
         run_id=run.evidence["run_id"],
-        expected_version_id=upload.evidence["version_id"],
+        expected_version_id=upload.evidence["draft_id"],
         expected_metrics_output_hash=artifacts.receipt.result.result_hash,
         expected_package_hash=artifacts.receipt.package.identity_hash,
         expected_package_archive_hash=upload.evidence["package_archive_hash"],
@@ -4522,7 +4625,7 @@ def _publish_ready_bitget_adapter(tmp_path: Path, publish_payload: dict[str, str
                     "code": "00000",
                     "data": {
                         "run_id": "run-1",
-                        "version_id": "version-1",
+                        "version_id": "draft-1",
                         "status": "completed",
                         "metrics_output": metrics_output,
                         "package_hash": artifacts.receipt.package.identity_hash,
@@ -4543,13 +4646,12 @@ def _publish_ready_bitget_adapter(tmp_path: Path, publish_payload: dict[str, str
     )
     upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
     assert upload.ok is True
-    run = adapter.run(version_id=upload.evidence["version_id"])
+    run = adapter.run(version_id=upload.evidence["draft_id"])
     assert run.ok is True
     adapter.proof_eligible = True
     readback = adapter.readback(
         run_id=run.evidence["run_id"],
-        expected_version_id=upload.evidence["version_id"],
-        expected_metrics_output_hash=artifacts.receipt.result.result_hash,
+        expected_version_id=upload.evidence["draft_id"],
         expected_package_hash=artifacts.receipt.package.identity_hash,
         expected_package_archive_hash=upload.evidence["package_archive_hash"],
     )
@@ -4581,7 +4683,7 @@ def test_bitget_sponsor_run_requires_upload_session(tmp_path: Path) -> None:
     assert calls == []
 
 
-def test_bitget_sponsor_run_requires_uploaded_version_id(tmp_path: Path) -> None:
+def test_bitget_sponsor_run_requires_uploaded_runnable_id(tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
     archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
@@ -4590,7 +4692,7 @@ def test_bitget_sponsor_run_requires_uploaded_version_id(tmp_path: Path) -> None
     def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
         calls.append(url)
         if url.endswith("/api/v1/playbook/upload"):
-            return 200, json.dumps({"draft_id": "draft-1"}).encode()
+            return 200, json.dumps({"suggested_version": "1.0.1"}).encode()
         return 200, json.dumps({"run_id": "run-1"}).encode()
 
     adapter = BitgetSponsorAdapter(
@@ -4607,7 +4709,7 @@ def test_bitget_sponsor_run_requires_uploaded_version_id(tmp_path: Path) -> None
 
     assert result.ok is False
     assert result.state == SponsorState.LOCAL_PASS_REQUIRED
-    assert result.evidence["required_step"] == "upload.version_id"
+    assert result.evidence["required_step"] == "upload.draft_id_or_version_id"
     assert len(calls) == 1
 
 
@@ -4647,6 +4749,16 @@ def test_bitget_sponsor_publish_rejects_draft_id_mismatch_before_request(tmp_pat
     assert (tmp_path / "transcript.jsonl").read_text(encoding="utf-8") == before_transcript
 
 
+def test_bitget_publish_accepts_documented_version_id_success(tmp_path: Path) -> None:
+    adapter = _publish_ready_bitget_adapter(tmp_path, {"status": "published", "version_id": "version-2", "version": "1.0.1"})
+
+    result = adapter.publish(draft_id="draft-1")
+
+    assert result.ok is True
+    assert result.state == SponsorState.PUBLISHED
+    assert result.evidence["version_id"] == "version-2"
+
+
 def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
     adapter = _publish_ready_bitget_adapter(tmp_path, {"status": "failed", "publish_id": "publish-1"})
 
@@ -4679,19 +4791,14 @@ def test_checked_in_sponsor_fixture_binds_current_demo_package(tmp_path: Path) -
     data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text(encoding="utf-8"))
     receipt = load_receipt(ROOT / "artifacts/demo/pass/receipt.json")
     package_hash = hash_tree(PACKAGE)
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=ROOT / "artifacts/demo/pass/receipt.json",
-        package=PACKAGE,
-        annotation_path=tmp_path / "redline-annotation.json",
-        out_path=tmp_path / "annotated-package.tar.gz",
-        package_hash=package_hash,
-    )
+    archive = make_package_archive(package_dir=PACKAGE, out_path=tmp_path / "package.tar.gz")
 
     assert package_hash == receipt.package.identity_hash
     assert data["package_hash"] == receipt.package.identity_hash
     assert data["package_archive_hash"] == sha256_bytes(archive.read_bytes())
-    assert data["metrics_output_hash"] == receipt.result.result_hash
-    assert data["expected_metrics_output_hash"] == receipt.result.result_hash
+    assert data["metrics_output_hash"].startswith("sha256:")
+    if data.get("expected_metrics_output_hash") is not None:
+        assert data["expected_metrics_output_hash"] == data["metrics_output_hash"]
 
 
 def test_receipt_bound_package_archive_is_independent_of_receipt_path_form(tmp_path: Path) -> None:
@@ -4853,7 +4960,6 @@ def test_sponsor_run_evidence_binds_expected_package_archive(tmp_path: Path) -> 
         adapter=NoPollAdapter(),  # type: ignore[arg-type]
         expected_package_hash=data["package_hash"],
         expected_package_archive_hash="sha256:" + "0" * 64,
-        expected_metrics_output_hash=data["expected_metrics_output_hash"],
     )
     assert result.ok is False
     assert result.state == SponsorState.MISMATCH
@@ -4861,24 +4967,19 @@ def test_sponsor_run_evidence_binds_expected_package_archive(tmp_path: Path) -> 
     assert result.evidence["expected_package_archive_hash"] == "sha256:" + "0" * 64
 
 
-def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: Path) -> None:
+def test_verify_sponsor_run_cli_binds_clean_package_archive(monkeypatch, tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=tmp_path / "run" / "receipt.json",
-        package=package,
-        annotation_path=tmp_path / "archive" / "redline-annotation.json",
-        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
-    )
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "archive" / "package.tar.gz")
     archive_hash = sha256_bytes(archive.read_bytes())
+    metrics_hash = hash_obj({"fixture": "sponsor-cli", "receipt_hash": artifacts.receipt.receipt_hash})
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
         "run_id": "run-live-1",
         "version_id": "version-live-1",
         "status": "completed",
-        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "metrics_output_hash": metrics_hash,
         "expected_version_id": "version-live-1",
-        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
         "package_hash": artifacts.receipt.package.identity_hash,
         "package_archive_hash": archive_hash,
         "source_kind": "live",
@@ -4902,7 +5003,7 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
                     "run_id": run_id,
                     "version_id": evidence["expected_version_id"],
                     "status": "completed",
-                    "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                    "metrics_output_hash": evidence["metrics_output_hash"],
                     "package_hash": evidence["package_hash"],
                     "package_archive_hash": evidence["package_archive_hash"],
                 },
@@ -4934,7 +5035,7 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
     assert payload["state"] == SponsorState.READBACK_VERIFIED.value
 
 
-def test_verify_sponsor_run_cli_binds_custom_ledger_attestation_to_archive(monkeypatch, tmp_path: Path) -> None:
+def test_verify_sponsor_run_cli_package_archive_is_independent_of_ledger_attestation(monkeypatch, tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
     private_key, public_key = generate_trust_keypair()
@@ -5002,16 +5103,18 @@ def test_verify_sponsor_run_cli_binds_custom_ledger_attestation_to_archive(monke
     default_archive_hash = sha256_bytes(default_archive.read_bytes())
     alt_archive_hash = sha256_bytes(alt_archive.read_bytes())
     assert default_archive_hash != alt_archive_hash
+    clean_archive = make_package_archive(package_dir=package, out_path=tmp_path / "clean-package.tar.gz")
+    clean_archive_hash = sha256_bytes(clean_archive.read_bytes())
+    metrics_hash = hash_obj({"fixture": "custom-attestation", "receipt_hash": artifacts.receipt.receipt_hash})
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
         "run_id": "run-live-2",
         "version_id": "version-live-2",
         "status": "completed",
-        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "metrics_output_hash": metrics_hash,
         "expected_version_id": "version-live-2",
-        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
         "package_hash": artifacts.receipt.package.identity_hash,
-        "package_archive_hash": alt_archive_hash,
+        "package_archive_hash": clean_archive_hash,
         "source_kind": "live",
         "proof_eligible": True,
         "transcript_hash": "sha256:" + "4" * 64,
@@ -5033,7 +5136,7 @@ def test_verify_sponsor_run_cli_binds_custom_ledger_attestation_to_archive(monke
                     "run_id": run_id,
                     "version_id": evidence["expected_version_id"],
                     "status": "completed",
-                    "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                    "metrics_output_hash": evidence["metrics_output_hash"],
                     "package_hash": evidence["package_hash"],
                     "package_archive_hash": evidence["package_archive_hash"],
                 },
@@ -5065,7 +5168,7 @@ def test_verify_sponsor_run_cli_binds_custom_ledger_attestation_to_archive(monke
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
-    assert payload["evidence"]["package_archive_hash"] == alt_archive_hash
+    assert payload["evidence"]["package_archive_hash"] == clean_archive_hash
 
 
 def test_verify_sponsor_run_cli_replays_report_and_proof_sidecars_before_credentials(monkeypatch, tmp_path: Path) -> None:
@@ -5080,12 +5183,7 @@ def test_verify_sponsor_run_cli_replays_report_and_proof_sidecars_before_credent
         monkeypatch.delenv(key, raising=False)
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=tmp_path / "run" / "receipt.json",
-        package=package,
-        annotation_path=tmp_path / "archive" / "redline-annotation.json",
-        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
-    )
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "archive" / "package.tar.gz")
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
         "run_id": "run-live-1",
@@ -5179,12 +5277,7 @@ def test_verify_sponsor_run_cli_rejects_tampered_receipt_before_credentials(monk
         monkeypatch.delenv(key, raising=False)
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=tmp_path / "run" / "receipt.json",
-        package=package,
-        annotation_path=tmp_path / "archive" / "redline-annotation.json",
-        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
-    )
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "archive" / "package.tar.gz")
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
         "run_id": "run-live-1",
@@ -5228,12 +5321,7 @@ def test_verify_sponsor_run_cli_rejects_tampered_receipt_before_credentials(monk
 def test_verify_sponsor_run_cli_local_base_url_is_not_live_proof(monkeypatch, tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=tmp_path / "run" / "receipt.json",
-        package=package,
-        annotation_path=tmp_path / "archive" / "redline-annotation.json",
-        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
-    )
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "archive" / "package.tar.gz")
     archive_hash = sha256_bytes(archive.read_bytes())
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
@@ -5299,7 +5387,7 @@ def test_verify_sponsor_run_cli_local_base_url_is_not_live_proof(monkeypatch, tm
     assert payload["evidence"]["proof_eligible"] == "false"
 
 
-def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, tmp_path: Path) -> None:
+def test_execute_sponsor_readback_keeps_platform_metrics_separate_from_receipt_hash(monkeypatch, tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
     private_key, public_key = generate_trust_keypair()
@@ -5335,12 +5423,15 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     )
     assert publish.ok is True
     observed_expected_hashes: list[str | None] = []
+    observed_run_ids: list[str] = []
 
     class FakeAdapter:
         def __init__(self, **kwargs: object) -> None:
             pass
 
         def upload(self, *, envelope, package_hash: str, package_archive: Path, idempotency_key: str | None = None):
+            with tarfile.open(package_archive, "r:gz") as tar:
+                assert ".redline/redline-annotation.json" not in tar.getnames()
             return surfaces_module.SponsorStepResult(
                 ok=True,
                 state=SponsorState.UPLOAD_ACCEPTED,
@@ -5353,6 +5444,7 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
             )
 
         def run(self, *, version_id: str):
+            observed_run_ids.append(version_id)
             return surfaces_module.SponsorStepResult(ok=True, state=SponsorState.RUN_STARTED, evidence={"run_id": "run-1"})
 
         def readback(
@@ -5373,7 +5465,6 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
                     "version_id": expected_version_id or "",
                     "status": "completed",
                     "metrics_output_hash": "sha256:" + "9" * 64,
-                    "expected_metrics_output_hash": expected_metrics_output_hash or "",
                     "package_hash": expected_package_hash or "",
                     "package_archive_hash": expected_package_archive_hash or "",
                     "transcript_hash": "sha256:" + "8" * 64,
@@ -5396,7 +5487,8 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
         trust_policy_path=policy_path,
         trust_policy_hash=policy.policy_hash,
     )
-    assert observed_expected_hashes == [artifacts.receipt.result.result_hash]
+    assert observed_run_ids == ["draft-1"]
+    assert observed_expected_hashes == [None]
     assert result.ok is False
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
     sponsor_proofs = sorted((tmp_path / "publish" / "proofs").glob("proof_sponsor_readback_*.json"))
@@ -5404,6 +5496,9 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     proof = json.loads(sponsor_proofs[0].read_text())
     assert proof["kind"] == ProofKind.SPONSOR_READBACK.value
     assert proof["meta"]["receipt_hash"] == artifacts.receipt.receipt_hash
+    annotation = PackageAnnotation.model_validate(json.loads((tmp_path / "publish" / "redline-annotation.json").read_text(encoding="utf-8")))
+    assert proof["meta"]["annotation_hash"] == annotation.annotation_hash
+    assert proof["meta"]["annotation_file_hash"] == sha256_bytes((tmp_path / "publish" / "redline-annotation.json").read_bytes())
 
 
 def test_execute_sponsor_readback_final_publish_uses_publish_transcript_hash(monkeypatch, tmp_path: Path) -> None:
@@ -5471,7 +5566,7 @@ def test_execute_sponsor_readback_final_publish_uses_publish_transcript_hash(mon
                 evidence={
                     "run_id": run_id,
                     "version_id": expected_version_id or "",
-                    "metrics_output_hash": expected_metrics_output_hash or "",
+                    "metrics_output_hash": "sha256:" + "9" * 64,
                     "package_hash": expected_package_hash or "",
                     "package_archive_hash": expected_package_archive_hash or "",
                     "transcript_hash": "sha256:" + "1" * 64,
@@ -5636,12 +5731,7 @@ def test_verify_sponsor_run_cli_requires_credentials(monkeypatch, tmp_path: Path
 def test_verify_sponsor_run_cli_preserves_amber_exit_after_successful_sponsor(monkeypatch, tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
-    archive, _annotation = make_receipt_bound_package_archive(
-        receipt_path=tmp_path / "run" / "receipt.json",
-        package=PACKAGE,
-        annotation_path=tmp_path / "archive" / "redline-annotation.json",
-        out_path=tmp_path / "archive" / "annotated-package.tar.gz",
-    )
+    archive = make_package_archive(package_dir=PACKAGE, out_path=tmp_path / "archive" / "package.tar.gz")
     evidence = {
         "version": "redline.sponsor.bitget.readback.v1",
         "run_id": "run-live-1",
@@ -5839,6 +5929,7 @@ def test_trust_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None:
 def test_sponsor_evidence_mismatch_rejects(tmp_path: Path) -> None:
     path = tmp_path / "evidence.json"
     data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text())
+    data["expected_metrics_output_hash"] = data["metrics_output_hash"]
     data["metrics_output_hash"] = "sha256:" + "0" * 64
     path.write_text(json.dumps(data), encoding="utf-8")
     result = validate_sponsor_evidence_shape(path)
@@ -5929,14 +6020,18 @@ def test_composite_action_runs_against_caller_workspace() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert 'allow-amber-baseline-genesis:' in action
     assert 'default: candidate_good' in action
-    assert 'default: "true"' in action
+    assert 'default: "false"' in action
     assert "astral-sh/setup-uv@v8.2.0" in action
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'REDLINE_ACTION_PACKAGE: ${{ inputs.package }}' in action
     assert 'resolve_workspace_path()' in action
+    assert 'hash_package_tree()' in action
     assert 'candidate.relative_to(workspace)' in action
+    assert 'echo "package_hash=$package_hash"' in action
+    assert 'echo "demo_package_hash=$demo_package_hash"' in action
     assert 'uv --project "$GITHUB_ACTION_PATH" run redline run "$package_path"' in action
     assert '[ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]' in action
+    assert '[ "$REDLINE_ACTION_PACKAGE_HASH" = "$REDLINE_ACTION_DEMO_PACKAGE_HASH" ]' in action
     assert '${{ github.workspace }}/${{ inputs.package }}' not in action
     assert "path: ${{ steps.redline.outputs.out_path }}" in action
     assert "${{ github.workspace }}/${{ inputs.out }}" not in action
@@ -5973,26 +6068,30 @@ def test_composite_action_workspace_path_resolver_rejects_escape_and_metachar_ex
     assert not marker.exists()
 
 
-def test_composite_action_amber_exception_is_demo_package_only(tmp_path: Path) -> None:
-    def enforce(package: str) -> int:
+def test_composite_action_amber_exception_requires_demo_package_hash(tmp_path: Path) -> None:
+    def enforce(package: str, *, allow: str = "true", package_hash: str = "sha256:" + "1" * 64, demo_hash: str = "sha256:" + "1" * 64) -> int:
         marker = tmp_path / "marker"
         script = (
             'code=10\n'
-            'if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]; then\n'
+            'if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ] && [ -n "$REDLINE_ACTION_PACKAGE_HASH" ] && [ "$REDLINE_ACTION_PACKAGE_HASH" = "$REDLINE_ACTION_DEMO_PACKAGE_HASH" ]; then\n'
             "  exit 0\n"
             "fi\n"
             'exit "$code"\n'
         )
         env = {
             **os.environ,
-            "REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS": "true",
+            "REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS": allow,
             "REDLINE_ACTION_PACKAGE": package,
+            "REDLINE_ACTION_PACKAGE_HASH": package_hash,
+            "REDLINE_ACTION_DEMO_PACKAGE_HASH": demo_hash,
         }
         result = subprocess.run(["bash", "-c", script], check=False, env=env)
         assert not marker.exists()
         return result.returncode
 
     assert enforce("fixtures/demo_pack") == 0
+    assert enforce("fixtures/demo_pack", allow="false") == 10
+    assert enforce("fixtures/demo_pack", demo_hash="sha256:" + "2" * 64) == 10
     assert enforce("fixtures/not_demo_pack") == 10
     assert enforce(f"fixtures/demo_pack$(touch {tmp_path / 'marker'})") == 10
 

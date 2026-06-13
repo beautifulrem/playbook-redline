@@ -79,7 +79,7 @@ class SponsorReadbackEvidence(BaseModel):
     status: str
     metrics_output_hash: str
     expected_version_id: str
-    expected_metrics_output_hash: str
+    expected_metrics_output_hash: str | None = None
     package_hash: str
     package_archive_hash: str
     source_kind: Literal["live", "mock", "recorded"]
@@ -88,7 +88,9 @@ class SponsorReadbackEvidence(BaseModel):
 
     @field_validator("metrics_output_hash", "expected_metrics_output_hash", "package_hash", "package_archive_hash", "transcript_hash")
     @classmethod
-    def _hash_must_be_sha256(cls, value: str) -> str:
+    def _hash_must_be_sha256(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
         if len(value) != 71 or not value.startswith("sha256:"):
             raise ValueError("expected sha256:<64 hex chars>")
         digest = value.removeprefix("sha256:")
@@ -117,7 +119,7 @@ def validate_sponsor_evidence_shape(path: Path) -> SponsorStepResult:
             evidence={"run_id": evidence.run_id, "version_id": evidence.version_id},
             reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
-    if evidence.metrics_output_hash != evidence.expected_metrics_output_hash:
+    if evidence.expected_metrics_output_hash is not None and evidence.metrics_output_hash != evidence.expected_metrics_output_hash:
         return SponsorStepResult(
             ok=False,
             state=SponsorState.MISMATCH,
@@ -131,6 +133,7 @@ def validate_sponsor_evidence_shape(path: Path) -> SponsorStepResult:
             "run_id": evidence.run_id,
             "version_id": evidence.version_id,
             "metrics_output_hash": evidence.metrics_output_hash,
+            "expected_metrics_output_hash": evidence.expected_metrics_output_hash or "",
             "source_kind": evidence.source_kind,
             "proof_eligible": str(evidence.proof_eligible and evidence.source_kind == "live").lower(),
             "transcript_hash": evidence.transcript_hash,
@@ -190,7 +193,18 @@ def verify_sponsor_readback_evidence(
             evidence={"run_id": evidence.run_id, "version_id": observed.get("version_id", ""), "expected_version_id": evidence.expected_version_id},
             reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
-    if observed.get("metrics_output_hash") != evidence.expected_metrics_output_hash:
+    if observed.get("metrics_output_hash") != evidence.metrics_output_hash:
+        return SponsorStepResult(
+            ok=False,
+            state=SponsorState.MISMATCH,
+            evidence={
+                "run_id": evidence.run_id,
+                "metrics_output_hash": observed.get("metrics_output_hash", ""),
+                "expected_metrics_output_hash": evidence.metrics_output_hash,
+            },
+            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+        )
+    if evidence.expected_metrics_output_hash is not None and observed.get("metrics_output_hash") != evidence.expected_metrics_output_hash:
         return SponsorStepResult(
             ok=False,
             state=SponsorState.MISMATCH,
@@ -208,9 +222,11 @@ def verify_sponsor_readback_evidence(
             evidence={"run_id": observed.get("run_id", ""), "expected_run_id": evidence.run_id},
             reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
+    observed_package_hash = observed.get("package_hash")
+    observed_archive_hash = observed.get("package_archive_hash")
     if getattr(adapter, "proof_eligible", False) and (
-        observed.get("package_hash") != evidence.package_hash
-        or observed.get("package_archive_hash") != evidence.package_archive_hash
+        (observed_package_hash is not None and observed_package_hash != evidence.package_hash)
+        or (observed_archive_hash is not None and observed_archive_hash != evidence.package_archive_hash)
     ):
         return SponsorStepResult(
             ok=False,
@@ -231,7 +247,8 @@ def verify_sponsor_readback_evidence(
             evidence={
                 "run_id": evidence.run_id,
                 "version_id": evidence.expected_version_id,
-                "metrics_output_hash": evidence.expected_metrics_output_hash,
+                "metrics_output_hash": evidence.metrics_output_hash,
+                "expected_metrics_output_hash": evidence.expected_metrics_output_hash or "",
                 "source_kind": observed.get("source_kind", evidence.source_kind),
                 "proof_eligible": "false",
                 "transcript_hash": observed.get("transcript_hash", evidence.transcript_hash),
@@ -244,9 +261,11 @@ def verify_sponsor_readback_evidence(
         evidence={
             "run_id": evidence.run_id,
             "version_id": evidence.expected_version_id,
-            "metrics_output_hash": evidence.expected_metrics_output_hash,
+            "metrics_output_hash": evidence.metrics_output_hash,
+            "expected_metrics_output_hash": evidence.expected_metrics_output_hash or "",
             "package_hash": evidence.package_hash,
             "package_archive_hash": evidence.package_archive_hash,
+            "readback_package_binding": "observed" if observed_package_hash is not None and observed_archive_hash is not None else "not_returned",
             "source_kind": "live",
             "proof_eligible": "true",
             "checked_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -337,6 +356,7 @@ class BitgetSponsorAdapter:
         self._readback_verified = False
         self._expected_version_id: str | None = None
         self._expected_draft_id: str | None = None
+        self._expected_run_version_id: str | None = None
         self._expected_package_hash: str | None = None
         self._expected_package_archive_hash: str | None = None
 
@@ -391,32 +411,33 @@ class BitgetSponsorAdapter:
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
         if response_archive_hash is not None and response_archive_hash != package_archive_hash:
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
-        if self.proof_eligible and (response_package_hash != package_hash or response_archive_hash != package_archive_hash):
-            return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
         self._upload_accepted = True
-        self._expected_version_id = result.evidence.get("version_id") or result.evidence.get("suggested_version")
+        self._expected_version_id = result.evidence.get("version_id")
         self._expected_draft_id = result.evidence.get("draft_id")
         return result
 
     def run(self, *, version_id: str) -> SponsorStepResult:
         if not self._upload_accepted:
             return _sponsor_session_required("run", "upload")
-        if self._expected_version_id is None:
-            return _sponsor_session_required("run", "upload.version_id")
-        if self._expected_version_id is not None and version_id != self._expected_version_id:
+        expected_runnable_id = self._expected_draft_id or self._expected_version_id
+        if expected_runnable_id is None:
+            return _sponsor_session_required("run", "upload.draft_id_or_version_id")
+        if version_id != expected_runnable_id:
             return SponsorStepResult(
                 ok=False,
                 state=SponsorState.MISMATCH,
-                evidence={"version_id": version_id, "expected_version_id": self._expected_version_id},
+                evidence={"version_id": version_id, "expected_version_id": expected_runnable_id},
                 reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
             )
-        self._expected_version_id = version_id
-        return self._json_request(
+        result = self._json_request(
             step=SponsorState.RUN_STARTED,
             method="POST",
             path="/api/v1/playbook/run",
             payload={"version_id": version_id},
         )
+        if result.ok:
+            self._expected_run_version_id = result.evidence.get("version_id") or version_id
+        return result
 
     def poll(self, *, run_id: str) -> SponsorStepResult:
         return self._json_request(
@@ -445,7 +466,7 @@ class BitgetSponsorAdapter:
                 evidence={"run_id": run_id, "status": result.evidence.get("status", "")},
                 reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
             )
-        expected_version_id = expected_version_id or self._expected_version_id
+        expected_version_id = expected_version_id or self._expected_run_version_id or self._expected_version_id or self._expected_draft_id
         expected_package_hash = expected_package_hash or self._expected_package_hash
         expected_package_archive_hash = expected_package_archive_hash or self._expected_package_archive_hash
         if expected_version_id is None or result.evidence.get("version_id") != expected_version_id:
@@ -455,7 +476,7 @@ class BitgetSponsorAdapter:
                 evidence={**result.evidence, "expected_version_id": expected_version_id or ""},
                 reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
             )
-        if expected_metrics_output_hash is None or result.evidence.get("metrics_output_hash") != expected_metrics_output_hash:
+        if expected_metrics_output_hash is not None and result.evidence.get("metrics_output_hash") != expected_metrics_output_hash:
             return SponsorStepResult(
                 ok=False,
                 state=SponsorState.MISMATCH,
@@ -469,9 +490,11 @@ class BitgetSponsorAdapter:
                 evidence={**result.evidence, "expected_package_hash": expected_package_hash or "", "expected_package_archive_hash": expected_package_archive_hash or ""},
                 reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
             )
+        observed_package_hash = result.evidence.get("package_hash")
+        observed_archive_hash = result.evidence.get("package_archive_hash")
         if self.proof_eligible and (
-            result.evidence.get("package_hash") != expected_package_hash
-            or result.evidence.get("package_archive_hash") != expected_package_archive_hash
+            (observed_package_hash is not None and observed_package_hash != expected_package_hash)
+            or (observed_archive_hash is not None and observed_archive_hash != expected_package_archive_hash)
         ):
             return SponsorStepResult(
                 ok=False,
@@ -486,11 +509,13 @@ class BitgetSponsorAdapter:
         evidence = {
             **result.evidence,
             "expected_version_id": expected_version_id,
-            "expected_metrics_output_hash": expected_metrics_output_hash,
             "package_hash": expected_package_hash,
             "package_archive_hash": expected_package_archive_hash,
+            "readback_package_binding": "observed" if observed_package_hash is not None and observed_archive_hash is not None else "not_returned",
             "transcript_hash": self.transcript.transcript_hash,
         }
+        if expected_metrics_output_hash is not None:
+            evidence["expected_metrics_output_hash"] = expected_metrics_output_hash
         if not self.proof_eligible:
             return SponsorStepResult(
                 ok=False,
@@ -543,6 +568,7 @@ class BitgetSponsorAdapter:
         extra_headers: dict[str, str],
     ) -> SponsorStepResult:
         url = self.base_url + path
+        request_hash = sha256_bytes(body)
         headers = {**self._auth_headers(method=method, request_path=path, body=body), **extra_headers}
         try:
             status_code, response_body = self.transport(method, url, headers, body)
@@ -562,6 +588,7 @@ class BitgetSponsorAdapter:
                 state=SponsorState.MISMATCH,
                 evidence={
                     "error": type(exc).__name__,
+                    "request_hash": request_hash,
                     "source_kind": self.credentials.source_kind,
                     "proof_eligible": str(self.proof_eligible).lower(),
                     "transcript_hash": self.transcript.transcript_hash,
@@ -584,6 +611,7 @@ class BitgetSponsorAdapter:
                 ok=False,
                 state=SponsorState.MISMATCH,
                 evidence={
+                    "request_hash": request_hash,
                     "source_kind": self.credentials.source_kind,
                     "proof_eligible": str(self.proof_eligible).lower(),
                     "transcript_hash": self.transcript.transcript_hash,
@@ -596,6 +624,7 @@ class BitgetSponsorAdapter:
                 state=SponsorState.MISMATCH,
                 evidence={
                     "status_code": str(status_code),
+                    "request_hash": request_hash,
                     "source_kind": self.credentials.source_kind,
                     "proof_eligible": str(self.proof_eligible).lower(),
                     "transcript_hash": self.transcript.transcript_hash,
@@ -611,6 +640,7 @@ class BitgetSponsorAdapter:
                     evidence={
                         "status_code": str(status_code),
                         "bitget_code": code,
+                        "request_hash": request_hash,
                         "source_kind": self.credentials.source_kind,
                         "proof_eligible": str(self.proof_eligible).lower(),
                         "transcript_hash": self.transcript.transcript_hash,
@@ -625,6 +655,7 @@ class BitgetSponsorAdapter:
                     evidence={
                         "status_code": str(status_code),
                         "bitget_code": code,
+                        "request_hash": request_hash,
                         "source_kind": self.credentials.source_kind,
                         "proof_eligible": str(self.proof_eligible).lower(),
                         "transcript_hash": self.transcript.transcript_hash,
@@ -632,7 +663,22 @@ class BitgetSponsorAdapter:
                     reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
                 )
             payload = data
+        response_request_hash = payload.get("request_hash")
+        if response_request_hash is not None and str(response_request_hash) != request_hash:
+            return SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    "request_hash": request_hash,
+                    "response_request_hash": str(response_request_hash),
+                    "source_kind": self.credentials.source_kind,
+                    "proof_eligible": str(self.proof_eligible).lower(),
+                    "transcript_hash": self.transcript.transcript_hash,
+                },
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
         evidence = {
+            "request_hash": request_hash,
             "source_kind": self.credentials.source_kind,
             "proof_eligible": str(self.proof_eligible).lower(),
             "transcript_hash": self.transcript.transcript_hash,
@@ -768,7 +814,7 @@ def _publish_success_evidence(evidence: dict[str, str]) -> bool:
     status = evidence.get("status")
     if status is not None and status.lower() not in {"published", "success", "succeeded", "completed", "ok"}:
         return False
-    return any(key in evidence and evidence[key] for key in ("publish_id", "published_version_id"))
+    return any(key in evidence and evidence[key] for key in ("publish_id", "published_version_id", "version_id"))
 
 
 def _sponsor_session_required(call_site: str, required_step: str) -> SponsorStepResult:

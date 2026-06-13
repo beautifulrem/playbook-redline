@@ -12,8 +12,8 @@ inputs:
     description: Candidate package name under the package directory.
     default: candidate_good
   allow-amber-baseline-genesis:
-    description: Treat the bundled demo BASELINE_GENESIS exit 10 as a successful CI outcome.
-    default: "true"
+    description: Treat the bundled demo BASELINE_GENESIS exit 10 as a successful CI outcome after demo package hash verification.
+    default: "false"
   suite:
     description: Redline suite JSON path.
     default: fixtures/suites/demo_suite.json
@@ -70,9 +70,33 @@ runs:
         print(candidate)
         PY
         }
+        hash_package_tree() {
+          uv --project "$GITHUB_ACTION_PATH" run python - "$1" <<'PY'
+        import sys
+        from pathlib import Path
+
+        from redline.canonical import hash_tree
+
+        print(hash_tree(Path(sys.argv[1])))
+        PY
+        }
         echo "out_path=$GITHUB_WORKSPACE/artifacts/action-redline" >> "$GITHUB_OUTPUT"
         package_path="$(resolve_workspace_path package "$REDLINE_ACTION_PACKAGE")"
         code=$?
+        if [ "$code" -eq 0 ]; then
+          package_hash="$(hash_package_tree "$package_path")"
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "package_hash=$package_hash" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+        if [ "$code" -eq 0 ]; then
+          demo_package_hash="$(hash_package_tree "$GITHUB_ACTION_PATH/fixtures/demo_pack")"
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "demo_package_hash=$demo_package_hash" >> "$GITHUB_OUTPUT"
+          fi
+        fi
         if [ "$code" -eq 0 ]; then
           suite_path="$(resolve_workspace_path suite "$REDLINE_ACTION_SUITE")"
           code=$?
@@ -110,12 +134,14 @@ runs:
       env:
         REDLINE_ACTION_PACKAGE: ${{ inputs.package }}
         REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS: ${{ inputs.allow-amber-baseline-genesis }}
+        REDLINE_ACTION_PACKAGE_HASH: ${{ steps.redline.outputs.package_hash }}
+        REDLINE_ACTION_DEMO_PACKAGE_HASH: ${{ steps.redline.outputs.demo_package_hash }}
       run: |
         code="${{ steps.redline.outputs.exit_code }}"
         if [ "$code" -eq 0 ]; then
           exit 0
         fi
-        if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]; then
+        if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ] && [ -n "$REDLINE_ACTION_PACKAGE_HASH" ] && [ "$REDLINE_ACTION_PACKAGE_HASH" = "$REDLINE_ACTION_DEMO_PACKAGE_HASH" ]; then
           exit 0
         fi
         exit "$code"

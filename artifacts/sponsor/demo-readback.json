@@ -3,11 +3,10 @@
   "run_id": "recorded-demo-run-001",
   "version_id": "recorded-demo-version-001",
   "status": "completed",
-  "metrics_output_hash": "sha256:83e6f1f573095856bb31b74de81bb7309612e4acf712e7024546a0d02892c53b",
+  "metrics_output_hash": "sha256:6b0520da6c840b5c76f985a046d4ceb2116f2550dd181e4ab9d75d3e2b0f0b86",
   "expected_version_id": "recorded-demo-version-001",
-  "expected_metrics_output_hash": "sha256:83e6f1f573095856bb31b74de81bb7309612e4acf712e7024546a0d02892c53b",
   "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
-  "package_archive_hash": "sha256:12f3f953612c510224a8bde77ac2d46f99d2ec4ddd0eeaa9fa86ca0f2855a77a",
+  "package_archive_hash": "sha256:f724fea9f854d0154f5fbf30611656bd9baade242cdf2f54e1208266d110eca9",
   "source_kind": "recorded",
   "proof_eligible": false,
   "transcript_hash": "sha256:f187b7ac43293584b491e6fcb28f7f6d1c125cfbda10ca1341df9ee8587c94f7"

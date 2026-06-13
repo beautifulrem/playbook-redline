@@ -19,7 +19,7 @@ from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_
 from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
 from redline.spec_compiler import OutOfScopeError
-from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
+from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import (
     capture_edit_provenance,
     compile_spec,
@@ -105,6 +105,8 @@ def run(
         _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "run input JSON is invalid", out)
     except ValidationError:
         _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "run input failed schema validation", out)
+    except CanonicalizationError as exc:
+        _exit_bad_input(exc.reason_code, json_out, str(exc), out)
     except ValueError as exc:
         _exit_bad_input(ReasonCode.DATA_MISSING, json_out, str(exc), out)
     except IssuanceLedgerConflict as exc:
@@ -781,15 +783,7 @@ def verify_sponsor_run_cmd(
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_BINDING_FAILED])
     try:
         with tempfile.TemporaryDirectory(prefix="redline-sponsor-archive-") as tmp:
-            archive, _annotation = make_receipt_bound_package_archive(
-                receipt_path=receipt,
-                package=package,
-                annotation_path=Path(tmp) / "redline-annotation.json",
-                out_path=Path(tmp) / "annotated-package.tar.gz",
-                ledger_checkpoint_path=ledger_checkpoint,
-                ledger_attestation_path=ledger_attestation,
-                package_hash=expected_package_hash,
-            )
+            archive = make_package_archive(package_dir=package, out_path=Path(tmp) / "package.tar.gz")
             expected_package_archive_hash = sha256_bytes(archive.read_bytes())
     except FileNotFoundError:
         result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.DATA_MISSING.value}
@@ -799,7 +793,6 @@ def verify_sponsor_run_cmd(
         result = {"ok": False, "state": "RECEIPT_PACKAGE_BINDING_INVALID", "evidence": {}, "reason_code": ReasonCode.SCHEMA_INVALID.value}
         _print_json_or_table(result, json_out, evidence)
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
-    expected_metrics_output_hash = receipt_obj.result.result_hash
     access_key = os.environ.get("REDLINE_BITGET_ACCESS_KEY") or os.environ.get("BITGET_ACCESS_KEY")
     secret_key = os.environ.get("REDLINE_BITGET_SECRET_KEY") or os.environ.get("BITGET_SECRET_KEY")
     passphrase = os.environ.get("REDLINE_BITGET_PASSPHRASE") or os.environ.get("BITGET_PASSPHRASE")
@@ -824,7 +817,6 @@ def verify_sponsor_run_cmd(
         adapter=adapter,
         expected_package_hash=expected_package_hash,
         expected_package_archive_hash=expected_package_archive_hash,
-        expected_metrics_output_hash=expected_metrics_output_hash,
     )
     if result.ok and (replayed_check.status != VerificationStatus.VERIFIED or replayed_check.reason_code != ReasonCode.PASS):
         result = SponsorStepResult(
@@ -983,21 +975,17 @@ def _doctor_checked_in_sponsor_fixture(*, package: Path) -> dict[str, str]:
     receipt = load_receipt(receipt_path)
     package_hash = hash_tree(package)
     with tempfile.TemporaryDirectory(prefix="redline-doctor-sponsor-") as tmp:
-        archive, _annotation = make_receipt_bound_package_archive(
-            receipt_path=receipt_path,
-            package=package,
-            annotation_path=Path(tmp) / "redline-annotation.json",
-            out_path=Path(tmp) / "annotated-package.tar.gz",
-            package_hash=package_hash,
-        )
+        archive = make_package_archive(package_dir=package, out_path=Path(tmp) / "package.tar.gz")
         package_archive_hash = sha256_bytes(archive.read_bytes())
     expected = {
-        "metrics_output_hash": receipt.result.result_hash,
-        "expected_metrics_output_hash": receipt.result.result_hash,
         "package_hash": receipt.package.identity_hash,
         "package_archive_hash": package_archive_hash,
     }
-    mismatches = sorted(key for key, value in expected.items() if evidence.get(key) != value)
+    if evidence.get("expected_metrics_output_hash") is not None and evidence.get("expected_metrics_output_hash") != evidence.get("metrics_output_hash"):
+        mismatches = ["expected_metrics_output_hash"]
+    else:
+        mismatches = []
+    mismatches.extend(sorted(key for key, value in expected.items() if evidence.get(key) != value))
     if package_hash != receipt.package.identity_hash:
         mismatches.append("package_tree_hash")
     if mismatches:
@@ -1005,7 +993,7 @@ def _doctor_checked_in_sponsor_fixture(*, package: Path) -> dict[str, str]:
     return {
         "package_hash": receipt.package.identity_hash,
         "package_archive_hash": package_archive_hash,
-        "metrics_output_hash": receipt.result.result_hash,
+        "metrics_output_hash": evidence.get("metrics_output_hash", ""),
     }
 
 

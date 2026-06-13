@@ -692,12 +692,12 @@ def execute_sponsor_readback(
             evidence={"annotation_state": annotation_result.state},
             reason_code=annotation_result.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH,
         )
-    archive = make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_dir / "annotated-package.tar.gz")
+    archive = make_package_archive(package_dir=package, out_path=out_dir / "package.tar.gz")
     adapter = BitgetSponsorAdapter(access_key=access_key, secret_key=secret_key, passphrase=passphrase, transcript_path=out_dir / "sponsor-transcript.jsonl")
     upload = adapter.upload(envelope=envelope, package_hash=receipt.package.identity_hash, package_archive=archive)
     if not upload.ok:
         return upload
-    version_id = upload.evidence.get("version_id") or upload.evidence.get("suggested_version")
+    version_id = upload.evidence.get("draft_id") or upload.evidence.get("version_id")
     if version_id is None:
         return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
     run = adapter.run(version_id=version_id)
@@ -709,7 +709,6 @@ def execute_sponsor_readback(
     readback = adapter.readback(
         run_id=run_id,
         expected_version_id=version_id,
-        expected_metrics_output_hash=receipt.result.result_hash,
         expected_package_hash=receipt.package.identity_hash,
         expected_package_archive_hash=upload.evidence.get("package_archive_hash"),
     )
@@ -719,7 +718,8 @@ def execute_sponsor_readback(
         result=readback,
         receipt_hash=receipt.receipt_hash,
         package_hash=receipt.package.identity_hash,
-        annotation_hash=hash_file(annotation_path),
+        annotation_hash=annotation_result.annotation_hash or "",
+        annotation_file_hash=hash_file(annotation_path),
     )
     if not final_publish or not readback.ok:
         return readback
@@ -887,13 +887,14 @@ def _write_sponsor_readback(path: Path, result: SponsorStepResult) -> None:
         "status": result.evidence.get("status", ""),
         "metrics_output_hash": result.evidence["metrics_output_hash"],
         "expected_version_id": result.evidence.get("expected_version_id", ""),
-        "expected_metrics_output_hash": result.evidence.get("expected_metrics_output_hash", ""),
         "package_hash": result.evidence.get("package_hash", ""),
         "package_archive_hash": result.evidence.get("package_archive_hash", ""),
         "source_kind": result.evidence.get("source_kind", "live"),
         "proof_eligible": result.evidence.get("proof_eligible") == "true",
         "transcript_hash": result.evidence.get("transcript_hash", ""),
     }
+    if result.evidence.get("expected_metrics_output_hash"):
+        payload["expected_metrics_output_hash"] = result.evidence["expected_metrics_output_hash"]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -905,6 +906,7 @@ def _write_sponsor_readback_proof(
     receipt_hash: str,
     package_hash: str,
     annotation_hash: str,
+    annotation_file_hash: str,
 ) -> None:
     if "run_id" not in result.evidence or "version_id" not in result.evidence or "metrics_output_hash" not in result.evidence:
         return
@@ -924,6 +926,7 @@ def _write_sponsor_readback_proof(
                 "receipt_hash": receipt_hash,
                 "package_hash": package_hash,
                 "annotation_hash": annotation_hash,
+                "annotation_file_hash": annotation_file_hash,
             }
         ),
         artifact_hash=hash_obj(artifact),
@@ -932,6 +935,7 @@ def _write_sponsor_readback_proof(
             "receipt_hash": receipt_hash,
             "package_hash": package_hash,
             "annotation_hash": annotation_hash,
+            "annotation_file_hash": annotation_file_hash,
             "proof_eligible": str(result.evidence.get("proof_eligible", "")).lower(),
             "state": result.state.value,
         },

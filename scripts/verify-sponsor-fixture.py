@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from redline.canonical import hash_tree, sha256_bytes
-from redline.surfaces import make_receipt_bound_package_archive
+from redline.sponsor.bitget import make_package_archive
 from redline.verifier import load_receipt
 
 
@@ -21,21 +21,18 @@ def main() -> int:
     receipt = load_receipt(RECEIPT)
     package_hash = hash_tree(PACKAGE)
     with tempfile.TemporaryDirectory(prefix="redline-sponsor-fixture-") as tmp:
-        archive, _annotation = make_receipt_bound_package_archive(
-            receipt_path=RECEIPT,
-            package=PACKAGE,
-            annotation_path=Path(tmp) / "redline-annotation.json",
-            out_path=Path(tmp) / "annotated-package.tar.gz",
-            package_hash=package_hash,
-        )
+        archive = make_package_archive(package_dir=PACKAGE, out_path=Path(tmp) / "package.tar.gz")
         archive_hash = sha256_bytes(archive.read_bytes())
     expected = {
-        "metrics_output_hash": receipt.result.result_hash,
-        "expected_metrics_output_hash": receipt.result.result_hash,
         "package_hash": receipt.package.identity_hash,
         "package_archive_hash": archive_hash,
     }
     mismatches = {key: {"actual": evidence.get(key), "expected": value} for key, value in expected.items() if evidence.get(key) != value}
+    if evidence.get("expected_metrics_output_hash") is not None and evidence.get("expected_metrics_output_hash") != evidence.get("metrics_output_hash"):
+        mismatches["expected_metrics_output_hash"] = {
+            "actual": evidence.get("expected_metrics_output_hash"),
+            "expected": evidence.get("metrics_output_hash"),
+        }
     if package_hash != receipt.package.identity_hash:
         mismatches["package_tree_hash"] = {"actual": package_hash, "expected": receipt.package.identity_hash}
     if mismatches:

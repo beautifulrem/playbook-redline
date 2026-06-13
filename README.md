@@ -25,6 +25,7 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Ed25519-signed ledger checkpoint attestation for production publish verification
 - Proof-level verification command
 - Machine-readable backend doctor for Day-0 fixture, schema, replay, and proof-map smoke checks
+- Static verdict-path import gate for proof/probe/verifier code
 - JSON schemas for receipts, reports, specs, suites, decisions, doctor results, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
@@ -45,6 +46,7 @@ still use the exchange's own runtime sandbox.
 
 ```bash
 make install
+make audit
 uv run redline doctor --json
 make goldens-check
 ```
@@ -65,6 +67,9 @@ verification fails closed if a locked source file drifts.
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
 Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses package-bound replay. `redline check --package ...` now replays by default, while `--hash-only` must be supplied explicitly for integrity-only inspection.
 Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an Ed25519-signed ledger attestation verified against a protected trust policy.
+The bundled GitHub Action treats that amber demo state as failure unless
+`allow-amber-baseline-genesis` is explicitly enabled and the caller workspace
+demo package hash matches the bundled fixture hash.
 
 ## CLI
 
@@ -157,7 +162,10 @@ preflight is already chained and signed. `--final-publish` additionally requires
 credentialed response must include durable publish/readback identifiers before it
 can reach `READBACK_VERIFIED` or `PUBLISHED`. The current adapter uses injectable
 mock transport for tests plus a conservative HMAC-signed HTTP wrapper for a
-future documented Playbook sponsor contract. Without those credentials and a
+future documented Playbook sponsor contract. Sponsor execution uploads the clean
+package archive; the Redline annotation stays as local preflight/proof evidence.
+Sponsor `metrics_output_hash` records the platform read-back payload and is not
+treated as the Redline receipt result hash. Without those credentials and a
 proof-eligible live read-back, the award evidence is the local proof kernel,
 receipt verifier, proof sidecars, signed ledger path, and reproducible checked-in
 artifacts; the recorded sponsor file is only a schema fixture.

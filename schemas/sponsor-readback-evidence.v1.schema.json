@@ -2,8 +2,16 @@
   "additionalProperties": false,
   "properties": {
     "expected_metrics_output_hash": {
-      "title": "Expected Metrics Output Hash",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Metrics Output Hash"
     },
     "expected_version_id": {
       "title": "Expected Version Id",
@@ -63,7 +71,6 @@
     "status",
     "metrics_output_hash",
     "expected_version_id",
-    "expected_metrics_output_hash",
     "package_hash",
     "package_archive_hash",
     "source_kind",

@@ -1,7 +1,10 @@
-.PHONY: install test schemas demo verify-demo verify-sponsor-fixture goldens goldens-check
+.PHONY: install audit test schemas demo verify-demo verify-sponsor-fixture goldens goldens-check
 
 install:
 	uv sync --frozen --extra dev
+
+audit:
+	uv run python scripts/check-verdict-path-imports.py
 
 test:
 	uv run --extra dev pytest -q
