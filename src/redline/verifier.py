@@ -418,6 +418,10 @@ def _replay_error(
         return ReasonCode.ENGINE_FAILURE
     if rerun.receipt is None:
         return rerun.envelope.reason_code
+    if rerun.receipt.runner.engine_source_tree_hash != receipt.runner.engine_source_tree_hash:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
+    if rerun.receipt.runner.runner_lock_hash != receipt.runner.runner_lock_hash:
+        return ReasonCode.ENGINE_IDENTITY_MISMATCH
     if rerun.envelope.status != Status(receipt.result.status):
         return ReasonCode.ENGINE_IDENTITY_MISMATCH
     if rerun.envelope.reason_code != receipt.decision.reason_code:

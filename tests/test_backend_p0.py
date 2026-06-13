@@ -89,6 +89,67 @@ def _sign_run_checkpoint(run_dir: Path, private_key: str, *, policy_id: str, key
     return attestation
 
 
+def _receipt_key_hash(receipt: Receipt) -> str:
+    return hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
+
+
+def _rewrite_ledger_for_receipt(run_dir: Path, receipt: Receipt) -> None:
+    ledger_path = run_dir / "issuance-ledger.jsonl"
+    key_hash = _receipt_key_hash(receipt)
+    previous_entry_hash = "sha256:genesis"
+    rewritten: list[dict[str, object]] = []
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        entry["previous_entry_hash"] = previous_entry_hash
+        if entry.get("key_hash") == key_hash:
+            entry["receipt_hash"] = receipt.receipt_hash
+            entry["status"] = receipt.result.status
+        entry["entry_hash"] = hash_obj({key: value for key, value in entry.items() if key != "entry_hash"})
+        rewritten.append(entry)
+        previous_entry_hash = str(entry["entry_hash"])
+    ledger_path.write_text("".join(json.dumps(entry, sort_keys=True) + "\n" for entry in rewritten), encoding="utf-8")
+    create_ledger_checkpoint(
+        ledger_path=ledger_path,
+        checkpoint_path=run_dir / "issuance-ledger.checkpoint.json",
+        subject_receipt_hashes=[receipt.receipt_hash],
+        ledger_path_label="issuance-ledger.jsonl",
+    )
+
+
+def _append_duplicate_ledger_key_and_resign(run_dir: Path, private_key: str, *, policy_id: str, key_id: str, issuer: str) -> None:
+    receipt = load_receipt(run_dir / "receipt.json")
+    ledger_path = run_dir / "issuance-ledger.jsonl"
+    lines = [line for line in ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    last_entry = json.loads(lines[-1])
+    duplicate = {
+        "key_hash": _receipt_key_hash(receipt),
+        "status": receipt.result.status,
+        "receipt_hash": "sha256:" + "1" * 64,
+        "previous_entry_hash": last_entry["entry_hash"],
+        "written_at": "2026-06-10T00:00:01Z",
+    }
+    duplicate["entry_hash"] = hash_obj(duplicate)
+    with ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(duplicate, sort_keys=True))
+        fh.write("\n")
+    create_ledger_checkpoint(
+        ledger_path=ledger_path,
+        checkpoint_path=run_dir / "issuance-ledger.checkpoint.json",
+        subject_receipt_hashes=[receipt.receipt_hash],
+        ledger_path_label="issuance-ledger.jsonl",
+    )
+    _sign_run_checkpoint(run_dir, private_key, policy_id=policy_id, key_id=key_id, issuer=issuer)
+
+
 def _make_chained_pass_fixture(tmp_path: Path, *, policy_id: str = "test-policy", key_id: str = "test-key", issuer: str = "test-ci") -> tuple[Path, object]:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -329,6 +390,30 @@ def test_candidate_builtins_eval_bypass_is_sandbox_violation(tmp_path: Path) -> 
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
 
 
+def test_candidate_allowed_module_dunder_reexport_eval_bypass_is_sandbox_violation(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_decimal_builtins_eval")
+    (package / "candidate_decimal_builtins_eval" / "strategy.py").write_text(
+        "from decimal import __builtins__ as b\n\n"
+        "e = b['ev' + 'al']\n\n"
+        "def signal(bar, state, config):\n"
+        "    return e('(id(object()) // 16384) % 2')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_decimal_builtins_eval",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+
+
 def test_candidate_operator_attrgetter_globals_bypass_is_sandbox_violation(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -559,6 +644,26 @@ def test_replayed_rejects_recomputed_hash_with_stale_report_hash(tmp_path: Path)
     result = verify(receipt_path=receipt_path, package=package, suite_path=SUITE, spec_path=SPEC, level=VerificationLevel.REPLAYED)
     assert result.status == VerificationStatus.REJECTED
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_replayed_rejects_forged_runner_identity_even_when_hashes_recomputed(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    receipt_path = tmp_path / "run" / "receipt.json"
+    data = json.loads(receipt_path.read_text(encoding="utf-8"))
+    data["runner"]["engine_source_tree_hash"] = "sha256:" + "0" * 64
+    data["runner"]["runner_lock_hash"] = "sha256:" + "1" * 64
+    forged = Receipt.model_validate(data)
+    forged = forged.model_copy(update={"receipt_hash": compute_receipt_hash(forged)})
+    receipt_path.write_text(forged.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    _rewrite_ledger_for_receipt(tmp_path / "run", forged)
+
+    result = verify(receipt_path=receipt_path, package=package, suite_path=SUITE, spec_path=SPEC, level=VerificationLevel.REPLAYED)
+
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.ENGINE_IDENTITY_MISMATCH
 
 
 def test_verifier_rejects_non_verdict_proof_marked_verdict_bearing(tmp_path: Path) -> None:
@@ -980,6 +1085,42 @@ def test_sandbox_rejects_config_format_address_entropy(tmp_path: Path) -> None:
         package_dir=package,
         baseline="baseline",
         candidate="candidate_config_format_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_poisoned_numeric_modulo_format_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_poisoned_modulo_entropy")
+    (package / "candidate_poisoned_modulo_entropy" / "config.json").write_text(
+        json.dumps({"entry_bar": 4, "leverage": "0.5", "fmt": "%s"}),
+        encoding="utf-8",
+    )
+    (package / "candidate_poisoned_modulo_entropy" / "strategy.py").write_text(
+        "from decimal import Decimal\n\n"
+        "def signal(bar, state, config):\n"
+        "    i = int(bar['i'])\n"
+        "    if i < int(config.get('entry_bar', 0)):\n"
+        "        return 0\n"
+        "    fmt = 1\n"
+        "    fmt = config['fmt']\n"
+        "    target = 1\n"
+        "    target = signal\n"
+        "    text = fmt % target\n"
+        "    tail = text.rsplit('0x', 1)[1].split('>', 1)[0]\n"
+        "    return Decimal((int(tail, 16) // 4096) % 7) / Decimal('100')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_poisoned_modulo_entropy",
         suite_path=SUITE,
         spec_path=SPEC,
         out_dir=tmp_path / "run",
@@ -2349,6 +2490,102 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
     )
     assert extra_sidecar_export["export_allowed"] is False
     assert extra_sidecar_export["verification"]["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
+
+
+def test_duplicate_baseline_ledger_key_blocks_successor_publish_and_mcp(monkeypatch, tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="baseline-policy", key_id="baseline-key", public_key=public_key, issuer="baseline-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="baseline",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "baseline",
+    )
+    assert baseline.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="baseline-policy", key_id="baseline-key", issuer="baseline-ci")
+    chained = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "chained",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert chained.receipt is not None
+    assert chained.envelope.status == Status.PASS
+    _sign_run_checkpoint(tmp_path / "chained", private_key, policy_id="baseline-policy", key_id="baseline-key", issuer="baseline-ci")
+    _append_duplicate_ledger_key_and_resign(tmp_path / "baseline", private_key, policy_id="baseline-policy", key_id="baseline-key", issuer="baseline-ci")
+
+    baseline_result = verify(
+        receipt_path=tmp_path / "baseline" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        ledger_attestation_path=tmp_path / "baseline" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert baseline_result.status == VerificationStatus.REJECTED
+    assert baseline_result.reason_code == ReasonCode.RECEIPT_MISMATCH
+    successor = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "successor-after-tamper",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert successor.receipt is None
+    assert successor.envelope.reason_code == ReasonCode.BASELINE_UNCHAINED
+    chained_result = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        ledger_attestation_path=tmp_path / "chained" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        level=VerificationLevel.REPLAYED,
+    )
+    assert chained_result.status == VerificationStatus.REJECTED
+    assert chained_result.reason_code == ReasonCode.BASELINE_UNCHAINED
+    preflight = publish_preflight(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        report_path=tmp_path / "chained" / "report.json",
+        ledger_attestation_path=tmp_path / "chained" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+    )
+    assert preflight.ok is False
+    assert preflight.reason_code == ReasonCode.BASELINE_UNCHAINED
+    monkeypatch.setenv("REDLINE_TRUST_POLICY_HASH", policy.policy_hash)
+    export = redline_export_if_clean(
+        str(tmp_path / "chained" / "receipt.json"),
+        str(package),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+        report_path=str(tmp_path / "chained" / "report.json"),
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert export["export_allowed"] is False
+    assert export["verification"]["reason_code"] == ReasonCode.BASELINE_UNCHAINED.value
 
 
 def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> None:

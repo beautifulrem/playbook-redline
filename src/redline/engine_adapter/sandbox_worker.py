@@ -147,7 +147,7 @@ _FORBIDDEN_ENTROPY_ATTRS = {
 }
 
 
-def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
+def _make_audit_hook(allowed_read_roots: tuple[Path, ...], dynamic_exec_guard: dict[str, bool] | None = None):
     path_type = os.PathLike
     reason = ReasonCode.CANDIDATE_SANDBOX_VIOLATION.value
 
@@ -186,7 +186,8 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
             raise RuntimeError(f"{reason}:{event}")
         if event == "exec" and args:
             filename = str(getattr(args[0], "co_filename", ""))
-            if filename.startswith("<") and filename != "<string>" and not filename.startswith("<frozen "):
+            reject_dynamic_exec = dynamic_exec_guard is None or dynamic_exec_guard.get("enabled", True)
+            if reject_dynamic_exec and filename.startswith("<") and not filename.startswith("<frozen "):
                 raise RuntimeError(f"{reason}:exec-dynamic")
         if event == "import" and args:
             module_name = str(args[0])
@@ -247,6 +248,8 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             if module_root in _FORBIDDEN_STATIC_MODULES:
                 raise RuntimeError(f"{reason}:import-{module_root}")
             for alias in node.names:
+                if alias.name.startswith("_") or alias.name in _FORBIDDEN_MODULE_GLOBAL_NAMES:
+                    raise RuntimeError(f"{reason}:module-global-import-{alias.name}")
                 alias_root = alias.name.split(".", 1)[0]
                 if alias_root in _FORBIDDEN_STATIC_MODULES:
                     raise RuntimeError(f"{reason}:import-{alias_root}")
@@ -314,14 +317,24 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
 
 
 def _numeric_assignment_names(tree: ast.AST) -> set[str]:
-    numeric_names: set[str] = set()
+    assignments: dict[str, list[ast.AST]] = {}
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and _is_numeric_expr(node.value, numeric_names):
+        if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    numeric_names.add(target.id)
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and _is_numeric_expr(node.value, numeric_names):
-            numeric_names.add(node.target.id)
+                    assignments.setdefault(target.id, []).append(node.value)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            assignments.setdefault(node.target.id, []).append(node.value)
+        elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+            assignments.setdefault(node.target.id, []).append(node.value)
+    numeric_names: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, values in assignments.items():
+            if name not in numeric_names and values and all(_is_numeric_expr(value, numeric_names) for value in values):
+                numeric_names.add(name)
+                changed = True
     return numeric_names
 
 
@@ -418,8 +431,10 @@ def _coerce_signal_value(raw: object) -> Decimal:
 
 def _run_signals(*, package_dir: Path, bars: list[Bar], allowed_read_roots: tuple[Path, ...]) -> list[str]:
     config = _read_config(package_dir / "config.json")
-    sys.addaudithook(_make_audit_hook(allowed_read_roots))
+    dynamic_exec_guard = {"enabled": False}
+    sys.addaudithook(_make_audit_hook(allowed_read_roots, dynamic_exec_guard))
     strategy = _load_strategy(package_dir / "strategy.py")
+    dynamic_exec_guard["enabled"] = True
     signals: list[str] = []
     state: dict[str, object] = {}
     for bar in bars:
@@ -453,7 +468,7 @@ def main() -> int:
         roots.add(Path(path).resolve())
     try:
         signals = _run_signals(package_dir=Path(args.package).resolve(), bars=bars, allowed_read_roots=tuple(roots))
-    except Exception as exc:  # subprocess boundary: return typed error instead of traceback contract drift
+    except BaseException as exc:  # subprocess boundary: return typed error instead of traceback contract drift
         reason = ReasonCode.ENGINE_FAILURE.value
         text = str(exc)
         for code in ReasonCode:

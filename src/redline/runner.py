@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -339,6 +340,7 @@ def run_redline(
         }
     )
     engine_hash = hash_tree(Path(__file__).resolve().parent / "engine_adapter")
+    runner_lock_hash = _runner_lock_hash(engine_hash)
     receipt = issue_receipt(
         envelope=envelope,
         proofs=proofs,
@@ -362,7 +364,7 @@ def run_redline(
         suite_lock_hash=suite.suite_lock_hash or hash_obj(suite),
         suite_source_path=_portable_path(suite_path),
         engine_source_tree_hash=engine_hash,
-        runner_lock_hash=hash_obj({"engine": "deterministic", "engine_hash": engine_hash}),
+        runner_lock_hash=runner_lock_hash,
         edit_provenance=effective_edit_provenance,
         **proof_reproduce_kwargs,
     )
@@ -566,6 +568,7 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
         }
     )
     matched = False
+    seen_key = False
     previous_entry_hash = "sha256:genesis"
     entry_count = 0
     try:
@@ -582,10 +585,14 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
                 if entry_hash != expected_entry_hash or entry.get("previous_entry_hash") != previous_entry_hash:
                     return False
                 previous_entry_hash = entry_hash
-                if entry.get("receipt_hash") == receipt.receipt_hash:
-                    if entry.get("key_hash") != key_hash or entry.get("status") != receipt.result.status:
-                        return False
-                    matched = True
+                if entry.get("key_hash") != key_hash:
+                    continue
+                if seen_key:
+                    return False
+                seen_key = True
+                if entry.get("receipt_hash") != receipt.receipt_hash or entry.get("status") != receipt.result.status:
+                    return False
+                matched = True
     except (OSError, json.JSONDecodeError):
         return False
     if not matched:
@@ -603,6 +610,19 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
         return verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=policy)
     except ValueError:
         return False
+
+
+def _runner_lock_hash(engine_hash: str) -> str:
+    repo_root = Path(__file__).resolve().parents[2]
+    uv_lock = repo_root / "uv.lock"
+    return hash_obj(
+        {
+            "engine": "deterministic",
+            "engine_source_tree_hash": engine_hash,
+            "python": f"{sys.implementation.name}-{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "uv_lock_hash": hash_file(uv_lock) if uv_lock.exists() else None,
+        }
+    )
 
 
 def _portable_path(path: Path) -> str:
