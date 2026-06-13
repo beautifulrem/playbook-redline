@@ -4600,6 +4600,48 @@ def test_bitget_sponsor_run_rejects_request_hash_mismatch(tmp_path: Path) -> Non
     assert len(calls) == 2
 
 
+def test_bitget_sponsor_poll_request_hash_binds_run_id(tmp_path: Path) -> None:
+    hashes: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 200, json.dumps({"run_id": url.rsplit("=", 1)[-1], "version_id": "version-1", "status": "completed"}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="poll-access-key",
+        secret_key="poll-secret-key",
+        passphrase="poll-passphrase",
+        transcript_path=tmp_path / "poll-transcript.jsonl",
+        transport=transport,
+    )
+
+    hashes.append(adapter.poll(run_id="run-A").evidence["request_hash"])
+    hashes.append(adapter.poll(run_id="run-B").evidence["request_hash"])
+
+    assert hashes[0] != hashes[1]
+
+
+def test_bitget_sponsor_transcript_rejects_symlink_output(tmp_path: Path) -> None:
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep\n", encoding="utf-8")
+    transcript_path = tmp_path / "transcript.jsonl"
+    os.symlink(victim, transcript_path)
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 200, json.dumps({"run_id": "run-1", "version_id": "version-1", "status": "completed"}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="poll-access-key",
+        secret_key="poll-secret-key",
+        passphrase="poll-passphrase",
+        transcript_path=transcript_path,
+        transport=transport,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        adapter.poll(run_id="run-1")
+    assert victim.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_bitget_sponsor_session_identity_mismatch_fails_before_next_request(tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
@@ -4664,6 +4706,56 @@ def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None
     assert readback.ok is False
     assert readback.state == SponsorState.MISMATCH
     assert readback.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
+def test_bitget_sponsor_live_readback_requires_observed_package_hashes(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1"}).encode()
+        if url.endswith("/api/v1/playbook/run") and method == "POST":
+            return 200, json.dumps({"run_id": "run-1", "version_id": "draft-1", "status": "started"}).encode()
+        if "/api/v1/playbook/run?" in url and method == "GET":
+            return 200, json.dumps(
+                {
+                    "code": "00000",
+                    "data": {
+                        "run_id": "run-1",
+                        "version_id": "draft-1",
+                        "status": "completed",
+                        "metrics_output": {"return": 0},
+                    },
+                }
+            ).encode()
+        return 404, b"{}"
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    assert upload.ok is True
+    run = adapter.run(version_id="draft-1")
+    assert run.ok is True
+    adapter.proof_eligible = True
+
+    readback = adapter.readback(
+        run_id=run.evidence["run_id"],
+        expected_version_id="draft-1",
+        expected_package_hash=artifacts.receipt.package.identity_hash,
+        expected_package_archive_hash=upload.evidence["package_archive_hash"],
+    )
+
+    assert readback.ok is False
+    assert readback.state == SponsorState.MISMATCH
+    assert readback.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert readback.evidence["readback_package_binding"] == "missing"
 
 
 def _publish_ready_bitget_adapter(tmp_path: Path, publish_payload: dict[str, str]) -> BitgetSponsorAdapter:
@@ -4934,6 +5026,54 @@ def test_live_sponsor_readback_verifies_three_recorded_fields(tmp_path: Path) ->
     assert result.evidence["run_id"] == "run-live-1"
     assert result.evidence["source_kind"] == "live"
     assert result.evidence["package_hash"] == evidence["package_hash"]
+
+
+def test_live_sponsor_readback_requires_observed_package_binding(tmp_path: Path) -> None:
+    metrics_output = {"status": "pass", "breaches": []}
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-1",
+        "version_id": "version-live-1",
+        "status": "completed",
+        "metrics_output_hash": hash_obj(metrics_output),
+        "expected_version_id": "version-live-1",
+        "package_hash": "sha256:" + "1" * 64,
+        "package_archive_hash": "sha256:" + "2" * 64,
+        "source_kind": "recorded",
+        "proof_eligible": False,
+        "transcript_hash": "sha256:" + "3" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 200, json.dumps(
+            {
+                "code": "00000",
+                "data": {
+                    "run_id": "run-live-1",
+                    "version_id": "version-live-1",
+                    "status": "completed",
+                    "metrics_output": metrics_output,
+                },
+            }
+        ).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    adapter.proof_eligible = True
+
+    result = verify_sponsor_readback_evidence(evidence_path=evidence_path, adapter=adapter)
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert result.evidence["readback_package_binding"] == "missing"
 
 
 def test_live_sponsor_readback_requires_package_binding(tmp_path: Path) -> None:
@@ -5560,6 +5700,144 @@ def test_execute_sponsor_readback_keeps_platform_metrics_separate_from_receipt_h
     annotation = PackageAnnotation.model_validate(json.loads((tmp_path / "publish" / "redline-annotation.json").read_text(encoding="utf-8")))
     assert proof["meta"]["annotation_hash"] == annotation.annotation_hash
     assert proof["meta"]["annotation_file_hash"] == sha256_bytes((tmp_path / "publish" / "redline-annotation.json").read_bytes())
+
+
+def test_execute_sponsor_readback_rejects_sponsor_readback_symlink(monkeypatch, tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    publish = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=tmp_path / "trust-policy.json",
+        trust_policy_hash=json.loads((tmp_path / "trust-policy.json").read_text(encoding="utf-8"))["policy_hash"],
+    )
+    assert publish.ok is True
+    victim = tmp_path / "readback-victim.json"
+    victim.write_text("keep\n", encoding="utf-8")
+    os.symlink(victim, tmp_path / "publish" / "sponsor-readback.json")
+
+    class FakeAdapter:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def upload(self, *, envelope, package_hash: str, package_archive: Path, idempotency_key: str | None = None):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.UPLOAD_ACCEPTED,
+                evidence={"draft_id": "draft-1", "package_archive_hash": "sha256:" + "4" * 64},
+            )
+
+        def run(self, *, version_id: str):
+            return surfaces_module.SponsorStepResult(ok=True, state=SponsorState.RUN_STARTED, evidence={"run_id": "run-1"})
+
+        def readback(self, **kwargs: object):
+            return surfaces_module.SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    "run_id": "run-1",
+                    "version_id": "draft-1",
+                    "status": "completed",
+                    "metrics_output_hash": "sha256:" + "9" * 64,
+                    "package_hash": artifacts.receipt.package.identity_hash,
+                    "package_archive_hash": "sha256:" + "4" * 64,
+                    "transcript_hash": "sha256:" + "8" * 64,
+                },
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
+
+    monkeypatch.setattr(surfaces_module, "BitgetSponsorAdapter", FakeAdapter)
+
+    with pytest.raises(CanonicalizationError):
+        execute_sponsor_readback(
+            receipt_path=tmp_path / "run" / "receipt.json",
+            package=package,
+            out_dir=tmp_path / "publish",
+            access_key="access",
+            secret_key="secret",
+            passphrase="pass",
+            suite_path=SUITE,
+            spec_path=SPEC,
+            baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+            ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+            trust_policy_path=tmp_path / "trust-policy.json",
+            trust_policy_hash=json.loads((tmp_path / "trust-policy.json").read_text(encoding="utf-8"))["policy_hash"],
+        )
+    assert victim.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_execute_sponsor_readback_rejects_proofs_symlink(monkeypatch, tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    publish = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+        trust_policy_path=tmp_path / "trust-policy.json",
+        trust_policy_hash=json.loads((tmp_path / "trust-policy.json").read_text(encoding="utf-8"))["policy_hash"],
+    )
+    assert publish.ok is True
+    outside = tmp_path / "outside-proofs"
+    outside.mkdir()
+    os.symlink(outside, tmp_path / "publish" / "proofs")
+
+    class FakeAdapter:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def upload(self, *, envelope, package_hash: str, package_archive: Path, idempotency_key: str | None = None):
+            return surfaces_module.SponsorStepResult(
+                ok=True,
+                state=SponsorState.UPLOAD_ACCEPTED,
+                evidence={"draft_id": "draft-1", "package_archive_hash": "sha256:" + "4" * 64},
+            )
+
+        def run(self, *, version_id: str):
+            return surfaces_module.SponsorStepResult(ok=True, state=SponsorState.RUN_STARTED, evidence={"run_id": "run-1"})
+
+        def readback(self, **kwargs: object):
+            return surfaces_module.SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    "run_id": "run-1",
+                    "version_id": "draft-1",
+                    "status": "completed",
+                    "metrics_output_hash": "sha256:" + "9" * 64,
+                    "package_hash": artifacts.receipt.package.identity_hash,
+                    "package_archive_hash": "sha256:" + "4" * 64,
+                    "transcript_hash": "sha256:" + "8" * 64,
+                },
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
+
+    monkeypatch.setattr(surfaces_module, "BitgetSponsorAdapter", FakeAdapter)
+
+    with pytest.raises(CanonicalizationError):
+        execute_sponsor_readback(
+            receipt_path=tmp_path / "run" / "receipt.json",
+            package=package,
+            out_dir=tmp_path / "publish",
+            access_key="access",
+            secret_key="secret",
+            passphrase="pass",
+            suite_path=SUITE,
+            spec_path=SPEC,
+            baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+            ledger_attestation_path=tmp_path / "run" / "issuance-ledger.attestation.json",
+            trust_policy_path=tmp_path / "trust-policy.json",
+            trust_policy_hash=json.loads((tmp_path / "trust-policy.json").read_text(encoding="utf-8"))["policy_hash"],
+        )
+    assert list(outside.iterdir()) == []
 
 
 def test_execute_sponsor_readback_final_publish_uses_publish_transcript_hash(monkeypatch, tmp_path: Path) -> None:

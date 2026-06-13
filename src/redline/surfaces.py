@@ -895,8 +895,7 @@ def _write_sponsor_readback(path: Path, result: SponsorStepResult) -> None:
     }
     if result.evidence.get("expected_metrics_output_hash"):
         payload["expected_metrics_output_hash"] = result.evidence["expected_metrics_output_hash"]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def _write_sponsor_readback_proof(
@@ -941,5 +940,5 @@ def _write_sponsor_readback_proof(
         },
     )
     proofs_dir = out_dir / "proofs"
-    proofs_dir.mkdir(parents=True, exist_ok=True)
-    (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    ensure_safe_output_dir(proofs_dir)
+    atomic_write_text(proofs_dir / f"{proof.proof_id.replace(':', '_')}.json", proof.model_dump_json(indent=2) + "\n")

@@ -19,6 +19,7 @@ from typing import Callable, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from redline.canonical import CanonicalizationError, hash_obj, iter_canonical_files, sha256_bytes
+from redline.io_safety import append_text, ensure_safe_output_dir
 from redline.models import DecisionEnvelope, ReasonCode, Status
 
 
@@ -224,22 +225,21 @@ def verify_sponsor_readback_evidence(
         )
     observed_package_hash = observed.get("package_hash")
     observed_archive_hash = observed.get("package_archive_hash")
-    if getattr(adapter, "proof_eligible", False) and (
-        (observed_package_hash is not None and observed_package_hash != evidence.package_hash)
-        or (observed_archive_hash is not None and observed_archive_hash != evidence.package_archive_hash)
-    ):
-        return SponsorStepResult(
-            ok=False,
-            state=SponsorState.MISMATCH,
-            evidence={
-                "run_id": evidence.run_id,
-                "package_hash": observed.get("package_hash", ""),
-                "expected_package_hash": evidence.package_hash,
-                "package_archive_hash": observed.get("package_archive_hash", ""),
-                "expected_package_archive_hash": evidence.package_archive_hash,
-            },
-            reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
-        )
+    if getattr(adapter, "proof_eligible", False):
+        if observed_package_hash != evidence.package_hash or observed_archive_hash != evidence.package_archive_hash:
+            return SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={
+                    "run_id": evidence.run_id,
+                    "package_hash": observed.get("package_hash", ""),
+                    "expected_package_hash": evidence.package_hash,
+                    "package_archive_hash": observed.get("package_archive_hash", ""),
+                    "expected_package_archive_hash": evidence.package_archive_hash,
+                    "readback_package_binding": "missing" if observed_package_hash is None or observed_archive_hash is None else "mismatch",
+                },
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
     if not getattr(adapter, "proof_eligible", False):
         return SponsorStepResult(
             ok=False,
@@ -265,7 +265,7 @@ def verify_sponsor_readback_evidence(
             "expected_metrics_output_hash": evidence.expected_metrics_output_hash or "",
             "package_hash": evidence.package_hash,
             "package_archive_hash": evidence.package_archive_hash,
-            "readback_package_binding": "observed" if observed_package_hash is not None and observed_archive_hash is not None else "not_returned",
+            "readback_package_binding": "observed",
             "source_kind": "live",
             "proof_eligible": "true",
             "checked_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -290,7 +290,7 @@ class BitgetCredentials(BaseModel):
 class SponsorTranscript:
     def __init__(self, path: Path):
         self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_safe_output_dir(self.path.parent)
 
     def append(
         self,
@@ -315,9 +315,7 @@ class SponsorTranscript:
             "captured_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         }
         entry["entry_hash"] = hash_obj(entry)
-        with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, sort_keys=True))
-            fh.write("\n")
+        append_text(self.path, json.dumps(entry, sort_keys=True) + "\n")
 
     @property
     def transcript_hash(self) -> str:
@@ -492,26 +490,25 @@ class BitgetSponsorAdapter:
             )
         observed_package_hash = result.evidence.get("package_hash")
         observed_archive_hash = result.evidence.get("package_archive_hash")
-        if self.proof_eligible and (
-            (observed_package_hash is not None and observed_package_hash != expected_package_hash)
-            or (observed_archive_hash is not None and observed_archive_hash != expected_package_archive_hash)
-        ):
-            return SponsorStepResult(
-                ok=False,
-                state=SponsorState.MISMATCH,
-                evidence={
-                    **result.evidence,
-                    "expected_package_hash": expected_package_hash,
-                    "expected_package_archive_hash": expected_package_archive_hash,
-                },
-                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
-            )
+        if self.proof_eligible:
+            if observed_package_hash != expected_package_hash or observed_archive_hash != expected_package_archive_hash:
+                return SponsorStepResult(
+                    ok=False,
+                    state=SponsorState.MISMATCH,
+                    evidence={
+                        **result.evidence,
+                        "expected_package_hash": expected_package_hash,
+                        "expected_package_archive_hash": expected_package_archive_hash,
+                        "readback_package_binding": "missing" if observed_package_hash is None or observed_archive_hash is None else "mismatch",
+                    },
+                    reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+                )
         evidence = {
             **result.evidence,
             "expected_version_id": expected_version_id,
             "package_hash": expected_package_hash,
             "package_archive_hash": expected_package_archive_hash,
-            "readback_package_binding": "observed" if observed_package_hash is not None and observed_archive_hash is not None else "not_returned",
+            "readback_package_binding": "observed",
             "transcript_hash": self.transcript.transcript_hash,
         }
         if expected_metrics_output_hash is not None:
@@ -568,7 +565,7 @@ class BitgetSponsorAdapter:
         extra_headers: dict[str, str],
     ) -> SponsorStepResult:
         url = self.base_url + path
-        request_hash = sha256_bytes(body)
+        request_hash = hash_obj({"method": method.upper(), "path": path, "body_hash": sha256_bytes(body)})
         headers = {**self._auth_headers(method=method, request_path=path, body=body), **extra_headers}
         try:
             status_code, response_body = self.transport(method, url, headers, body)
