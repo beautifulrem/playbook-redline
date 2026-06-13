@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from redline.canonical import hash_file, hash_obj
+from redline.io_safety import append_text, atomic_write_text, ensure_safe_output_dir, reject_unsafe_output_file
 from redline.models import (
     Assertion,
     BaselineInfo,
@@ -201,17 +201,10 @@ def atomic_write_receipt(
     ledger_written_at: str | None = None,
     ledger_path_label: str | None = None,
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     if ledger_path is not None:
         assert_no_issuance_conflict(ledger_path, receipt)
-    tmp = path.with_suffix(path.suffix + ".tmp")
     data = receipt.model_dump_json(indent=2)
-    with tmp.open("w", encoding="utf-8") as fh:
-        fh.write(data)
-        fh.write("\n")
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp, path)
+    atomic_write_text(path, data + "\n")
     if ledger_path is not None:
         try:
             _append_ledger(ledger_path, receipt, written_at=ledger_written_at)
@@ -248,8 +241,7 @@ def create_ledger_checkpoint(
     )
     checkpoint = checkpoint.model_copy(update={"checkpoint_hash": hash_obj(checkpoint)})
     if checkpoint_path is not None:
-        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_path.write_text(checkpoint.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        atomic_write_text(checkpoint_path, checkpoint.model_dump_json(indent=2) + "\n")
     return checkpoint
 
 
@@ -258,7 +250,8 @@ def assert_no_issuance_conflict(ledger_path: Path, receipt: Receipt) -> None:
 
 
 def _append_ledger(path: Path, receipt: Receipt, *, written_at: str | None = None) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_safe_output_dir(path.parent)
+    reject_unsafe_output_file(path)
     previous_entry_hash = _last_ledger_entry_hash(path)
     entry = {
         "key_hash": _ledger_key_hash(receipt),
@@ -268,14 +261,13 @@ def _append_ledger(path: Path, receipt: Receipt, *, written_at: str | None = Non
         "written_at": written_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
     entry["entry_hash"] = hash_obj(entry)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(entry, sort_keys=True))
-        fh.write("\n")
+    append_text(path, json.dumps(entry, sort_keys=True) + "\n")
 
 
 def _raise_on_ledger_conflict(path: Path, receipt: Receipt) -> None:
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return
+    reject_unsafe_output_file(path)
     key_hash = _ledger_key_hash(receipt)
     with path.open(encoding="utf-8") as fh:
         for line in fh:

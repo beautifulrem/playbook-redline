@@ -27,7 +27,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: astral-sh/setup-uv@v6
+    - uses: astral-sh/setup-uv@v8.2.0
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
@@ -49,21 +49,62 @@ runs:
         REDLINE_ACTION_OUT: ${{ inputs.out }}
       run: |
         set +e
-        uv --project "$GITHUB_ACTION_PATH" run redline run "$GITHUB_WORKSPACE/$REDLINE_ACTION_PACKAGE" \
-          --baseline "$REDLINE_ACTION_BASELINE" \
-          --candidate "$REDLINE_ACTION_CANDIDATE" \
-          --suite "$GITHUB_WORKSPACE/$REDLINE_ACTION_SUITE" \
-          --spec "$GITHUB_WORKSPACE/$REDLINE_ACTION_SPEC" \
-          --out "$GITHUB_WORKSPACE/$REDLINE_ACTION_OUT" \
-          --json
+        resolve_workspace_path() {
+          local name="$1"
+          local raw="$2"
+          if [ -z "$raw" ] || [[ "$raw" = /* ]]; then
+            echo "redline action input $name must be a relative path under GITHUB_WORKSPACE" >&2
+            return 64
+          fi
+          python3 - "$GITHUB_WORKSPACE" "$raw" "$name" <<'PY'
+        import sys
+        from pathlib import Path
+
+        workspace = Path(sys.argv[1]).resolve()
+        candidate = (workspace / sys.argv[2]).resolve()
+        try:
+            candidate.relative_to(workspace)
+        except ValueError:
+            print(f"redline action input {sys.argv[3]} escapes GITHUB_WORKSPACE", file=sys.stderr)
+            sys.exit(64)
+        print(candidate)
+        PY
+        }
+        echo "out_path=$GITHUB_WORKSPACE/artifacts/action-redline" >> "$GITHUB_OUTPUT"
+        package_path="$(resolve_workspace_path package "$REDLINE_ACTION_PACKAGE")"
         code=$?
+        if [ "$code" -eq 0 ]; then
+          suite_path="$(resolve_workspace_path suite "$REDLINE_ACTION_SUITE")"
+          code=$?
+        fi
+        if [ "$code" -eq 0 ]; then
+          spec_path="$(resolve_workspace_path spec "$REDLINE_ACTION_SPEC")"
+          code=$?
+        fi
+        if [ "$code" -eq 0 ]; then
+          out_path="$(resolve_workspace_path out "$REDLINE_ACTION_OUT")"
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "out_path=$out_path" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+        if [ "$code" -eq 0 ]; then
+          uv --project "$GITHUB_ACTION_PATH" run redline run "$package_path" \
+            --baseline "$REDLINE_ACTION_BASELINE" \
+            --candidate "$REDLINE_ACTION_CANDIDATE" \
+            --suite "$suite_path" \
+            --spec "$spec_path" \
+            --out "$out_path" \
+            --json
+          code=$?
+        fi
         echo "exit_code=$code" >> "$GITHUB_OUTPUT"
         exit 0
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: redline-artifacts
-        path: ${{ github.workspace }}/${{ inputs.out }}
+        path: ${{ steps.redline.outputs.out_path }}
     - name: Enforce Redline result
       shell: bash
       env:

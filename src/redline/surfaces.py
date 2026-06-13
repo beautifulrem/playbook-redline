@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
+from redline.io_safety import append_text, atomic_write_text, ensure_safe_output_dir
 from redline.models import (
     ChainStatus,
     EditProvenance,
@@ -114,8 +115,7 @@ def capture_edit_provenance(
 class _PreflightTranscript:
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text("", encoding="utf-8")
+        atomic_write_text(self.path, "")
 
     def append(self, *, step_id: str, command: str, inputs: dict[str, object], output: dict[str, object], exit_code: int) -> None:
         entry = {
@@ -128,9 +128,7 @@ class _PreflightTranscript:
             "exit_code": exit_code,
         }
         entry = {**entry, "entry_hash": hash_obj(entry)}
-        with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, sort_keys=True))
-            fh.write("\n")
+        append_text(self.path, json.dumps(entry, sort_keys=True) + "\n")
 
     @property
     def transcript_hash(self) -> str:
@@ -169,9 +167,14 @@ def publish_preflight(
     ledger_attestation_path = ledger_attestation_path or receipt_path.parent / "issuance-ledger.attestation.json"
     if out_dir.resolve() == package.resolve() or package.resolve() in out_dir.resolve().parents:
         return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INSIDE_PACKAGE", reason_code=ReasonCode.RECEIPT_BINDING_FAILED)
-    if out_dir.exists() and not out_dir.is_dir():
-        return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INVALID", reason_code=ReasonCode.DATA_MISSING)
-    transcript = _PreflightTranscript(out_dir / "preflight-transcript.jsonl")
+    try:
+        if out_dir.exists() and not out_dir.is_dir():
+            return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INVALID", reason_code=ReasonCode.DATA_MISSING)
+        ensure_safe_output_dir(out_dir)
+        transcript = _PreflightTranscript(out_dir / "preflight-transcript.jsonl")
+    except (CanonicalizationError, OSError) as exc:
+        reason = exc.reason_code if isinstance(exc, CanonicalizationError) else ReasonCode.DATA_MISSING
+        return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INVALID", reason_code=reason)
     try:
         package_hash = hash_tree(package)
     except FileNotFoundError:
@@ -376,7 +379,7 @@ def publish_preflight(
             output={"ok": True},
             exit_code=0,
         )
-    out_dir.mkdir(parents=True, exist_ok=True)
+    ensure_safe_output_dir(out_dir)
     try:
         package_archive, annotation = make_receipt_bound_package_archive(
             receipt_path=receipt_path,
@@ -480,9 +483,9 @@ def make_receipt_bound_package_archive(
         annotation_hash="",
     )
     annotation = annotation.model_copy(update={"annotation_hash": hash_obj(annotation)})
-    annotation_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    ensure_safe_output_dir(annotation_path.parent)
+    ensure_safe_output_dir(out_path.parent)
+    atomic_write_text(annotation_path, annotation.model_dump_json(indent=2) + "\n")
     return make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_path), annotation
 
 

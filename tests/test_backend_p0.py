@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import textwrap
 from decimal import Decimal
 from pathlib import Path
 
@@ -4087,6 +4088,101 @@ def test_publish_preflight_rejects_archive_output_hardlink_alias(tmp_path: Path)
     assert strategy_path.read_text(encoding="utf-8") == before_content
 
 
+def test_publish_preflight_rejects_annotation_output_aliases(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is not None
+    before_hash = hash_tree(package)
+    strategy_path = package / "candidate_good" / "strategy.py"
+    before_content = strategy_path.read_text(encoding="utf-8")
+    out_dir = tmp_path / "publish"
+    out_dir.mkdir()
+    os.link(strategy_path, out_dir / "redline-annotation.json")
+
+    result = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=out_dir,
+        allow_demo_baseline_genesis=True,
+    )
+
+    assert result.ok is False
+    assert result.state == "OUTPUT_PATH_INVALID"
+    assert result.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    assert not (out_dir / "annotated-package.tar.gz").exists()
+    assert hash_tree(package) == before_hash
+    assert strategy_path.read_text(encoding="utf-8") == before_content
+
+
+def test_publish_preflight_rejects_transcript_symlink_without_external_write(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    out_dir = tmp_path / "publish"
+    out_dir.mkdir()
+    victim = tmp_path / "victim.jsonl"
+    victim.write_text("keep-me\n", encoding="utf-8")
+    os.symlink(victim, out_dir / "preflight-transcript.jsonl")
+
+    result = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=out_dir,
+        allow_demo_baseline_genesis=True,
+    )
+
+    assert result.ok is False
+    assert result.state == "OUTPUT_PATH_INVALID"
+    assert result.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    assert victim.read_text(encoding="utf-8") == "keep-me\n"
+    assert not (out_dir / "redline-annotation.json").exists()
+    assert not (out_dir / "annotated-package.tar.gz").exists()
+
+
+def test_run_redline_replaces_proofs_symlink_without_touching_target(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    keep = victim / "keep.json"
+    keep.write_text('{"keep":true}\n', encoding="utf-8")
+    os.symlink(victim, out_dir / "proofs")
+
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=out_dir)
+
+    assert artifacts.receipt is not None
+    assert keep.read_text(encoding="utf-8") == '{"keep":true}\n'
+    assert sorted(path.name for path in victim.iterdir()) == ["keep.json"]
+    assert not (out_dir / "proofs").is_symlink()
+    assert any((out_dir / "proofs").glob("proof_*.json"))
+
+
+def test_run_redline_removes_legacy_receipt_tmp_symlink_without_clobber(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep-me\n", encoding="utf-8")
+    os.symlink(victim, out_dir / "receipt.json.tmp")
+
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=out_dir)
+
+    assert artifacts.receipt is not None
+    assert victim.read_text(encoding="utf-8") == "keep-me\n"
+    assert not (out_dir / "receipt.json.tmp").exists()
+    assert (out_dir / "receipt.json").exists()
+
+
 def test_doctor_json_runs_backend_smoke() -> None:
     result = CliRunner().invoke(
         app,
@@ -5803,6 +5899,7 @@ def test_public_json_artifacts_validate_against_exported_schemas(tmp_path: Path)
         run_dir = ROOT / "artifacts/demo" / run_name
         validate("receipt.v3.2.schema.json", json.loads((run_dir / "receipt.json").read_text(encoding="utf-8")))
         validate("decision-envelope.v1.schema.json", json.loads((run_dir / "envelope.json").read_text(encoding="utf-8")))
+        validate("ledger-checkpoint.v1.schema.json", json.loads((run_dir / "issuance-ledger.checkpoint.json").read_text(encoding="utf-8")))
         for proof_path in sorted((run_dir / "proofs").glob("*.json")):
             validate("proof.v1.schema.json", json.loads(proof_path.read_text(encoding="utf-8")))
 
@@ -5833,12 +5930,47 @@ def test_composite_action_runs_against_caller_workspace() -> None:
     assert 'allow-amber-baseline-genesis:' in action
     assert 'default: candidate_good' in action
     assert 'default: "true"' in action
+    assert "astral-sh/setup-uv@v8.2.0" in action
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'REDLINE_ACTION_PACKAGE: ${{ inputs.package }}' in action
-    assert 'uv --project "$GITHUB_ACTION_PATH" run redline run "$GITHUB_WORKSPACE/$REDLINE_ACTION_PACKAGE"' in action
+    assert 'resolve_workspace_path()' in action
+    assert 'candidate.relative_to(workspace)' in action
+    assert 'uv --project "$GITHUB_ACTION_PATH" run redline run "$package_path"' in action
     assert '[ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]' in action
     assert '${{ github.workspace }}/${{ inputs.package }}' not in action
-    assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
+    assert "path: ${{ steps.redline.outputs.out_path }}" in action
+    assert "${{ github.workspace }}/${{ inputs.out }}" not in action
+
+
+def test_composite_action_workspace_path_resolver_rejects_escape_and_metachar_execution(tmp_path: Path) -> None:
+    action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    run_section = action.split("    - name: Run Redline", 1)[1].split("    - uses: actions/upload-artifact@v4", 1)[0]
+    run_block = textwrap.dedent(run_section.split("      run: |\n", 1)[1])
+    resolver = run_block.split('echo "out_path=$GITHUB_WORKSPACE/artifacts/action-redline"', 1)[0]
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    marker = tmp_path / "marker"
+
+    def resolve(raw: str) -> subprocess.CompletedProcess[str]:
+        script = (
+            resolver
+            + "\n"
+            + 'resolved="$(resolve_workspace_path out "$REDLINE_ACTION_OUT")"\n'
+            + "code=$?\n"
+            + 'printf "%s\\n%s\\n" "$code" "$resolved"\n'
+        )
+        env = {**os.environ, "GITHUB_WORKSPACE": str(workspace), "REDLINE_ACTION_OUT": raw}
+        return subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, check=False, capture_output=True, text=True)
+
+    escaped = resolve("../outside")
+    assert escaped.stdout.splitlines()[0] == "64"
+    assert "escapes GITHUB_WORKSPACE" in escaped.stderr
+
+    valid = resolve(f"artifacts/out dir$(touch {marker})")
+    valid_lines = valid.stdout.splitlines()
+    assert valid_lines[0] == "0"
+    assert valid_lines[1] == str(workspace / f"artifacts/out dir$(touch {marker})")
+    assert not marker.exists()
 
 
 def test_composite_action_amber_exception_is_demo_package_only(tmp_path: Path) -> None:
@@ -5867,6 +5999,8 @@ def test_composite_action_amber_exception_is_demo_package_only(tmp_path: Path) -
 
 def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     workflow = (ROOT / ".github/workflows/redline-ci.yml").read_text(encoding="utf-8")
+    assert "actions/checkout@v6" in workflow
+    assert "astral-sh/setup-uv@v8.2.0" in workflow
     assert "uv run python scripts/verify-sponsor-fixture.py" in workflow
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow

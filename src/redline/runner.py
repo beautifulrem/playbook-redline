@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.engine_adapter import DeterministicReplayEngine, ReplayEngineError
+from redline.io_safety import atomic_write_text, ensure_safe_output_dir
 from redline.models import (
     Assertion,
     ChainStatus,
@@ -404,17 +405,18 @@ def run_redline(
 
 
 def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at: str | None = None, ledger_path_label: str | None = None) -> None:
+    ensure_safe_output_dir(out_dir)
     if artifacts.receipt is not None:
         assert_no_issuance_conflict(out_dir / "issuance-ledger.jsonl", artifacts.receipt)
     _clear_artifacts_dir(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "envelope.json").write_text(artifacts.envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    (out_dir / "report.json").write_text(json.dumps(artifacts.report_json, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    ensure_safe_output_dir(out_dir)
+    atomic_write_text(out_dir / "envelope.json", artifacts.envelope.model_dump_json(indent=2) + "\n")
+    atomic_write_text(out_dir / "report.json", json.dumps(artifacts.report_json, indent=2, sort_keys=True) + "\n")
     proofs_dir = out_dir / "proofs"
-    proofs_dir.mkdir(exist_ok=True)
+    ensure_safe_output_dir(proofs_dir)
     proofs = artifacts.receipt.proofs if artifacts.receipt is not None else artifacts.proofs
     for proof in proofs:
-        (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        atomic_write_text(proofs_dir / f"{proof.proof_id.replace(':', '_')}.json", proof.model_dump_json(indent=2) + "\n")
     if artifacts.receipt is not None:
         atomic_write_receipt(
             out_dir / "receipt.json",
@@ -429,17 +431,22 @@ def write_artifacts(artifacts: RunArtifacts, *, out_dir: Path, ledger_written_at
 def _clear_artifacts_dir(out_dir: Path) -> None:
     if not out_dir.exists():
         return
+    ensure_safe_output_dir(out_dir)
     for name in [
         "envelope.json",
         "report.json",
         "receipt.json",
+        "receipt.json.tmp",
         "issuance-ledger.attestation.json",
     ]:
         path = out_dir / name
-        if path.exists():
+        if path.exists() or path.is_symlink():
             path.unlink()
     proofs_dir = out_dir / "proofs"
-    if proofs_dir.exists():
+    if proofs_dir.is_symlink():
+        proofs_dir.unlink()
+    elif proofs_dir.exists():
+        ensure_safe_output_dir(proofs_dir)
         for proof_path in proofs_dir.glob("*.json"):
             proof_path.unlink()
 
