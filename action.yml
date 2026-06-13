@@ -40,14 +40,21 @@ runs:
       id: redline
       shell: bash
       working-directory: ${{ github.workspace }}
+      env:
+        REDLINE_ACTION_PACKAGE: ${{ inputs.package }}
+        REDLINE_ACTION_BASELINE: ${{ inputs.baseline }}
+        REDLINE_ACTION_CANDIDATE: ${{ inputs.candidate }}
+        REDLINE_ACTION_SUITE: ${{ inputs.suite }}
+        REDLINE_ACTION_SPEC: ${{ inputs.spec }}
+        REDLINE_ACTION_OUT: ${{ inputs.out }}
       run: |
         set +e
-        uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}" \
-          --baseline "${{ inputs.baseline }}" \
-          --candidate "${{ inputs.candidate }}" \
-          --suite "${{ github.workspace }}/${{ inputs.suite }}" \
-          --spec "${{ github.workspace }}/${{ inputs.spec }}" \
-          --out "${{ github.workspace }}/${{ inputs.out }}" \
+        uv --project "$GITHUB_ACTION_PATH" run redline run "$GITHUB_WORKSPACE/$REDLINE_ACTION_PACKAGE" \
+          --baseline "$REDLINE_ACTION_BASELINE" \
+          --candidate "$REDLINE_ACTION_CANDIDATE" \
+          --suite "$GITHUB_WORKSPACE/$REDLINE_ACTION_SUITE" \
+          --spec "$GITHUB_WORKSPACE/$REDLINE_ACTION_SPEC" \
+          --out "$GITHUB_WORKSPACE/$REDLINE_ACTION_OUT" \
           --json
         code=$?
         echo "exit_code=$code" >> "$GITHUB_OUTPUT"
@@ -59,12 +66,15 @@ runs:
         path: ${{ github.workspace }}/${{ inputs.out }}
     - name: Enforce Redline result
       shell: bash
+      env:
+        REDLINE_ACTION_PACKAGE: ${{ inputs.package }}
+        REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS: ${{ inputs.allow-amber-baseline-genesis }}
       run: |
         code="${{ steps.redline.outputs.exit_code }}"
         if [ "$code" -eq 0 ]; then
           exit 0
         fi
-        if [ "$code" -eq 10 ] && [ "${{ inputs.allow-amber-baseline-genesis }}" = "true" ] && [ "${{ inputs.package }}" = "fixtures/demo_pack" ]; then
+        if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]; then
           exit 0
         fi
         exit "$code"

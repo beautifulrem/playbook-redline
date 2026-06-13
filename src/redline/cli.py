@@ -786,6 +786,8 @@ def verify_sponsor_run_cmd(
                 package=package,
                 annotation_path=Path(tmp) / "redline-annotation.json",
                 out_path=Path(tmp) / "annotated-package.tar.gz",
+                ledger_checkpoint_path=ledger_checkpoint,
+                ledger_attestation_path=ledger_attestation,
                 package_hash=expected_package_hash,
             )
             expected_package_archive_hash = sha256_bytes(archive.read_bytes())
@@ -874,6 +876,7 @@ def _run_doctor(*, package: Path, suite: Path, spec: Path) -> DoctorResult:
     checks.append(_doctor_check("deterministic-pass-smoke", lambda: _doctor_deterministic_pass_smoke(package=package, suite=suite, spec=spec)))
     checks.append(_doctor_check("withheld-smoke", lambda: _doctor_withheld_smoke(package=package, suite=suite, spec=spec)))
     checks.append(_doctor_check("checked-in-demo-artifacts", lambda: _doctor_checked_in_demo_artifacts(package=package, suite=suite, spec=spec)))
+    checks.append(_doctor_check("checked-in-sponsor-fixture", lambda: _doctor_checked_in_sponsor_fixture(package=package)))
     checks.append(_doctor_check("schema-export-smoke", lambda: _doctor_schema_export_smoke()))
     first_failed = next((check for check in checks if not check.ok), None)
     return DoctorResult(ok=first_failed is None, reason_code=first_failed.reason_code if first_failed is not None else ReasonCode.PASS, checks=checks)
@@ -965,6 +968,44 @@ def _doctor_checked_in_demo_artifacts(*, package: Path, suite: Path, spec: Path)
         "pass_receipt_hash": pass_result.receipt_hash or "",
         "withheld_reason_code": withheld_result.reason_code.value,
         "withheld_receipt_hash": withheld_result.receipt_hash or "",
+    }
+
+
+def _doctor_checked_in_sponsor_fixture(*, package: Path) -> dict[str, str]:
+    evidence_path = Path("artifacts/sponsor/demo-readback.json")
+    receipt_path = Path("artifacts/demo/pass/receipt.json")
+    shape = validate_sponsor_evidence_shape(evidence_path)
+    if not shape.ok and not (
+        shape.state == SponsorState.RECORDED_ATTESTATION_VALID and shape.reason_code == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED
+    ):
+        raise ValueError(f"sponsor fixture shape drift: {(shape.reason_code or ReasonCode.SPONSOR_READBACK_MISMATCH).value}")
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    receipt = load_receipt(receipt_path)
+    package_hash = hash_tree(package)
+    with tempfile.TemporaryDirectory(prefix="redline-doctor-sponsor-") as tmp:
+        archive, _annotation = make_receipt_bound_package_archive(
+            receipt_path=receipt_path,
+            package=package,
+            annotation_path=Path(tmp) / "redline-annotation.json",
+            out_path=Path(tmp) / "annotated-package.tar.gz",
+            package_hash=package_hash,
+        )
+        package_archive_hash = sha256_bytes(archive.read_bytes())
+    expected = {
+        "metrics_output_hash": receipt.result.result_hash,
+        "expected_metrics_output_hash": receipt.result.result_hash,
+        "package_hash": receipt.package.identity_hash,
+        "package_archive_hash": package_archive_hash,
+    }
+    mismatches = sorted(key for key, value in expected.items() if evidence.get(key) != value)
+    if package_hash != receipt.package.identity_hash:
+        mismatches.append("package_tree_hash")
+    if mismatches:
+        raise ValueError(f"sponsor fixture binding drift: {','.join(mismatches)}")
+    return {
+        "package_hash": receipt.package.identity_hash,
+        "package_archive_hash": package_archive_hash,
+        "metrics_output_hash": receipt.result.result_hash,
     }
 
 

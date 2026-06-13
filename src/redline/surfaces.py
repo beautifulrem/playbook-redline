@@ -377,17 +377,40 @@ def publish_preflight(
             exit_code=0,
         )
     out_dir.mkdir(parents=True, exist_ok=True)
-    package_archive, annotation = make_receipt_bound_package_archive(
-        receipt_path=receipt_path,
-        package=package,
-        annotation_path=out_dir / "redline-annotation.json",
-        out_path=out_dir / "annotated-package.tar.gz",
-        ledger_checkpoint_path=ledger_checkpoint_path,
-        ledger_attestation_path=ledger_attestation_path,
-        package_hash=package_hash,
-        strength_summary=result.strength_summary,
-        verification_level=result.verification_level,
-    )
+    try:
+        package_archive, annotation = make_receipt_bound_package_archive(
+            receipt_path=receipt_path,
+            package=package,
+            annotation_path=out_dir / "redline-annotation.json",
+            out_path=out_dir / "annotated-package.tar.gz",
+            ledger_checkpoint_path=ledger_checkpoint_path,
+            ledger_attestation_path=ledger_attestation_path,
+            package_hash=package_hash,
+            strength_summary=result.strength_summary,
+            verification_level=result.verification_level,
+        )
+    except (CanonicalizationError, OSError) as exc:
+        reason = exc.reason_code if isinstance(exc, CanonicalizationError) else ReasonCode.DATA_MISSING
+        blocked = PublishPreflightResult(
+            ok=False,
+            state="OUTPUT_PATH_INVALID",
+            receipt_hash=result.receipt_hash,
+            package_hash=package_hash,
+            reason_code=reason,
+        )
+        transcript.append(
+            step_id="annotate-package",
+            command="make_receipt_bound_package_archive",
+            inputs={
+                "receipt_path": str(receipt_path),
+                "package": str(package),
+                "annotation_path": str(out_dir / "redline-annotation.json"),
+                "out_path": str(out_dir / "annotated-package.tar.gz"),
+            },
+            output=blocked.model_dump(mode="json"),
+            exit_code=1,
+        )
+        return _with_preflight_transcript(blocked, transcript)
     package_archive_hash = sha256_bytes(package_archive.read_bytes())
     transcript.append(
         step_id="annotate-package",

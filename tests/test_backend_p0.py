@@ -3055,6 +3055,27 @@ def test_mcp_bad_inputs_return_specific_reason_codes(tmp_path: Path) -> None:
     run = redline_run_suite(str(tmp_path / "missing-package"))
     assert run["schema_version"] == "redline.mcp.error.v1"
     assert run["reason_code"] == ReasonCode.FILE_NOT_FOUND.value
+    missing_suite = redline_run_suite(str(PACKAGE), suite_path=str(tmp_path / "missing-suite.json"), spec_path=str(SPEC))
+    assert missing_suite["schema_version"] == "redline.mcp.error.v1"
+    assert missing_suite["reason_code"] == ReasonCode.DATA_MISSING.value
+    missing_spec = redline_run_suite(str(PACKAGE), suite_path=str(SUITE), spec_path=str(tmp_path / "missing-spec.json"))
+    assert missing_spec["schema_version"] == "redline.mcp.error.v1"
+    assert missing_spec["reason_code"] == ReasonCode.DATA_MISSING.value
+    missing_package_export = redline_export_if_clean(
+        receipt_path=str(ROOT / "artifacts/demo/pass/receipt.json"),
+        pkg_path=str(tmp_path / "missing-package"),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+    )
+    assert missing_package_export["schema_version"] == "redline.mcp.export_if_clean.v1"
+    assert missing_package_export["export_allowed"] is False
+    assert missing_package_export["verification"]["status"] in {VerificationStatus.BAD_INPUT.value, VerificationStatus.REJECTED.value}
+    malformed_receipt = tmp_path / "malformed-receipt.json"
+    malformed_receipt.write_text("{not json", encoding="utf-8")
+    malformed_export = redline_export_if_clean(receipt_path=str(malformed_receipt), pkg_path=str(PACKAGE))
+    assert malformed_export["schema_version"] == "redline.mcp.export_if_clean.v1"
+    assert malformed_export["export_allowed"] is False
+    assert malformed_export["verification"]["status"] == VerificationStatus.BAD_INPUT.value
 
 
 def test_edit_provenance_diff_mismatch_rejects(tmp_path: Path) -> None:
@@ -3883,6 +3904,85 @@ def test_publish_execute_forbids_demo_baseline(tmp_path: Path) -> None:
     assert stdout["state"] == "DEMO_EXECUTE_FORBIDDEN"
 
 
+@pytest.mark.parametrize(
+    ("extra_args", "expected_state"),
+    [
+        (["--final-publish"], "FINAL_PUBLISH_REQUIRES_EXECUTE"),
+        (["--execute"], "EXECUTE_CONFIRMATION_REQUIRED"),
+        (["--execute", "--final-publish", "--yes-i-understand-redline-is-wrapper-only"], "FINAL_PUBLISH_CONFIRMATION_REQUIRED"),
+        (
+            ["--execute", "--final-publish", "--yes-i-understand-redline-is-wrapper-only", "--yes-final-publish"],
+            "FINAL_PUBLISH_CONFIRMATION_REQUIRED",
+        ),
+    ],
+)
+def test_publish_cli_final_execute_guards_fail_closed(monkeypatch, tmp_path: Path, extra_args: list[str], expected_state: str) -> None:
+    monkeypatch.delenv("REDLINE_ALLOW_FINAL_PUBLISH", raising=False)
+    result = CliRunner().invoke(
+        app,
+        [
+            "publish",
+            str(PACKAGE),
+            str(ROOT / "artifacts/demo/pass/receipt.json"),
+            "--out",
+            str(tmp_path / "publish"),
+            "--json",
+            *extra_args,
+        ],
+    )
+
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == expected_state
+    assert payload["reason_code"] == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED.value
+
+
+def test_publish_execute_requires_bitget_credentials_after_clean_preflight(monkeypatch, tmp_path: Path) -> None:
+    for key in [
+        "REDLINE_BITGET_ACCESS_KEY",
+        "REDLINE_BITGET_SECRET_KEY",
+        "REDLINE_BITGET_PASSPHRASE",
+        "BITGET_ACCESS_KEY",
+        "BITGET_SECRET_KEY",
+        "BITGET_PASSPHRASE",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    policy = json.loads((tmp_path / "trust-policy.json").read_text(encoding="utf-8"))
+    monkeypatch.setenv("REDLINE_TRUST_POLICY", str(tmp_path / "trust-policy.json"))
+    monkeypatch.setenv("REDLINE_TRUST_POLICY_HASH", policy["policy_hash"])
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "publish",
+            str(package),
+            str(tmp_path / "run" / "receipt.json"),
+            "--suite",
+            str(SUITE),
+            "--spec",
+            str(SPEC),
+            "--out",
+            str(tmp_path / "publish"),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--ledger-attestation",
+            str(tmp_path / "run" / "issuance-ledger.attestation.json"),
+            "--execute",
+            "--yes-i-understand-redline-is-wrapper-only",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 6
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["state"] == "BITGET_CREDENTIALS_REQUIRED"
+    assert payload["reason_code"] == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED.value
+
+
 def test_publish_rejects_output_inside_package_and_symlink_package(tmp_path: Path) -> None:
     runner = CliRunner()
     package = tmp_path / "package"
@@ -3951,6 +4051,42 @@ def test_publish_rejects_existing_file_out_path_with_json_error(tmp_path: Path) 
     assert "Traceback" not in result.stderr
 
 
+def test_publish_preflight_rejects_archive_output_hardlink_alias(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is not None
+    before_hash = hash_tree(package)
+    out_dir = tmp_path / "publish"
+    out_dir.mkdir()
+    archive_path = out_dir / "annotated-package.tar.gz"
+    strategy_path = package / "candidate_good" / "strategy.py"
+    before_content = strategy_path.read_text(encoding="utf-8")
+    os.link(strategy_path, archive_path)
+
+    result = publish_preflight(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=out_dir,
+        allow_demo_baseline_genesis=True,
+    )
+
+    assert result.ok is False
+    assert result.state == "OUTPUT_PATH_INVALID"
+    assert result.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    assert hash_tree(package) == before_hash
+    assert strategy_path.read_text(encoding="utf-8") == before_content
+
+
 def test_doctor_json_runs_backend_smoke() -> None:
     result = CliRunner().invoke(
         app,
@@ -3977,6 +4113,10 @@ def test_doctor_json_runs_backend_smoke() -> None:
     assert checks["withheld-smoke"]["evidence"]["reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
     assert checks["checked-in-demo-artifacts"]["evidence"]["pass_reason_code"] == ReasonCode.BASELINE_GENESIS.value
     assert checks["checked-in-demo-artifacts"]["evidence"]["withheld_reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
+    assert checks["checked-in-sponsor-fixture"]["ok"] is True
+    assert checks["checked-in-sponsor-fixture"]["evidence"]["package_hash"] == checks["fixture-inputs"]["evidence"]["package_hash"]
+    assert checks["checked-in-sponsor-fixture"]["evidence"]["metrics_output_hash"]
+    assert checks["checked-in-sponsor-fixture"]["evidence"]["package_archive_hash"]
     assert int(checks["schema-export-smoke"]["evidence"]["schema_count"]) >= 17
 
 
@@ -4160,6 +4300,77 @@ def test_bitget_sponsor_poll_records_get_readback_transcript(tmp_path: Path) -> 
     assert "/api/v1/playbook/run?run_id=run-42" in transcript
 
 
+@pytest.mark.parametrize(
+    ("case", "expected_reason"),
+    [
+        ("transport_exception", ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED),
+        ("non_json", ReasonCode.SPONSOR_READBACK_MISMATCH),
+        ("http_error", ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED),
+        ("bitget_code_error", ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED),
+        ("data_not_object", ReasonCode.SPONSOR_READBACK_MISMATCH),
+    ],
+)
+def test_bitget_sponsor_http_failures_fail_closed(tmp_path: Path, case: str, expected_reason: ReasonCode) -> None:
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        if case == "transport_exception":
+            raise TimeoutError("timeout")
+        if case == "non_json":
+            return 200, b"{not-json"
+        if case == "http_error":
+            return 500, b'{"error":"server"}'
+        if case == "bitget_code_error":
+            return 200, b'{"code":"40001","msg":"denied","data":{}}'
+        if case == "data_not_object":
+            return 200, b'{"code":"00000","data":[]}'
+        raise AssertionError(case)
+
+    adapter = BitgetSponsorAdapter(
+        access_key="failure-access-key",
+        secret_key="fail-sec",
+        passphrase="failure-passphrase",
+        transcript_path=tmp_path / f"{case}-transcript.jsonl",
+        transport=transport,
+    )
+
+    result = adapter.poll(run_id="run-failure")
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == expected_reason
+    assert result.evidence["transcript_hash"] == sha256_bytes((tmp_path / f"{case}-transcript.jsonl").read_bytes())
+
+
+def test_bitget_sponsor_session_identity_mismatch_fails_before_next_request(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+    calls: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append(url)
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, b'{"draft_id":"draft-1","version_id":"version-1"}'
+        raise AssertionError("session mismatch must block before follow-up sponsor request")
+
+    adapter = BitgetSponsorAdapter(
+        access_key="identity-access-key",
+        secret_key="id-sec",
+        passphrase="identity-passphrase",
+        transcript_path=tmp_path / "identity-transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    assert upload.ok is True
+
+    run = adapter.run(version_id="wrong-version")
+
+    assert run.ok is False
+    assert run.state == SponsorState.MISMATCH
+    assert run.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert run.evidence["expected_version_id"] == "version-1"
+    assert calls == ["https://api.bitget.com/api/v1/playbook/upload"]
+
+
 def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None:
     package, artifacts = _make_chained_pass_fixture(tmp_path)
     assert artifacts.receipt is not None
@@ -4325,6 +4536,19 @@ def test_bitget_sponsor_publish_requires_verified_readback_session(tmp_path: Pat
     assert result.state == SponsorState.LOCAL_PASS_REQUIRED
     assert result.evidence["required_step"] == "readback"
     assert calls == []
+
+
+def test_bitget_sponsor_publish_rejects_draft_id_mismatch_before_request(tmp_path: Path) -> None:
+    adapter = _publish_ready_bitget_adapter(tmp_path, {"status": "ok", "publish_id": "publish-1"})
+    before_transcript = (tmp_path / "transcript.jsonl").read_text(encoding="utf-8")
+
+    result = adapter.publish(draft_id="wrong-draft")
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+    assert result.evidence["expected_draft_id"] == "draft-1"
+    assert (tmp_path / "transcript.jsonl").read_text(encoding="utf-8") == before_transcript
 
 
 def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
@@ -4612,6 +4836,140 @@ def test_verify_sponsor_run_cli_binds_annotated_archive(monkeypatch, tmp_path: P
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
     assert payload["state"] == SponsorState.READBACK_VERIFIED.value
+
+
+def test_verify_sponsor_run_cli_binds_custom_ledger_attestation_to_archive(monkeypatch, tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="custom-attestation-policy", key_id="custom-attestation-key", public_key=public_key, issuer="custom-ci")
+    policy_path = tmp_path / "trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    baseline = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="baseline",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "baseline",
+    )
+    assert baseline.receipt is not None
+    _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id=policy.policy_id, key_id="custom-attestation-key", issuer="custom-ci")
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        baseline_trust_policy_path=policy_path,
+    )
+    assert artifacts.receipt is not None
+    checkpoint = LedgerCheckpoint.model_validate(json.loads((tmp_path / "run" / "issuance-ledger.checkpoint.json").read_text(encoding="utf-8")))
+    default_attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer="custom-ci",
+        trust_policy_id=policy.policy_id,
+        key_id="custom-attestation-key",
+        issuer="custom-ci",
+        signed_at="2026-06-10T00:00:00Z",
+    )
+    default_attestation_path = tmp_path / "run" / "issuance-ledger.attestation.json"
+    default_attestation_path.write_text(default_attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    alt_attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer="custom-ci",
+        trust_policy_id=policy.policy_id,
+        key_id="custom-attestation-key",
+        issuer="custom-ci",
+        signed_at="2026-06-10T00:00:01Z",
+    )
+    alt_attestation_path = tmp_path / "alt-ledger.attestation.json"
+    alt_attestation_path.write_text(alt_attestation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    default_archive, _default_annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "default-archive" / "redline-annotation.json",
+        out_path=tmp_path / "default-archive" / "annotated-package.tar.gz",
+        ledger_attestation_path=default_attestation_path,
+    )
+    alt_archive, _alt_annotation = make_receipt_bound_package_archive(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        annotation_path=tmp_path / "alt-archive" / "redline-annotation.json",
+        out_path=tmp_path / "alt-archive" / "annotated-package.tar.gz",
+        ledger_attestation_path=alt_attestation_path,
+    )
+    default_archive_hash = sha256_bytes(default_archive.read_bytes())
+    alt_archive_hash = sha256_bytes(alt_archive.read_bytes())
+    assert default_archive_hash != alt_archive_hash
+    evidence = {
+        "version": "redline.sponsor.bitget.readback.v1",
+        "run_id": "run-live-2",
+        "version_id": "version-live-2",
+        "status": "completed",
+        "metrics_output_hash": artifacts.receipt.result.result_hash,
+        "expected_version_id": "version-live-2",
+        "expected_metrics_output_hash": artifacts.receipt.result.result_hash,
+        "package_hash": artifacts.receipt.package.identity_hash,
+        "package_archive_hash": alt_archive_hash,
+        "source_kind": "live",
+        "proof_eligible": True,
+        "transcript_hash": "sha256:" + "4" * 64,
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    class FakeAdapter:
+        proof_eligible = True
+
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def poll(self, *, run_id: str) -> SponsorStepResult:
+            return SponsorStepResult(
+                ok=True,
+                state=SponsorState.READBACK_VERIFIED,
+                evidence={
+                    "run_id": run_id,
+                    "version_id": evidence["expected_version_id"],
+                    "status": "completed",
+                    "metrics_output_hash": evidence["expected_metrics_output_hash"],
+                    "package_hash": evidence["package_hash"],
+                    "package_archive_hash": evidence["package_archive_hash"],
+                },
+            )
+
+    monkeypatch.setattr(cli_module, "BitgetSponsorAdapter", FakeAdapter)
+    monkeypatch.setenv("REDLINE_BITGET_ACCESS_KEY", "access")
+    monkeypatch.setenv("REDLINE_BITGET_SECRET_KEY", "secret")
+    monkeypatch.setenv("REDLINE_BITGET_PASSPHRASE", "passphrase")
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-sponsor-run",
+            str(evidence_path),
+            "--receipt",
+            str(tmp_path / "run" / "receipt.json"),
+            "--package",
+            str(package),
+            "--baseline-receipt",
+            str(tmp_path / "baseline" / "receipt.json"),
+            "--ledger-attestation",
+            str(alt_attestation_path),
+            "--trust-policy",
+            str(policy_path),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["evidence"]["package_archive_hash"] == alt_archive_hash
 
 
 def test_verify_sponsor_run_cli_replays_report_and_proof_sidecars_before_credentials(monkeypatch, tmp_path: Path) -> None:
@@ -5433,30 +5791,86 @@ def test_generated_reports_validate_against_exported_schema(tmp_path: Path) -> N
     Draft202012Validator(schema).validate(json.loads((tmp_path / "run" / "report.json").read_text()))
 
 
+def test_public_json_artifacts_validate_against_exported_schemas(tmp_path: Path) -> None:
+    schema_dir = tmp_path / "schemas"
+    export_schemas(schema_dir)
+
+    def validate(schema_name: str, payload: object) -> None:
+        schema = json.loads((schema_dir / schema_name).read_text(encoding="utf-8"))
+        Draft202012Validator(schema).validate(payload)
+
+    for run_name in ["pass", "withheld"]:
+        run_dir = ROOT / "artifacts/demo" / run_name
+        validate("receipt.v3.2.schema.json", json.loads((run_dir / "receipt.json").read_text(encoding="utf-8")))
+        validate("decision-envelope.v1.schema.json", json.loads((run_dir / "envelope.json").read_text(encoding="utf-8")))
+        for proof_path in sorted((run_dir / "proofs").glob("*.json")):
+            validate("proof.v1.schema.json", json.loads(proof_path.read_text(encoding="utf-8")))
+
+    validate("sponsor-readback-evidence.v1.schema.json", json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text(encoding="utf-8")))
+    verification = verify(
+        receipt_path=ROOT / "artifacts/demo/withheld/receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        level=VerificationLevel.REPLAYED,
+    )
+    validate("verification-result.v1.schema.json", verification.model_dump(mode="json"))
+    preflight = publish_preflight(
+        receipt_path=ROOT / "artifacts/demo/pass/receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-preflight",
+        allow_demo_baseline_genesis=True,
+    )
+    validate("publish-preflight.v1.schema.json", preflight.model_dump(mode="json"))
+    doctor_result = cli_module._run_doctor(package=PACKAGE, suite=SUITE, spec=SPEC)
+    validate("doctor-result.v1.schema.json", doctor_result.model_dump(mode="json"))
+
+
 def test_composite_action_runs_against_caller_workspace() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert 'allow-amber-baseline-genesis:' in action
     assert 'default: candidate_good' in action
     assert 'default: "true"' in action
     assert "working-directory: ${{ github.workspace }}" in action
-    assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
-    assert '[ "${{ inputs.package }}" = "fixtures/demo_pack" ]' in action
+    assert 'REDLINE_ACTION_PACKAGE: ${{ inputs.package }}' in action
+    assert 'uv --project "$GITHUB_ACTION_PATH" run redline run "$GITHUB_WORKSPACE/$REDLINE_ACTION_PACKAGE"' in action
+    assert '[ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]' in action
+    assert '${{ github.workspace }}/${{ inputs.package }}' not in action
     assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
 
 
-def test_composite_action_amber_exception_is_demo_package_only() -> None:
+def test_composite_action_amber_exception_is_demo_package_only(tmp_path: Path) -> None:
     def enforce(package: str) -> int:
+        marker = tmp_path / "marker"
         script = (
             'code=10\n'
-            f'if [ "$code" -eq 10 ] && [ "true" = "true" ] && [ "{package}" = "fixtures/demo_pack" ]; then\n'
+            'if [ "$code" -eq 10 ] && [ "$REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS" = "true" ] && [ "$REDLINE_ACTION_PACKAGE" = "fixtures/demo_pack" ]; then\n'
             "  exit 0\n"
             "fi\n"
             'exit "$code"\n'
         )
-        return subprocess.run(["bash", "-c", script], check=False).returncode
+        env = {
+            **os.environ,
+            "REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS": "true",
+            "REDLINE_ACTION_PACKAGE": package,
+        }
+        result = subprocess.run(["bash", "-c", script], check=False, env=env)
+        assert not marker.exists()
+        return result.returncode
 
     assert enforce("fixtures/demo_pack") == 0
     assert enforce("fixtures/not_demo_pack") == 10
+    assert enforce(f"fixtures/demo_pack$(touch {tmp_path / 'marker'})") == 10
+
+
+def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
+    workflow = (ROOT / ".github/workflows/redline-ci.yml").read_text(encoding="utf-8")
+    assert "uv run python scripts/verify-sponsor-fixture.py" in workflow
+    assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
+    assert 'test "$code" -eq 10' in workflow
+    assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow
 
 
 def test_decision_envelope_construction_stays_in_proof_kernel() -> None:

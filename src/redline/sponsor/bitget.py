@@ -7,6 +7,7 @@ import hmac
 import io
 import json
 import tarfile
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -667,30 +668,50 @@ def _write_package_archive(*, package_dir: Path, out_path: Path, annotation_path
     if resolved_out == root or root in resolved_out.parents:
         raise CanonicalizationError("package archive output must be outside package root", ReasonCode.RECEIPT_BINDING_FAILED)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:
-            with tarfile.open(fileobj=gz, mode="w") as tar:
-                for rel, file_path in iter_canonical_files(root):
-                    data = file_path.read_bytes()
-                    info = tarfile.TarInfo(rel)
-                    info.size = len(data)
-                    info.mtime = 0
-                    info.uid = 0
-                    info.gid = 0
-                    info.uname = ""
-                    info.gname = ""
-                    tar.addfile(info, io.BytesIO(data))
-                if annotation_path is not None:
-                    data = annotation_path.read_bytes()
-                    info = tarfile.TarInfo(".redline/redline-annotation.json")
-                    info.size = len(data)
-                    info.mtime = 0
-                    info.uid = 0
-                    info.gid = 0
-                    info.uname = ""
-                    info.gname = ""
-                    tar.addfile(info, io.BytesIO(data))
+    canonical_files = list(iter_canonical_files(root))
+    _reject_package_output_alias(out_path=out_path, package_files=[file_path for _rel, file_path in canonical_files])
+    tmp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=out_path.parent, prefix=f".{out_path.name}.", suffix=".tmp", delete=False) as raw:
+            tmp_name = raw.name
+            with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:
+                with tarfile.open(fileobj=gz, mode="w") as tar:
+                    for rel, file_path in canonical_files:
+                        data = file_path.read_bytes()
+                        info = tarfile.TarInfo(rel)
+                        info.size = len(data)
+                        info.mtime = 0
+                        info.uid = 0
+                        info.gid = 0
+                        info.uname = ""
+                        info.gname = ""
+                        tar.addfile(info, io.BytesIO(data))
+                    if annotation_path is not None:
+                        data = annotation_path.read_bytes()
+                        info = tarfile.TarInfo(".redline/redline-annotation.json")
+                        info.size = len(data)
+                        info.mtime = 0
+                        info.uid = 0
+                        info.gid = 0
+                        info.uname = ""
+                        info.gname = ""
+                        tar.addfile(info, io.BytesIO(data))
+        Path(tmp_name).replace(out_path)
+    except Exception:
+        if tmp_name is not None:
+            Path(tmp_name).unlink(missing_ok=True)
+        raise
     return out_path
+
+
+def _reject_package_output_alias(*, out_path: Path, package_files: list[Path]) -> None:
+    if not out_path.exists():
+        return
+    out_stat = out_path.stat()
+    for package_file in package_files:
+        package_stat = package_file.stat()
+        if out_stat.st_dev == package_stat.st_dev and out_stat.st_ino == package_stat.st_ino:
+            raise CanonicalizationError("package archive output aliases a package file", ReasonCode.RECEIPT_BINDING_FAILED)
 
 
 def _urllib_transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
