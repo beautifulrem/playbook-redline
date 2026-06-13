@@ -268,6 +268,8 @@ def verify_decision_proof_bundle(
         return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.PARSE_ERROR)
     except ValidationError:
         return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.SCHEMA_INVALID)
+    if envelope.status is not Status.REJECT:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
     proofs_root = proofs_dir or envelope_path.parent / "proofs"
     if not proofs_root.exists():
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
@@ -291,6 +293,8 @@ def verify_decision_proof_bundle(
         proof_ids=non_decision_ids,
         coverage=envelope.coverage,
     )
+    if sorted(envelope.required_proof_ids) != [expected_proof_id] or sorted(envelope.satisfied_proof_ids) != [expected_proof_id]:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
     if decision_proof.proof_id != expected_proof_id:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
     expected_inputs_hash = hash_obj(

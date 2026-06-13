@@ -27,9 +27,11 @@ from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
 from redline.models import (
     Assertion,
+    Capabilities,
     ChainStatus,
     CoverageManifest,
     DecisionContext,
+    DecisionEnvelope,
     LedgerCheckpoint,
     PackageAnnotation,
     Proof,
@@ -47,7 +49,7 @@ from redline.models import (
 )
 from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE
 from redline.probes.drawdown import MaxDrawdownProbe
-from redline.proof_kernel import REQUIRED_PROOFS, decide
+from redline.proof_kernel import REQUIRED_PROOFS, decide, decision_proof_id
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, create_ledger_checkpoint, make_decision_proof
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
@@ -1011,6 +1013,80 @@ def test_sandbox_rejects_object_signal_return(tmp_path: Path) -> None:
     assert artifacts.receipt is None
 
 
+def test_sandbox_rejects_set_identity_hash_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_set_entropy")
+    (package / "candidate_set_entropy" / "strategy.py").write_text(
+        "class Token:\n"
+        "    def __init__(self, value):\n"
+        "        self.value = value\n\n"
+        "def signal(bar, state, config):\n"
+        "    left = Token(0)\n"
+        "    right = Token(1)\n"
+        "    for item in {left, right}:\n"
+        "        return item.value\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_set_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_allows_numeric_modulo_strategy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_modulo_rebalance")
+    (package / "candidate_modulo_rebalance" / "strategy.py").write_text(
+        "def signal(bar, state, config):\n"
+        "    i = int(bar['i'])\n"
+        "    return 1 if i % 2 == 0 else 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_modulo_rebalance",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.reason_code != ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is not None
+
+
+def test_sandbox_rejects_stdout_pollution(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_print")
+    (package / "candidate_print" / "strategy.py").write_text(
+        "def signal(bar, state, config):\n"
+        "    print('protocol noise')\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_print",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
 def test_sandbox_read_root_bypass_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_read_bypass", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.envelope.status == Status.REJECT
@@ -1143,6 +1219,56 @@ def test_reject_decision_proof_bundle_is_verifiable(tmp_path: Path) -> None:
     )
     assert tampered_result.exit_code == 4
     assert json.loads(tampered_result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
+
+
+@pytest.mark.parametrize(
+    ("status", "reason_code"),
+    [(Status.PASS, ReasonCode.PASS), (Status.WITHHELD, ReasonCode.NEW_BLOCK_BREACH)],
+)
+def test_envelope_verifier_rejects_receipt_backed_statuses(tmp_path: Path, status: Status, reason_code: ReasonCode) -> None:
+    proofs_dir = tmp_path / "proofs"
+    proofs_dir.mkdir()
+    fake_artifact_hash = hash_obj({"status": status.value, "kind": ProofKind.PACKAGE_CANONICAL.value})
+    fake_proof = Proof(
+        proof_id=f"proof:{ProofKind.PACKAGE_CANONICAL.value}:{fake_artifact_hash.removeprefix('sha256:')[:24]}",
+        phase="import",
+        kind=ProofKind.PACKAGE_CANONICAL,
+        verdict_bearing=True,
+        inputs_hash=fake_artifact_hash,
+        artifact_hash=fake_artifact_hash,
+    )
+    coverage = CoverageManifest(cells=[("s1", "p1")], complete=True, missing=[])
+    decision_id = decision_proof_id(status=status, reason_code=reason_code, proof_ids=[fake_proof.proof_id], coverage=coverage)
+    envelope = DecisionEnvelope(
+        status=status,
+        reason_code=reason_code,
+        chain_status=ChainStatus.CHAINED,
+        required_proof_ids=[decision_id],
+        satisfied_proof_ids=[decision_id],
+        coverage=coverage,
+        capabilities=Capabilities(scenario_count=1),
+    )
+    decision_proof = make_decision_proof(envelope=envelope, proofs=[fake_proof], envelope_bundle=True)
+    assert decision_proof.proof_id == decision_id
+    (tmp_path / "envelope.json").write_text(envelope.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    for proof in [fake_proof, decision_proof]:
+        (proofs_dir / f"{proof.proof_id.replace(':', '_')}.json").write_text(proof.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-proof",
+            "--envelope",
+            str(tmp_path / "envelope.json"),
+            "--proof-id",
+            decision_id,
+            "--proofs-dir",
+            str(proofs_dir),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 4
+    assert json.loads(result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
 
 
 def test_extreme_numeric_signal_fails_closed(tmp_path: Path) -> None:
@@ -2562,6 +2688,36 @@ def test_publish_preflight_requires_chained_pass_by_default_and_demo_flag_writes
     )
     assert annotation_verify.ok is True
     assert annotation_verify.reason_code == ReasonCode.BASELINE_GENESIS
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="demo-policy", key_id="demo-key", public_key=public_key, issuer="demo-ci")
+    policy_path = tmp_path / "demo-trust-policy.json"
+    policy_path.write_text(policy.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    _sign_run_checkpoint(tmp_path / "good", private_key, policy_id="demo-policy", key_id="demo-key", issuer="demo-ci")
+    unpinned_demo_result = publish_preflight(
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-demo-unpinned",
+        ledger_attestation_path=tmp_path / "good" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        allow_demo_baseline_genesis=True,
+    )
+    assert unpinned_demo_result.ok is False
+    assert unpinned_demo_result.state == "TRUST_POLICY_REQUIRED"
+    wrong_pin_demo_result = publish_preflight(
+        receipt_path=tmp_path / "good" / "receipt.json",
+        package=PACKAGE,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-demo-wrong-pin",
+        ledger_attestation_path=tmp_path / "good" / "issuance-ledger.attestation.json",
+        trust_policy_path=policy_path,
+        trust_policy_hash="sha256:" + "0" * 64,
+        allow_demo_baseline_genesis=True,
+    )
+    assert wrong_pin_demo_result.ok is False
+    assert wrong_pin_demo_result.state == "TRUST_POLICY_REQUIRED"
     report_path = tmp_path / "good" / "report.json"
     original_report = report_path.read_text(encoding="utf-8")
     report_data = json.loads(original_report)
@@ -3230,6 +3386,33 @@ def test_publish_rejects_existing_file_out_path_with_json_error(tmp_path: Path) 
     assert payload["state"] == "OUTPUT_PATH_INVALID"
     assert payload["reason_code"] == ReasonCode.DATA_MISSING.value
     assert "Traceback" not in result.stderr
+
+
+def test_doctor_json_runs_backend_smoke() -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "doctor",
+            "--package",
+            str(PACKAGE),
+            "--suite",
+            str(SUITE),
+            "--spec",
+            str(SPEC),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "redline.doctor.v1"
+    assert payload["ok"] is True
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["reason-exit-coverage"]["ok"] is True
+    assert checks["required-proofs-coverage"]["ok"] is True
+    assert checks["fixture-inputs"]["evidence"]["scenario_count"] == "2"
+    assert checks["deterministic-pass-smoke"]["evidence"]["reason_code"] == ReasonCode.BASELINE_GENESIS.value
+    assert checks["withheld-smoke"]["evidence"]["reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
+    assert int(checks["schema-export-smoke"]["evidence"]["schema_count"]) >= 17
 
 
 def test_make_demo_refuses_broad_or_unowned_output_paths(tmp_path: Path) -> None:
@@ -4471,6 +4654,7 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
     export_schemas(tmp_path)
     expected = {
         "decision-envelope.v1.schema.json",
+        "doctor-result.v1.schema.json",
         "edit-provenance.v1.schema.json",
         "ledger-attestation.v1.schema.json",
         "ledger-checkpoint.v1.schema.json",

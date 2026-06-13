@@ -5,6 +5,7 @@ from pathlib import Path
 
 from redline.models import (
     DecisionEnvelope,
+    DoctorResult,
     EditProvenance,
     LedgerCheckpoint,
     LedgerCheckpointAttestation,
@@ -26,6 +27,7 @@ def export_schemas(out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     models = {
         "decision-envelope.v1.schema.json": DecisionEnvelope,
+        "doctor-result.v1.schema.json": DoctorResult,
         "edit-provenance.v1.schema.json": EditProvenance,
         "ledger-attestation.v1.schema.json": LedgerCheckpointAttestation,
         "ledger-checkpoint.v1.schema.json": LedgerCheckpoint,

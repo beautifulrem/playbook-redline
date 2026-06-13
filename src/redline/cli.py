@@ -13,7 +13,8 @@ from rich.console import Console
 from rich.table import Table
 
 from redline.canonical import CanonicalizationError, hash_obj, hash_tree, sha256_bytes
-from redline.models import EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
+from redline.models import DoctorCheck, DoctorResult, EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
+from redline.proof_kernel import REQUIRED_PROOFS
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
@@ -837,8 +838,115 @@ def export_schemas(out: Path = Path("schemas")) -> None:
 
 
 @app.command()
-def doctor() -> None:
-    console.print("redline backend doctor: ok")
+def doctor(
+    package: Path = typer.Option(Path("fixtures/demo_pack"), "--package"),
+    suite: Path = typer.Option(Path("fixtures/suites/demo_suite.json"), "--suite"),
+    spec: Path = typer.Option(Path("fixtures/specs/redline_spec.json"), "--spec"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = _run_doctor(package=package, suite=suite, spec=spec)
+    if json_out:
+        console.print_json(data=result.model_dump(mode="json"))
+    else:
+        table = Table("check", "ok", "reason", "detail")
+        for check in result.checks:
+            table.add_row(check.name, "yes" if check.ok else "no", check.reason_code.value, check.detail)
+        console.print(table)
+    raise typer.Exit(0 if result.ok else EXIT_BY_REASON[result.reason_code])
+
+
+def _run_doctor(*, package: Path, suite: Path, spec: Path) -> DoctorResult:
+    checks: list[DoctorCheck] = []
+    checks.append(_doctor_check("reason-exit-coverage", lambda: _doctor_reason_exit_coverage()))
+    checks.append(_doctor_check("required-proofs-coverage", lambda: _doctor_required_proofs_coverage()))
+    checks.append(_doctor_check("fixture-inputs", lambda: _doctor_fixture_inputs(package=package, suite=suite, spec=spec)))
+    checks.append(_doctor_check("deterministic-pass-smoke", lambda: _doctor_deterministic_pass_smoke(package=package, suite=suite, spec=spec)))
+    checks.append(_doctor_check("withheld-smoke", lambda: _doctor_withheld_smoke(package=package, suite=suite, spec=spec)))
+    checks.append(_doctor_check("schema-export-smoke", lambda: _doctor_schema_export_smoke()))
+    first_failed = next((check for check in checks if not check.ok), None)
+    return DoctorResult(ok=first_failed is None, reason_code=first_failed.reason_code if first_failed is not None else ReasonCode.PASS, checks=checks)
+
+
+def _doctor_check(name: str, fn) -> DoctorCheck:
+    try:
+        evidence = fn()
+    except FileNotFoundError as exc:
+        return DoctorCheck(name=name, ok=False, reason_code=ReasonCode.FILE_NOT_FOUND, detail=str(exc))
+    except (json.JSONDecodeError, ValidationError) as exc:
+        return DoctorCheck(name=name, ok=False, reason_code=ReasonCode.SCHEMA_INVALID, detail=exc.__class__.__name__)
+    except ValueError as exc:
+        return DoctorCheck(name=name, ok=False, reason_code=ReasonCode.DATA_MISSING, detail=str(exc))
+    except Exception as exc:
+        return DoctorCheck(name=name, ok=False, reason_code=ReasonCode.ENGINE_FAILURE, detail=exc.__class__.__name__)
+    return DoctorCheck(name=name, ok=True, evidence=evidence)
+
+
+def _doctor_reason_exit_coverage() -> dict[str, str]:
+    missing = sorted(reason.value for reason in set(ReasonCode) - set(EXIT_BY_REASON))
+    extra = sorted(reason.value for reason in set(EXIT_BY_REASON) - set(ReasonCode))
+    if missing or extra:
+        raise ValueError(f"reason exit map drift: missing={missing} extra={extra}")
+    return {"reason_codes": str(len(ReasonCode))}
+
+
+def _doctor_required_proofs_coverage() -> dict[str, str]:
+    missing = sorted(status.value for status in set(Status) - set(REQUIRED_PROOFS))
+    extra = sorted(status.value for status in set(REQUIRED_PROOFS) - set(Status))
+    if missing or extra:
+        raise ValueError(f"required proof map drift: missing={missing} extra={extra}")
+    return {"statuses": str(len(Status))}
+
+
+def _doctor_fixture_inputs(*, package: Path, suite: Path, spec: Path) -> dict[str, str]:
+    _validate_run_inputs(package=package, baseline="baseline", candidate="candidate_good", suite=suite, spec=spec)
+    _validate_run_inputs(package=package, baseline="baseline", candidate="candidate_bad", suite=suite, spec=spec)
+    loaded_suite = load_suite(suite)
+    loaded_spec = load_spec(spec)
+    return {
+        "package_hash": hash_tree(package),
+        "suite_id": loaded_suite.suite_id,
+        "scenario_count": str(len(loaded_suite.scenarios)),
+        "spec_id": loaded_spec.spec_id,
+        "probe_count": str(len(loaded_spec.probes)),
+    }
+
+
+def _doctor_deterministic_pass_smoke(*, package: Path, suite: Path, spec: Path) -> dict[str, str]:
+    first = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=suite, spec_path=spec, out_dir=None)
+    second = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=suite, spec_path=spec, out_dir=None)
+    if first.envelope.status != Status.PASS or first.envelope.reason_code != ReasonCode.BASELINE_GENESIS or first.receipt is None:
+        raise ValueError(f"unexpected pass smoke verdict: {first.envelope.status.value}/{first.envelope.reason_code.value}")
+    first_hashes = [trace.artifact_hash for trace in first.traces]
+    second_hashes = [trace.artifact_hash for trace in second.traces]
+    if first_hashes != second_hashes:
+        raise ValueError("deterministic replay trace hash drift")
+    return {
+        "status": first.envelope.status.value,
+        "reason_code": first.envelope.reason_code.value,
+        "trace_count": str(len(first_hashes)),
+        "receipt_hash": first.receipt.receipt_hash,
+    }
+
+
+def _doctor_withheld_smoke(*, package: Path, suite: Path, spec: Path) -> dict[str, str]:
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_bad", suite_path=suite, spec_path=spec, out_dir=None)
+    if artifacts.envelope.status != Status.WITHHELD or artifacts.envelope.reason_code != ReasonCode.NEW_BLOCK_BREACH or artifacts.receipt is None:
+        raise ValueError(f"unexpected withheld smoke verdict: {artifacts.envelope.status.value}/{artifacts.envelope.reason_code.value}")
+    return {
+        "status": artifacts.envelope.status.value,
+        "reason_code": artifacts.envelope.reason_code.value,
+        "receipt_hash": artifacts.receipt.receipt_hash,
+    }
+
+
+def _doctor_schema_export_smoke() -> dict[str, str]:
+    with tempfile.TemporaryDirectory(prefix="redline-doctor-schemas-") as tmp:
+        out = Path(tmp)
+        export_schema_files(out)
+        schema_files = sorted(out.glob("*.schema.json"))
+        if not schema_files:
+            raise ValueError("schema export produced no files")
+        return {"schema_count": str(len(schema_files))}
 
 
 def _print_envelope(status: str, reason: str, target: object) -> None:

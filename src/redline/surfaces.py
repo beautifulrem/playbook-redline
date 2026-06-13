@@ -290,6 +290,36 @@ def publish_preflight(
         output=checkpoint.model_dump(mode="json"),
         exit_code=0,
     )
+    trust_policy_checked = False
+    if trust_policy_path is not None or trust_policy_hash is not None:
+        trust_policy_ok = _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash)
+        if not trust_policy_ok:
+            blocked = PublishPreflightResult(
+                ok=False,
+                state="TRUST_POLICY_REQUIRED",
+                receipt_hash=result.receipt_hash,
+                package_hash=package_hash,
+                report_hash=_report_hash(report_path),
+                ledger_hash=checkpoint.ledger_hash,
+                ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+                reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+            )
+            transcript.append(
+                step_id="trust-policy",
+                command="verify_trust_policy",
+                inputs={"trust_policy_path": str(trust_policy_path) if trust_policy_path is not None else None, "trust_policy_hash": trust_policy_hash},
+                output=blocked.model_dump(mode="json"),
+                exit_code=1,
+            )
+            return _with_preflight_transcript(blocked, transcript)
+        transcript.append(
+            step_id="trust-policy",
+            command="verify_trust_policy",
+            inputs={"trust_policy_path": str(trust_policy_path), "trust_policy_hash": trust_policy_hash},
+            output={"ok": True},
+            exit_code=0,
+        )
+        trust_policy_checked = True
     if result.chain_status == ChainStatus.CHAINED and trust_policy_path is None:
         blocked = PublishPreflightResult(
             ok=False,
@@ -309,7 +339,7 @@ def publish_preflight(
             exit_code=1,
         )
         return _with_preflight_transcript(blocked, transcript)
-    if result.chain_status == ChainStatus.CHAINED:
+    if result.chain_status == ChainStatus.CHAINED and not trust_policy_checked:
         trust_policy_ok = _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash)
         if not trust_policy_ok:
             blocked = PublishPreflightResult(

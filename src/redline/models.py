@@ -517,6 +517,21 @@ class ProofVerification(RedlineModel):
     reason_code: ReasonCode = ReasonCode.PASS
 
 
+class DoctorCheck(RedlineModel):
+    name: str
+    ok: bool
+    reason_code: ReasonCode = ReasonCode.PASS
+    detail: str = ""
+    evidence: dict[str, str] = Field(default_factory=dict)
+
+
+class DoctorResult(RedlineModel):
+    schema_version: Literal["redline.doctor.v1"] = "redline.doctor.v1"
+    ok: bool
+    reason_code: ReasonCode = ReasonCode.PASS
+    checks: list[DoctorCheck]
+
+
 class ReportJson(RedlineModel):
     version: Literal["redline.report.v1"] = "redline.report.v1"
     envelope: DecisionEnvelope

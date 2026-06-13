@@ -70,9 +70,12 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "id",
     "locals",
     "object",
+    "print",
     "repr",
     "setattr",
     "str",
+    "set",
+    "frozenset",
     "type",
     "vars",
 }
@@ -228,6 +231,7 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
         tree = ast.parse(strategy_path.read_text(encoding="utf-8"), filename=str(strategy_path))
     except SyntaxError as exc:
         raise RuntimeError(f"{ReasonCode.PARSE_ERROR.value}:cannot parse strategy") from exc
+    numeric_names = _numeric_assignment_names(tree)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -277,7 +281,9 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:dynamic-subscript-call")
         elif isinstance(node, ast.JoinedStr):
             raise RuntimeError(f"{reason}:dynamic-format-string")
-        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+        elif isinstance(node, (ast.Set, ast.SetComp)):
+            raise RuntimeError(f"{reason}:unordered-collection")
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and not _is_numeric_modulo(node, numeric_names):
             raise RuntimeError(f"{reason}:dynamic-format-string")
         elif isinstance(node, ast.Attribute) and node.attr in {"format", "format_map"}:
             raise RuntimeError(f"{reason}:dynamic-format-{node.attr}")
@@ -305,6 +311,38 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             raise RuntimeError(f"{reason}:dynamic-dunder-name-{node.id}")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             _reject_forbidden_string(node.value, reason)
+
+
+def _numeric_assignment_names(tree: ast.AST) -> set[str]:
+    numeric_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and _is_numeric_expr(node.value, numeric_names):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    numeric_names.add(target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and _is_numeric_expr(node.value, numeric_names):
+            numeric_names.add(node.target.id)
+    return numeric_names
+
+
+def _is_numeric_modulo(node: ast.BinOp, numeric_names: set[str]) -> bool:
+    return _is_numeric_expr(node.left, numeric_names) and _is_numeric_expr(node.right, numeric_names)
+
+
+def _is_numeric_expr(node: ast.AST | None, numeric_names: set[str]) -> bool:
+    if node is None:
+        return False
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, int) and not isinstance(node.value, bool)
+    if isinstance(node, ast.Name):
+        return node.id in numeric_names
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        return _is_numeric_expr(node.operand, numeric_names)
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"int", "Decimal"}:
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.FloorDiv)):
+        return _is_numeric_expr(node.left, numeric_names) and _is_numeric_expr(node.right, numeric_names)
+    return False
 
 
 def _reject_forbidden_string(value: str, reason: str) -> None:

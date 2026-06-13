@@ -24,7 +24,8 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Receipt issuer and verifier
 - Ed25519-signed ledger checkpoint attestation for production publish verification
 - Proof-level verification command
-- JSON schemas for receipts, reports, specs, suites, decisions, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
+- Machine-readable backend doctor for Day-0 fixture, schema, replay, and proof-map smoke checks
+- JSON schemas for receipts, reports, specs, suites, decisions, doctor results, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
 
@@ -44,6 +45,7 @@ still use the exchange's own runtime sandbox.
 
 ```bash
 make install
+uv run redline doctor --json
 make goldens
 uv run redline check artifacts/demo/pass/receipt.json --package fixtures/demo_pack --rerun --json
 uv run redline check artifacts/demo/withheld/receipt.json --package fixtures/demo_pack --rerun --json
