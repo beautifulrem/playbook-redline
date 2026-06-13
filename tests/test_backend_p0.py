@@ -48,7 +48,7 @@ from redline.models import (
     VerificationLevel,
     VerificationStatus,
 )
-from redline.package_identity import build_identity_lock, identity_lock_path, write_identity_lock
+from redline.package_identity import build_identity_lock, identity_lock_path, load_identity_lock, write_identity_lock
 from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE
 from redline.probes.drawdown import MaxDrawdownProbe
 from redline.proof_kernel import REQUIRED_PROOFS, decide, decision_proof_id
@@ -1052,6 +1052,12 @@ def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> 
         if probe["type"] == "no_entry_when":
             probe["params"].pop("before_bar", None)
             probe["params"]["bar_lt"] = "3.0"
+    assert_rejected(spec_data)
+
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"]["scenario_id"] = "not-in-suite"
     assert_rejected(spec_data)
 
 
@@ -2850,6 +2856,36 @@ def test_replayed_rejects_tampered_playbook_identity_lock_source(tmp_path: Path)
     assert result.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
 
 
+def test_playbook_identity_lock_rejects_forged_adapter_contract(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    write_identity_lock(package)
+    lock_path = identity_lock_path(package)
+    data = json.loads(lock_path.read_text(encoding="utf-8"))
+    data["adapter_id"] = "evil_adapter"
+    data["canonical_tar_rules"] = "evil.rules"
+    data["identity_hash"] = hash_obj({"adapter_id": data["adapter_id"], "canonical_tar_rules": data["canonical_tar_rules"], "locked_files": data["locked_files"]})
+    data["lock_hash"] = ""
+    data["lock_hash"] = hash_obj(data)
+    lock_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(CanonicalizationError):
+        load_identity_lock(package)
+
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+
+
 def test_missing_playbook_identity_lock_is_fail_closed(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -4319,6 +4355,47 @@ def test_sponsor_evidence_verifier() -> None:
     assert result.reason_code == ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED
 
 
+def test_checked_in_sponsor_fixture_binds_current_demo_package(tmp_path: Path) -> None:
+    data = json.loads((ROOT / "artifacts/sponsor/demo-readback.json").read_text(encoding="utf-8"))
+    receipt = load_receipt(ROOT / "artifacts/demo/pass/receipt.json")
+    package_hash = hash_tree(PACKAGE)
+    archive, _annotation = make_receipt_bound_package_archive(
+        receipt_path=ROOT / "artifacts/demo/pass/receipt.json",
+        package=PACKAGE,
+        annotation_path=tmp_path / "redline-annotation.json",
+        out_path=tmp_path / "annotated-package.tar.gz",
+        package_hash=package_hash,
+    )
+
+    assert package_hash == receipt.package.identity_hash
+    assert data["package_hash"] == receipt.package.identity_hash
+    assert data["package_archive_hash"] == sha256_bytes(archive.read_bytes())
+    assert data["metrics_output_hash"] == receipt.result.result_hash
+    assert data["expected_metrics_output_hash"] == receipt.result.result_hash
+
+
+def test_receipt_bound_package_archive_is_independent_of_receipt_path_form(tmp_path: Path) -> None:
+    absolute_archive, absolute_annotation = make_receipt_bound_package_archive(
+        receipt_path=ROOT / "artifacts/demo/pass/receipt.json",
+        package=PACKAGE,
+        annotation_path=tmp_path / "absolute" / "redline-annotation.json",
+        out_path=tmp_path / "absolute" / "annotated-package.tar.gz",
+        package_hash=hash_tree(PACKAGE),
+    )
+    relative_archive, relative_annotation = make_receipt_bound_package_archive(
+        receipt_path=Path("artifacts/demo/pass/receipt.json"),
+        package=PACKAGE,
+        annotation_path=tmp_path / "relative" / "redline-annotation.json",
+        out_path=tmp_path / "relative" / "annotated-package.tar.gz",
+        package_hash=hash_tree(PACKAGE),
+    )
+
+    assert absolute_annotation.receipt_path == "artifacts/demo/pass/receipt.json"
+    assert relative_annotation.receipt_path == "artifacts/demo/pass/receipt.json"
+    assert absolute_annotation.annotation_hash == relative_annotation.annotation_hash
+    assert sha256_bytes(absolute_archive.read_bytes()) == sha256_bytes(relative_archive.read_bytes())
+
+
 def test_live_sponsor_readback_verifies_three_recorded_fields(tmp_path: Path) -> None:
     metrics_output = {"status": "pass", "breaches": []}
     evidence = {
@@ -5363,7 +5440,23 @@ def test_composite_action_runs_against_caller_workspace() -> None:
     assert 'default: "true"' in action
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
+    assert '[ "${{ inputs.package }}" = "fixtures/demo_pack" ]' in action
     assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
+
+
+def test_composite_action_amber_exception_is_demo_package_only() -> None:
+    def enforce(package: str) -> int:
+        script = (
+            'code=10\n'
+            f'if [ "$code" -eq 10 ] && [ "true" = "true" ] && [ "{package}" = "fixtures/demo_pack" ]; then\n'
+            "  exit 0\n"
+            "fi\n"
+            'exit "$code"\n'
+        )
+        return subprocess.run(["bash", "-c", script], check=False).returncode
+
+    assert enforce("fixtures/demo_pack") == 0
+    assert enforce("fixtures/not_demo_pack") == 10
 
 
 def test_decision_envelope_construction_stays_in_proof_kernel() -> None:

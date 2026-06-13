@@ -6,10 +6,10 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, iter_canonical_files
-from redline.models import PackageIdentityFile, PlaybookIdentityLock, ReasonCode
+from redline.models import CANONICAL_TAR_RULES, PLAYBOOK_ADAPTER_ID, PackageIdentityFile, PlaybookIdentityLock, ReasonCode
 
 IDENTITY_LOCK_NAME = "playbook_identity.lock"
-DEFAULT_ADAPTER_ID = "python_strategy_sandbox"
+DEFAULT_ADAPTER_ID = PLAYBOOK_ADAPTER_ID
 
 
 def identity_lock_path(package: Path) -> Path:
@@ -17,6 +17,8 @@ def identity_lock_path(package: Path) -> Path:
 
 
 def build_identity_lock(package: Path, *, adapter_id: str = DEFAULT_ADAPTER_ID) -> PlaybookIdentityLock:
+    if adapter_id != PLAYBOOK_ADAPTER_ID:
+        raise CanonicalizationError("unsupported playbook identity adapter", ReasonCode.RECEIPT_BINDING_FAILED)
     locked_files = [
         PackageIdentityFile(path=rel, hash=hash_file(path))
         for rel, path in iter_canonical_files(package)
@@ -24,7 +26,7 @@ def build_identity_lock(package: Path, *, adapter_id: str = DEFAULT_ADAPTER_ID) 
     ]
     if not locked_files:
         raise CanonicalizationError("package has no lockable playbook source files", ReasonCode.DATA_MISSING)
-    identity_hash = hash_obj({"adapter_id": adapter_id, "canonical_tar_rules": "redline.v9.canonical-tree", "locked_files": locked_files})
+    identity_hash = hash_obj({"adapter_id": adapter_id, "canonical_tar_rules": CANONICAL_TAR_RULES, "locked_files": locked_files})
     lock = PlaybookIdentityLock(
         adapter_id=adapter_id,
         locked_files=locked_files,

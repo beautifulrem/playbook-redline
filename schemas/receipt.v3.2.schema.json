@@ -263,11 +263,13 @@
       "additionalProperties": false,
       "properties": {
         "adapter_id": {
+          "const": "python_strategy_sandbox",
           "default": "python_strategy_sandbox",
           "title": "Adapter Id",
           "type": "string"
         },
         "canonical_tar_rules": {
+          "const": "redline.v9.canonical-tree",
           "default": "redline.v9.canonical-tree",
           "title": "Canonical Tar Rules",
           "type": "string"

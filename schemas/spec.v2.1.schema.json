@@ -81,8 +81,11 @@
                     "type": "string"
                   },
                   "scenario_id": {
-                    "minLength": 1,
-                    "pattern": "\\S",
+                    "description": "Scenario id supported by the current P0 adapter contract.",
+                    "enum": [
+                      "btc-crash-2024-03-05",
+                      "btc-chop-2024-08"
+                    ],
                     "type": "string"
                   }
                 },

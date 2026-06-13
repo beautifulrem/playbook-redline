@@ -2,6 +2,7 @@
   "additionalProperties": false,
   "properties": {
     "adapter_id": {
+      "const": "python_strategy_sandbox",
       "default": "python_strategy_sandbox",
       "title": "Adapter Id",
       "type": "string"

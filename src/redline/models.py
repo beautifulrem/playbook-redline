@@ -80,6 +80,10 @@ class ProbeType(StrEnum):
     TRADE_BUDGET = "trade_budget"
 
 
+PLAYBOOK_ADAPTER_ID = "python_strategy_sandbox"
+CANONICAL_TAR_RULES = "redline.v9.canonical-tree"
+P0_ALLOWED_SCENARIO_IDS = ("btc-crash-2024-03-05", "btc-chop-2024-08")
+
 _DECIMAL_GT_ZERO_LE_ONE_PATTERN = r"^(?:(?:0?\.[0-9]*[1-9][0-9]*)|(?:1(?:\.0*)?))$"
 _DECIMAL_ZERO_TO_ONE_PATTERN = r"^(?:(?:0(?:\.[0-9]*)?)|(?:0?\.[0-9]+)|(?:1(?:\.0*)?))$"
 _INT_ZERO_TO_1000_PATTERN = r"^0*(?:[0-9]{1,3}|1000)$"
@@ -103,7 +107,11 @@ _PROBE_PARAMS_SCHEMA: dict[ProbeType, dict[str, Any]] = {
         "additionalProperties": {"type": "string"},
         "required": ["scenario_id", "max_abs_position"],
         "properties": {
-            "scenario_id": {"type": "string", "minLength": 1, "pattern": r"\S"},
+            "scenario_id": {
+                "type": "string",
+                "enum": list(P0_ALLOWED_SCENARIO_IDS),
+                "description": "Scenario id supported by the current P0 adapter contract.",
+            },
             "before_bar": {
                 "type": "string",
                 "pattern": _INT_ZERO_TO_100000_PATTERN,
@@ -399,8 +407,8 @@ class DecisionEnvelope(RedlineModel):
 class PackageInfo(RedlineModel):
     identity_hash: str
     manifest_hash: str
-    canonical_tar_rules: str = "redline.v9.canonical-tree"
-    adapter_id: str = "python_strategy_sandbox"
+    canonical_tar_rules: Literal["redline.v9.canonical-tree"] = CANONICAL_TAR_RULES
+    adapter_id: Literal["python_strategy_sandbox"] = PLAYBOOK_ADAPTER_ID
     identity_lock_hash: str
     identity_lock_path: str
 
@@ -412,8 +420,8 @@ class PackageIdentityFile(RedlineModel):
 
 class PlaybookIdentityLock(RedlineModel):
     version: Literal["redline.playbook_identity.v1"] = "redline.playbook_identity.v1"
-    adapter_id: str = "python_strategy_sandbox"
-    canonical_tar_rules: str = "redline.v9.canonical-tree"
+    adapter_id: Literal["python_strategy_sandbox"] = PLAYBOOK_ADAPTER_ID
+    canonical_tar_rules: Literal["redline.v9.canonical-tree"] = CANONICAL_TAR_RULES
     locked_files: list[PackageIdentityFile] = Field(min_length=1)
     identity_hash: str
     lock_hash: str
@@ -432,7 +440,7 @@ class PackageImportResult(RedlineModel):
     path: str
     identity_hash: str
     files: list[str]
-    adapter_id: str = "python_strategy_sandbox"
+    adapter_id: Literal["python_strategy_sandbox"] = PLAYBOOK_ADAPTER_ID
     identity_lock_hash: str
     identity_lock_path: str
 

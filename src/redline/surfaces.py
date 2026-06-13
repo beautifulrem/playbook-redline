@@ -442,7 +442,7 @@ def make_receipt_bound_package_archive(
     attestation = _load_attestation(attestation_path) if attestation_path.exists() else None
     annotation = PackageAnnotation(
         annotation_kind="demo-preview" if receipt.baseline.chain_status != ChainStatus.CHAINED else "publish-preflight",
-        receipt_path=str(receipt_path),
+        receipt_path=_portable_artifact_label(receipt_path),
         receipt_hash=receipt.receipt_hash,
         report_hash=receipt.report.report_hash,
         package_hash=package_hash,
@@ -461,6 +461,14 @@ def make_receipt_bound_package_archive(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     annotation_path.write_text(annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return make_annotated_package_archive(package_dir=package, annotation_path=annotation_path, out_path=out_path), annotation
+
+
+def _portable_artifact_label(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return path.name
 
 
 def verify_annotation(

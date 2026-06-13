@@ -46,9 +46,7 @@ still use the exchange's own runtime sandbox.
 ```bash
 make install
 uv run redline doctor --json
-make goldens
-uv run redline check artifacts/demo/pass/receipt.json --package fixtures/demo_pack --rerun --json
-uv run redline check artifacts/demo/withheld/receipt.json --package fixtures/demo_pack --rerun --json
+make goldens-check
 ```
 
 Expected demo outcomes:
