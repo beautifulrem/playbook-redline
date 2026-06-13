@@ -109,6 +109,14 @@ _FORBIDDEN_FILE_METADATA_CALLS = {
     "samefile",
     "stat",
 }
+_FORBIDDEN_NAME_REFERENCES = (
+    _FORBIDDEN_DYNAMIC_CALLS
+    | _FORBIDDEN_FILE_READ_CALLS
+    | _FORBIDDEN_FILE_WRITE_CALLS
+    | _FORBIDDEN_FILE_CONSTRUCTOR_CALLS
+    | _FORBIDDEN_LOADER_ACCESS_CALLS
+    | _FORBIDDEN_FILE_METADATA_CALLS
+)
 _FORBIDDEN_ENTROPY_ATTRS = {
     "choice",
     "choices",
@@ -267,6 +275,18 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             raise RuntimeError(f"{reason}:dynamic-dunder-{node.attr}")
         elif isinstance(node, ast.Name) and node.id in _FORBIDDEN_MODULE_GLOBAL_NAMES:
             raise RuntimeError(f"{reason}:module-global-{node.id}")
+        elif isinstance(node, ast.Name) and node.id in _FORBIDDEN_NAME_REFERENCES:
+            if node.id in _FORBIDDEN_DYNAMIC_CALLS:
+                raise RuntimeError(f"{reason}:dynamic-code-name-{node.id}")
+            if node.id in _FORBIDDEN_FILE_READ_CALLS:
+                raise RuntimeError(f"{reason}:file-read-name-{node.id}")
+            if node.id in _FORBIDDEN_FILE_WRITE_CALLS:
+                raise RuntimeError(f"{reason}:file-write-name-{node.id}")
+            if node.id in _FORBIDDEN_FILE_CONSTRUCTOR_CALLS:
+                raise RuntimeError(f"{reason}:file-constructor-name-{node.id}")
+            if node.id in _FORBIDDEN_LOADER_ACCESS_CALLS:
+                raise RuntimeError(f"{reason}:loader-file-access-name-{node.id}")
+            raise RuntimeError(f"{reason}:file-metadata-name-{node.id}")
         elif isinstance(node, ast.Name) and node.id.startswith("__") and node.id.endswith("__"):
             raise RuntimeError(f"{reason}:dynamic-dunder-name-{node.id}")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -354,7 +374,7 @@ def main() -> int:
         stdout_write(json_dumps({"ok": False, "reason_code": ReasonCode.DATA_MISSING.value, "message": str(exc)}, sort_keys=True))
         return 0
     roots = {Path(args.package).resolve()}
-    for path in {sys.prefix, sys.base_prefix, sysconfig.get_paths().get("stdlib", ""), sysconfig.get_paths().get("purelib", "")}:
+    for path in {sysconfig.get_paths().get("stdlib", ""), sysconfig.get_paths().get("purelib", "")}:
         if path:
             roots.add(Path(path).resolve())
     for path in site.getsitepackages():

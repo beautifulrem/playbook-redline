@@ -62,7 +62,7 @@ from redline.surfaces import (
     render_report_html,
     verify_annotation,
 )
-from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
+from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation, verify_trust_policy
 from redline.verifier import load_receipt, verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -896,6 +896,32 @@ def test_sandbox_network_violation_rejects(tmp_path: Path) -> None:
 
 def test_sandbox_file_escape_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_file_escape", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_default_arg_open_alias(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_default_open")
+    secret = tmp_path / "outside-open-secret.bin"
+    secret.write_bytes(b"\xcf")
+    (package / "candidate_default_open" / "strategy.py").write_text(
+        f"EXTERNAL = {str(secret)!r}\n\n"
+        "def signal(bar, state, config, f=open):\n"
+        "    byte = f(EXTERNAL, 'rb').read(1)[0]\n"
+        "    return byte % 2\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_default_open",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
     assert artifacts.envelope.status == Status.REJECT
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
     assert artifacts.receipt is None
@@ -2467,6 +2493,34 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     )
     assert annotation_result.ok is True
     assert annotation_result.reason_code == ReasonCode.PASS
+    metadata_forged_annotation_path = tmp_path / "forged-metadata-annotation.json"
+    metadata_forged_annotation = PackageAnnotation.model_validate(json.loads((tmp_path / "publish" / "redline-annotation.json").read_text()))
+    metadata_forged_annotation = metadata_forged_annotation.model_copy(
+        update={
+            "strength_summary": "forged sponsor-ready claim",
+            "chain_status": ChainStatus.GENESIS,
+            "verification_level": VerificationLevel.HASH_ONLY,
+            "annotation_hash": "",
+        }
+    )
+    metadata_forged_annotation = metadata_forged_annotation.model_copy(update={"annotation_hash": hash_obj(metadata_forged_annotation)})
+    metadata_forged_annotation_path.write_text(metadata_forged_annotation.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    metadata_forged_annotation_result = verify_annotation(
+        annotation_path=metadata_forged_annotation_path,
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        report_path=tmp_path / "chained" / "report.json",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_checkpoint_path=tmp_path / "chained" / "issuance-ledger.checkpoint.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert metadata_forged_annotation_result.ok is False
+    assert metadata_forged_annotation_result.state == "ANNOTATION_BINDING_MISMATCH"
+    assert metadata_forged_annotation_result.reason_code == ReasonCode.RECEIPT_MISMATCH
     unpinned_annotation_result = verify_annotation(
         annotation_path=tmp_path / "publish" / "redline-annotation.json",
         receipt_path=tmp_path / "chained" / "receipt.json",
@@ -2603,6 +2657,37 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     )
     assert unpinned_policy_publish.ok is False
     assert unpinned_policy_publish.state == "TRUST_POLICY_REQUIRED"
+
+
+def test_trust_policy_hash_rejects_tamper_and_revocation() -> None:
+    private_key, public_key = generate_trust_keypair()
+    policy = make_trust_policy(policy_id="policy", key_id="key", public_key=public_key, issuer="ci")
+    assert verify_trust_policy(policy)
+    tampered = policy.model_copy(update={"keys": [policy.keys[0].model_copy(update={"issuer": "attacker"})]})
+    assert not verify_trust_policy(tampered)
+
+    checkpoint = LedgerCheckpoint(
+        ledger_path="issuance-ledger.jsonl",
+        ledger_hash="sha256:" + "1" * 64,
+        ledger_tail_hash="sha256:" + "2" * 64,
+        ledger_entry_count=1,
+        subject_receipt_hashes=["sha256:" + "3" * 64],
+        checkpoint_hash="",
+    )
+    checkpoint = checkpoint.model_copy(update={"checkpoint_hash": hash_obj(checkpoint)})
+    attestation = sign_checkpoint(
+        checkpoint=checkpoint,
+        private_key_text=private_key,
+        signer="ci",
+        trust_policy_id="policy",
+        key_id="key",
+        issuer="ci",
+    )
+    assert verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=policy)
+    revoked_policy = policy.model_copy(update={"keys": [policy.keys[0].model_copy(update={"revoked": True})]})
+    revoked_policy = revoked_policy.model_copy(update={"policy_hash": hash_obj(revoked_policy.model_copy(update={"policy_hash": ""}))})
+    assert verify_trust_policy(revoked_policy)
+    assert not verify_checkpoint_attestation(checkpoint=checkpoint, attestation=attestation, trust_policy=revoked_policy)
 
 
 def test_verify_annotation_rejects_withheld_publish_annotation(tmp_path: Path) -> None:

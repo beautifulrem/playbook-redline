@@ -480,6 +480,12 @@ def verify_annotation(
             return PublishPreflightResult(ok=False, state="ANNOTATION_LOCAL_PASS_REQUIRED", reason_code=verification.reason_code)
         if annotation.receipt_hash != receipt.receipt_hash or annotation.report_hash != receipt.report.report_hash:
             return PublishPreflightResult(ok=False, state="ANNOTATION_BINDING_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
+        if (
+            annotation.strength_summary != receipt.strength_summary
+            or annotation.chain_status != receipt.baseline.chain_status
+            or annotation.verification_level != verification.verification_level
+        ):
+            return PublishPreflightResult(ok=False, state="ANNOTATION_BINDING_MISMATCH", reason_code=ReasonCode.RECEIPT_MISMATCH)
     if package is not None and annotation.package_hash != hash_tree(package):
         return PublishPreflightResult(ok=False, state="ANNOTATION_PACKAGE_MISMATCH", reason_code=ReasonCode.RECEIPT_BINDING_FAILED)
     if report_path is not None and annotation.report_hash != _report_hash(report_path):
