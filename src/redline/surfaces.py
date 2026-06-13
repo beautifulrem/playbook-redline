@@ -102,6 +102,43 @@ def capture_edit_provenance(
     )
 
 
+class _PreflightTranscript:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text("", encoding="utf-8")
+
+    def append(self, *, step_id: str, command: str, inputs: dict[str, object], output: dict[str, object], exit_code: int) -> None:
+        entry = {
+            "version": "redline.preflight.transcript.v1",
+            "captured_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "step_id": step_id,
+            "command": command,
+            "input_hash": hash_obj(inputs),
+            "output_hash": hash_obj(output),
+            "exit_code": exit_code,
+        }
+        entry = {**entry, "entry_hash": hash_obj(entry)}
+        with self.path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, sort_keys=True))
+            fh.write("\n")
+
+    @property
+    def transcript_hash(self) -> str:
+        return sha256_bytes(self.path.read_bytes())
+
+
+def _with_preflight_transcript(result: PublishPreflightResult, transcript: _PreflightTranscript | None) -> PublishPreflightResult:
+    if transcript is None:
+        return result
+    return result.model_copy(
+        update={
+            "preflight_transcript_path": str(transcript.path),
+            "preflight_transcript_hash": transcript.transcript_hash,
+        }
+    )
+
+
 def publish_preflight(
     *,
     receipt_path: Path,
@@ -125,13 +162,37 @@ def publish_preflight(
         return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INSIDE_PACKAGE", reason_code=ReasonCode.RECEIPT_BINDING_FAILED)
     if out_dir.exists() and not out_dir.is_dir():
         return PublishPreflightResult(ok=False, state="OUTPUT_PATH_INVALID", reason_code=ReasonCode.DATA_MISSING)
+    transcript = _PreflightTranscript(out_dir / "preflight-transcript.jsonl")
     try:
         package_hash = hash_tree(package)
     except FileNotFoundError:
-        return PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=ReasonCode.FILE_NOT_FOUND)
+        result = PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=ReasonCode.FILE_NOT_FOUND)
+        transcript.append(
+            step_id="package-hash",
+            command="hash_tree(package)",
+            inputs={"package": str(package)},
+            output=result.model_dump(mode="json"),
+            exit_code=1,
+        )
+        return _with_preflight_transcript(result, transcript)
     except (NotADirectoryError, CanonicalizationError) as exc:
         reason = exc.reason_code if isinstance(exc, CanonicalizationError) else ReasonCode.FILE_NOT_FOUND
-        return PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=reason)
+        result = PublishPreflightResult(ok=False, state="PACKAGE_INVALID", reason_code=reason)
+        transcript.append(
+            step_id="package-hash",
+            command="hash_tree(package)",
+            inputs={"package": str(package)},
+            output=result.model_dump(mode="json"),
+            exit_code=1,
+        )
+        return _with_preflight_transcript(result, transcript)
+    transcript.append(
+        step_id="package-hash",
+        command="hash_tree(package)",
+        inputs={"package": str(package)},
+        output={"package_hash": package_hash},
+        exit_code=0,
+    )
     result = verify(
         receipt_path=receipt_path,
         package=package,
@@ -145,61 +206,92 @@ def publish_preflight(
         baseline_receipt_path=baseline_receipt_path,
         level=VerificationLevel.REPLAYED,
     )
+    transcript.append(
+        step_id="verify-replayed",
+        command="verify(level=replayed)",
+        inputs={
+            "receipt_path": str(receipt_path),
+            "package": str(package),
+            "suite_path": str(suite_path),
+            "spec_path": str(spec_path),
+            "report_path": str(report_path),
+            "ledger_checkpoint_path": str(ledger_checkpoint_path),
+            "ledger_attestation_path": str(ledger_attestation_path),
+            "baseline_receipt_path": str(baseline_receipt_path) if baseline_receipt_path is not None else None,
+        },
+        output=result.model_dump(mode="json"),
+        exit_code=0 if result.status == VerificationStatus.VERIFIED else 1,
+    )
     if result.status != VerificationStatus.VERIFIED:
         if result.reason_code == ReasonCode.BASELINE_GENESIS and allow_demo_baseline_genesis:
             pass
         elif result.reason_code == ReasonCode.BASELINE_GENESIS:
-            return PublishPreflightResult(
+            return _with_preflight_transcript(PublishPreflightResult(
                 ok=False,
                 state="CHAINED_PASS_REQUIRED",
                 receipt_hash=result.receipt_hash,
                 package_hash=package_hash,
                 reason_code=result.reason_code,
-            )
+            ), transcript)
         elif result.reason_code == ReasonCode.BASELINE_UNCHAINED:
-            return PublishPreflightResult(
+            return _with_preflight_transcript(PublishPreflightResult(
                 ok=False,
                 state="TRUSTED_LEDGER_CHECKPOINT_REQUIRED",
                 receipt_hash=result.receipt_hash,
                 package_hash=package_hash,
                 reason_code=result.reason_code,
-            )
+            ), transcript)
         else:
-            return PublishPreflightResult(
+            return _with_preflight_transcript(PublishPreflightResult(
                 ok=False,
                 state="LOCAL_PASS_REQUIRED",
                 receipt_hash=result.receipt_hash,
                 package_hash=package_hash,
                 reason_code=result.reason_code,
-            )
+            ), transcript)
     if result.status == VerificationStatus.VERIFIED and result.reason_code not in {ReasonCode.PASS, ReasonCode.BASELINE_GENESIS}:
-        return PublishPreflightResult(
+        return _with_preflight_transcript(PublishPreflightResult(
             ok=False,
             state="LOCAL_PASS_REQUIRED",
             receipt_hash=result.receipt_hash,
             package_hash=package_hash,
             reason_code=result.reason_code,
-        )
+        ), transcript)
     if result.reason_code == ReasonCode.BASELINE_GENESIS or result.chain_status != ChainStatus.CHAINED:
         if not allow_demo_baseline_genesis:
-            return PublishPreflightResult(
+            return _with_preflight_transcript(PublishPreflightResult(
                 ok=False,
                 state="CHAINED_PASS_REQUIRED",
                 receipt_hash=result.receipt_hash,
                 package_hash=package_hash,
                 reason_code=result.reason_code,
-            )
+            ), transcript)
     checkpoint = _load_checkpoint(ledger_checkpoint_path)
     if checkpoint is None:
-        return PublishPreflightResult(
+        blocked = PublishPreflightResult(
             ok=False,
             state="LEDGER_CHECKPOINT_REQUIRED",
             receipt_hash=result.receipt_hash,
             package_hash=package_hash,
             reason_code=ReasonCode.RECEIPT_MISMATCH,
         )
+        transcript.append(
+            step_id="load-ledger-checkpoint",
+            command="load_checkpoint",
+            inputs={"ledger_checkpoint_path": str(ledger_checkpoint_path)},
+            output=blocked.model_dump(mode="json"),
+            exit_code=1,
+        )
+        return _with_preflight_transcript(blocked, transcript)
+    transcript.append(
+        step_id="load-ledger-checkpoint",
+        command="load_checkpoint",
+        inputs={"ledger_checkpoint_path": str(ledger_checkpoint_path)},
+        output=checkpoint.model_dump(mode="json"),
+        exit_code=0,
+    )
     if result.chain_status == ChainStatus.CHAINED and trust_policy_path is None:
-        return PublishPreflightResult(
+        blocked = PublishPreflightResult(
             ok=False,
             state="TRUSTED_LEDGER_CHECKPOINT_REQUIRED",
             receipt_hash=result.receipt_hash,
@@ -209,16 +301,41 @@ def publish_preflight(
             ledger_checkpoint_hash=checkpoint.checkpoint_hash,
             reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
         )
-    if result.chain_status == ChainStatus.CHAINED and not _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash):
-        return PublishPreflightResult(
-            ok=False,
-            state="TRUST_POLICY_REQUIRED",
-            receipt_hash=result.receipt_hash,
-            package_hash=package_hash,
-            report_hash=_report_hash(report_path),
-            ledger_hash=checkpoint.ledger_hash,
-            ledger_checkpoint_hash=checkpoint.checkpoint_hash,
-            reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+        transcript.append(
+            step_id="trust-policy",
+            command="verify_trust_policy",
+            inputs={"trust_policy_path": None, "trust_policy_hash": trust_policy_hash},
+            output=blocked.model_dump(mode="json"),
+            exit_code=1,
+        )
+        return _with_preflight_transcript(blocked, transcript)
+    if result.chain_status == ChainStatus.CHAINED:
+        trust_policy_ok = _trust_policy_matches(trust_policy_path=trust_policy_path, trust_policy_hash=trust_policy_hash)
+        if not trust_policy_ok:
+            blocked = PublishPreflightResult(
+                ok=False,
+                state="TRUST_POLICY_REQUIRED",
+                receipt_hash=result.receipt_hash,
+                package_hash=package_hash,
+                report_hash=_report_hash(report_path),
+                ledger_hash=checkpoint.ledger_hash,
+                ledger_checkpoint_hash=checkpoint.checkpoint_hash,
+                reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
+            )
+            transcript.append(
+                step_id="trust-policy",
+                command="verify_trust_policy",
+                inputs={"trust_policy_path": str(trust_policy_path), "trust_policy_hash": trust_policy_hash},
+                output=blocked.model_dump(mode="json"),
+                exit_code=1,
+            )
+            return _with_preflight_transcript(blocked, transcript)
+        transcript.append(
+            step_id="trust-policy",
+            command="verify_trust_policy",
+            inputs={"trust_policy_path": str(trust_policy_path), "trust_policy_hash": trust_policy_hash},
+            output={"ok": True},
+            exit_code=0,
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     package_archive, annotation = make_receipt_bound_package_archive(
@@ -233,7 +350,23 @@ def publish_preflight(
         verification_level=result.verification_level,
     )
     package_archive_hash = sha256_bytes(package_archive.read_bytes())
-    return PublishPreflightResult(
+    transcript.append(
+        step_id="annotate-package",
+        command="make_receipt_bound_package_archive",
+        inputs={
+            "receipt_path": str(receipt_path),
+            "package": str(package),
+            "annotation_path": str(out_dir / "redline-annotation.json"),
+            "out_path": str(out_dir / "annotated-package.tar.gz"),
+        },
+        output={
+            "package_archive_hash": package_archive_hash,
+            "annotation_hash": annotation.annotation_hash,
+            "annotation_kind": annotation.annotation_kind,
+        },
+        exit_code=0,
+    )
+    return _with_preflight_transcript(PublishPreflightResult(
         ok=True,
         state="DEMO_ANNOTATION_READY" if annotation.annotation_kind == "demo-preview" else "ANNOTATED_PACKAGE_READY",
         receipt_hash=result.receipt_hash,
@@ -245,7 +378,7 @@ def publish_preflight(
         ledger_attestation_hash=annotation.ledger_attestation_hash,
         annotation_hash=annotation.annotation_hash,
         reason_code=result.reason_code,
-    )
+    ), transcript)
 
 
 def make_receipt_bound_package_archive(

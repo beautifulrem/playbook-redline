@@ -4,11 +4,14 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 from typer.testing import CliRunner
@@ -48,7 +51,7 @@ from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, comput
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
-from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite
+from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite, redline_verify_receipt
 from redline.surfaces import (
     capture_edit_provenance,
     compile_spec,
@@ -156,6 +159,21 @@ def test_canonical_number_vectors_and_float_rejection() -> None:
         pass
     else:
         raise AssertionError("raw floats must be rejected")
+
+
+@settings(max_examples=25, deadline=None)
+@given(
+    st.dictionaries(
+        st.text(alphabet=st.characters(blacklist_categories=("Cs",)), min_size=1, max_size=12),
+        st.one_of(st.integers(min_value=-10_000, max_value=10_000), st.booleans(), st.none()),
+        min_size=1,
+        max_size=8,
+    )
+)
+def test_hash_obj_is_order_equivalent(payload: dict[str, object]) -> None:
+    forward = dict(payload.items())
+    reverse = dict(reversed(list(payload.items())))
+    assert hash_obj(forward) == hash_obj(reverse)
 
 
 def test_bad_candidate_withheld_and_good_candidate_pass(tmp_path: Path) -> None:
@@ -1130,6 +1148,177 @@ def test_sandbox_rejects_import_time_loader_read_in_python_fallback(monkeypatch,
     assert artifacts.receipt is None
 
 
+def test_sandbox_rejects_import_time_linecache_read(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    secret = tmp_path / "outside-linecache-secret"
+    secret.write_text("9\n", encoding="utf-8")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_linecache")
+    (package / "candidate_import_time_linecache" / "strategy.py").write_text(
+        "import linecache\n"
+        f"SECRET_SIGNAL = int(linecache.getline({str(secret)!r}, 1).strip() or '9')\n\n"
+        "def signal(bar, state, config):\n"
+        "    return SECRET_SIGNAL\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_linecache",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_configparser_read(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    secret = tmp_path / "outside-secret.ini"
+    secret.write_text("[secret]\nallow=1\n", encoding="utf-8")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_configparser")
+    (package / "candidate_import_time_configparser" / "strategy.py").write_text(
+        "import configparser\n"
+        "parser = configparser.ConfigParser()\n"
+        f"parser.read({str(secret)!r}, encoding='utf-8')\n"
+        "ALLOW = int(parser['secret']['allow'])\n\n"
+        "def signal(bar, state, config):\n"
+        "    return ALLOW\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_configparser",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_runpy_read(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    payload = tmp_path / "outside_payload.py"
+    payload.write_text("ALLOW = 1\n", encoding="utf-8")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_runpy")
+    (package / "candidate_import_time_runpy" / "strategy.py").write_text(
+        "import runpy\n"
+        f"payload = runpy.run_path({str(payload)!r})\n"
+        "ALLOW = int(payload['ALLOW'])\n\n"
+        "def signal(bar, state, config):\n"
+        "    return ALLOW\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_runpy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_genericpath_metadata(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-state.bin"
+    marker.write_bytes(b"12345678")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_genericpath")
+    (package / "candidate_import_time_genericpath" / "strategy.py").write_text(
+        "from genericpath import getsize as gs\n"
+        f"ENTRY = 4 if gs({str(marker)!r}) == 8 else 1\n\n"
+        "def signal(bar, state, config):\n"
+        "    i = int(bar['i'])\n"
+        "    if i < ENTRY:\n"
+        "        return 0\n"
+        "    if i >= int(config.get('exit_bar', 999999)):\n"
+        "        return 0\n"
+        "    return 1\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_genericpath",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_runtime_genericpath_metadata(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-state.bin"
+    marker.write_bytes(b"12345678")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_runtime_genericpath")
+    (package / "candidate_runtime_genericpath" / "strategy.py").write_text(
+        "from genericpath import getsize as gs\n\n"
+        "def signal(bar, state, config):\n"
+        f"    entry = 4 if gs({str(marker)!r}) == 8 else 1\n"
+        "    i = int(bar['i'])\n"
+        "    if i < entry:\n"
+        "        return 0\n"
+        "    if i >= int(config.get('exit_bar', 999999)):\n"
+        "        return 0\n"
+        "    return 1\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_runtime_genericpath",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_logging_filehandler_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-logging-marker"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_logging")
+    (package / "candidate_import_time_logging" / "strategy.py").write_text(
+        "import logging\n"
+        f"handler = logging.FileHandler({str(marker)!r})\n"
+        "handler.close()\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_logging",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
 def test_sandbox_rejects_import_time_path_unlink_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
     package = tmp_path / "package"
@@ -1412,8 +1601,30 @@ def test_replay_hash_is_stable() -> None:
     engine = DeterministicReplayEngine()
     scenario = suite.scenarios[0]
     first = engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate")
-    hashes = {engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate").artifact_hash for _ in range(10)}
+    hashes = {engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate").artifact_hash for _ in range(100)}
     assert hashes == {first.artifact_hash}
+
+
+def test_replay_hash_is_stable_across_parent_hash_seeds() -> None:
+    suite = load_suite(SUITE)
+    scenario = suite.scenarios[0]
+    expected = DeterministicReplayEngine().replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate").artifact_hash
+    script = (
+        "from pathlib import Path\n"
+        "from redline.engine_adapter import DeterministicReplayEngine\n"
+        "from redline.runner import load_suite\n"
+        f"root = Path({str(ROOT)!r})\n"
+        "suite = load_suite(root / 'fixtures/suites/demo_suite.json')\n"
+        f"scenario_id = {scenario.id!r}\n"
+        "scenario = next(item for item in suite.scenarios if item.id == scenario_id)\n"
+        "trace = DeterministicReplayEngine().replay(package=root / 'fixtures/demo_pack/candidate_good', scenario=scenario, role='candidate')\n"
+        "print(trace.artifact_hash)\n"
+    )
+    for seed in ("random", "1", "31337"):
+        env = {**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": str(ROOT / "src")}
+        proc = subprocess.run([sys.executable, "-c", script], check=False, capture_output=True, text=True, cwd=ROOT, env=env, timeout=10)
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == expected
 
 
 def test_worker_command_uses_macos_sandbox_when_available() -> None:
@@ -1562,6 +1773,19 @@ def test_mcp_package_path_defaults_to_replayed_and_checks_proof_sidecars(tmp_pat
     assert result["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
 
 
+def test_mcp_verify_receipt_alias_matches_check_surface(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+
+    check = redline_check_receipt(str(tmp_path / "run" / "receipt.json"), pkg_path=str(PACKAGE), rerun=True)
+    verify_alias = redline_verify_receipt(str(tmp_path / "run" / "receipt.json"), pkg_path=str(PACKAGE), rerun=True)
+
+    assert verify_alias == check
+    assert verify_alias["schema_version"] == "redline.mcp.check.v1"
+    assert verify_alias["verification_level"] == VerificationLevel.REPLAYED.value
+    assert verify_alias["trust_source"] == "untrusted_tool_input"
+
+
 def test_mcp_import_compile_run_and_export_surfaces(tmp_path: Path) -> None:
     imported = redline_import_playbook(str(PACKAGE))
     assert imported["schema_version"] == "redline.mcp.import.v1"
@@ -1645,6 +1869,15 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
     assert untrusted_check["status"] != VerificationStatus.VERIFIED.value
     assert untrusted_check["reason_code"] == ReasonCode.BASELINE_UNCHAINED.value
     assert untrusted_check["trust_source"] == "untrusted_tool_input"
+    untrusted_verify_alias = redline_verify_receipt(
+        str(tmp_path / "chained" / "receipt.json"),
+        pkg_path=str(package),
+        rerun=True,
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert untrusted_verify_alias == untrusted_check
     untrusted_export = redline_export_if_clean(
         str(tmp_path / "chained" / "receipt.json"),
         str(package),
@@ -2199,6 +2432,21 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     assert publish.state == "ANNOTATED_PACKAGE_READY"
     assert publish.ledger_attestation_hash == attestation.attestation_hash
     assert publish.package_archive_hash is not None
+    assert publish.preflight_transcript_path == str(tmp_path / "publish" / "preflight-transcript.jsonl")
+    assert publish.preflight_transcript_hash == sha256_bytes((tmp_path / "publish" / "preflight-transcript.jsonl").read_bytes())
+    preflight_entries = [
+        json.loads(line)
+        for line in (tmp_path / "publish" / "preflight-transcript.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [entry["step_id"] for entry in preflight_entries] == [
+        "package-hash",
+        "verify-replayed",
+        "load-ledger-checkpoint",
+        "trust-policy",
+        "annotate-package",
+    ]
+    for entry in preflight_entries:
+        assert entry["entry_hash"] == hash_obj({key: value for key, value in entry.items() if key != "entry_hash"})
     with tarfile.open(tmp_path / "publish" / "annotated-package.tar.gz", "r:gz") as tar:
         assert ".redline/redline-annotation.json" in tar.getnames()
         annotation_member = tar.extractfile(".redline/redline-annotation.json")
@@ -2739,6 +2987,37 @@ def test_bitget_sponsor_adapter_records_redacted_transcript(tmp_path: Path) -> N
     assert "ACCESS-TIMESTAMP" in calls[0][2]
     assert "ACCESS-PASSPHRASE" in calls[0][2]
     assert calls[0][2]["Idempotency-Key"].startswith("redline-")
+
+
+def test_bitget_sponsor_poll_records_get_readback_transcript(tmp_path: Path) -> None:
+    calls: list[tuple[str, str, dict[str, str], bytes]] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append((method, url, headers, body))
+        return 200, json.dumps({"run_id": "run-42", "version_id": "version-42", "status": "completed"}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="poll-access-key",
+        secret_key="poll-secret-key",
+        passphrase="poll-passphrase",
+        transcript_path=tmp_path / "poll-transcript.jsonl",
+        transport=transport,
+    )
+
+    result = adapter.poll(run_id="run-42")
+
+    assert result.ok is True
+    assert result.state == SponsorState.RUN_COMPLETED
+    assert result.evidence["run_id"] == "run-42"
+    assert calls[0][0] == "GET"
+    assert calls[0][1] == "https://api.bitget.com/api/v1/playbook/run?run_id=run-42"
+    assert calls[0][3] == b""
+    assert calls[0][2]["ACCESS-SIGN"]
+    assert calls[0][2]["Content-Type"] == "application/json"
+    transcript = (tmp_path / "poll-transcript.jsonl").read_text(encoding="utf-8")
+    assert "poll-access-key" not in transcript
+    assert "poll***-key" in transcript
+    assert "/api/v1/playbook/run?run_id=run-42" in transcript
 
 
 def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None:

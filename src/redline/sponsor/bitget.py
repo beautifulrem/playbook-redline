@@ -731,4 +731,11 @@ def _mask(value: str) -> str:
 
 def _redact_url(url: str) -> str:
     parsed = urllib.parse.urlsplit(url)
-    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+    sensitive_keys = {"access_key", "api_key", "key", "passphrase", "secret", "signature", "sign", "token"}
+    query = urllib.parse.urlencode(
+        [
+            (key, _mask(value) if key.lower() in sensitive_keys else value)
+            for key, value in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        ]
+    )
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, ""))

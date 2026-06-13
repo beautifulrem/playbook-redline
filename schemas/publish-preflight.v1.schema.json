@@ -109,6 +109,30 @@
       "default": null,
       "title": "Package Hash"
     },
+    "preflight_transcript_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preflight Transcript Hash"
+    },
+    "preflight_transcript_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preflight Transcript Path"
+    },
     "reason_code": {
       "anyOf": [
         {

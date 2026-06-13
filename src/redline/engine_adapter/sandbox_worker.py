@@ -18,16 +18,30 @@ from redline.models import Bar, ReasonCode
 
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
+_ALLOWED_STATIC_MODULES = {"__future__", "collections", "decimal", "fractions", "math", "statistics", "typing"}
 _FORBIDDEN_ENTROPY_MODULES = {"datetime", "random", "secrets", "time", "uuid"}
 _FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator", "platform"}
 _FORBIDDEN_STATIC_MODULES = {
     "builtins",
     "cffi",
+    "configparser",
     "ctypes",
+    "dbm",
+    "fileinput",
+    "genericpath",
+    "glob",
     "importlib",
     "io",
+    "linecache",
+    "logging",
+    "ntpath",
     "os",
+    "pathlib",
+    "posixpath",
+    "pydoc",
+    "runpy",
     "shutil",
+    "shelve",
     "sqlite3",
     "socket",
     "subprocess",
@@ -127,12 +141,15 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
             "os.chmod",
             "os.chown",
             "os.link",
+            "os.listdir",
             "os.mkdir",
             "os.posix_spawn",
             "os.remove",
             "os.rename",
             "os.rmdir",
+            "os.scandir",
             "os.spawn",
+            "os.stat",
             "os.symlink",
             "os.system",
             "os.truncate",
@@ -150,8 +167,10 @@ def _make_audit_hook(allowed_read_roots: tuple[Path, ...]):
         }
         if event.startswith(blocked_prefixes) or event in blocked_events:
             raise RuntimeError(f"{reason}:{event}")
-        if event == "exec" and args and str(getattr(args[0], "co_filename", "")).startswith("<"):
-            raise RuntimeError(f"{reason}:exec-dynamic")
+        if event == "exec" and args:
+            filename = str(getattr(args[0], "co_filename", ""))
+            if filename.startswith("<") and filename != "<string>" and not filename.startswith("<frozen "):
+                raise RuntimeError(f"{reason}:exec-dynamic")
         if event == "import" and args:
             module_name = str(args[0])
             module_root = module_name.split(".", 1)[0]
@@ -199,10 +218,14 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 module_root = alias.name.split(".", 1)[0]
+                if module_root not in _ALLOWED_STATIC_MODULES:
+                    raise RuntimeError(f"{reason}:import-{module_root}")
                 if module_root in _FORBIDDEN_STATIC_MODULES:
                     raise RuntimeError(f"{reason}:import-{module_root}")
         elif isinstance(node, ast.ImportFrom):
             module_root = (node.module or "").split(".", 1)[0]
+            if module_root not in _ALLOWED_STATIC_MODULES:
+                raise RuntimeError(f"{reason}:import-{module_root}")
             if module_root in _FORBIDDEN_STATIC_MODULES:
                 raise RuntimeError(f"{reason}:import-{module_root}")
             for alias in node.names:
@@ -303,8 +326,8 @@ def _read_config(path: Path) -> dict[str, object]:
 
 def _run_signals(*, package_dir: Path, bars: list[Bar], allowed_read_roots: tuple[Path, ...]) -> list[str]:
     config = _read_config(package_dir / "config.json")
-    strategy = _load_strategy(package_dir / "strategy.py")
     sys.addaudithook(_make_audit_hook(allowed_read_roots))
+    strategy = _load_strategy(package_dir / "strategy.py")
     signals: list[str] = []
     state: dict[str, object] = {}
     for bar in bars:

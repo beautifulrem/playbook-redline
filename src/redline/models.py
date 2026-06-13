@@ -336,6 +336,8 @@ class PublishPreflightResult(RedlineModel):
     ledger_checkpoint_hash: str | None = None
     ledger_attestation_hash: str | None = None
     annotation_hash: str | None = None
+    preflight_transcript_path: str | None = None
+    preflight_transcript_hash: str | None = None
     sponsor_evidence: dict[str, str] = Field(default_factory=dict)
     reason_code: ReasonCode | None = None
 
