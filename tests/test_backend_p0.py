@@ -47,12 +47,14 @@ from redline.models import (
     VerificationLevel,
     VerificationStatus,
 )
+from redline.package_identity import build_identity_lock, identity_lock_path, write_identity_lock
 from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE
 from redline.probes.drawdown import MaxDrawdownProbe
 from redline.proof_kernel import REQUIRED_PROOFS, decide, decision_proof_id
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, create_ledger_checkpoint, make_decision_proof
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
+from redline.spec_compiler import OutOfScopeError
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite, redline_verify_receipt
 from redline.surfaces import (
@@ -2612,6 +2614,139 @@ def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> 
     assert artifacts.receipt.edit_provenance == provenance
 
 
+def test_compile_out_of_scope_intent_does_not_generate_gate(tmp_path: Path) -> None:
+    text_spec = tmp_path / "profit.txt"
+    text_spec.write_text("帮我把杠杆调到能赚最多，越激进越好。", encoding="utf-8")
+
+    try:
+        compile_spec(text_spec)
+    except OutOfScopeError as exc:
+        assert "out_of_scope" in str(exc)
+    else:
+        raise AssertionError("out-of-scope intent must not generate a RedlineSpec")
+
+    cli_result = CliRunner().invoke(app, ["compile", str(text_spec), "--json"])
+    assert cli_result.exit_code == 2
+    payload = json.loads(cli_result.stdout)
+    assert payload["reason_code"] == ReasonCode.OUT_OF_SCOPE.value
+    mcp_result = redline_compile_spec(str(text_spec))
+    assert mcp_result["schema_version"] == "redline.mcp.error.v1"
+    assert mcp_result["reason_code"] == ReasonCode.OUT_OF_SCOPE.value
+
+    mixed_spec = tmp_path / "mixed.txt"
+    mixed_spec.write_text("Max drawdown <= 8%; then tune leverage to maximize profit.", encoding="utf-8")
+    try:
+        compile_spec(mixed_spec)
+    except OutOfScopeError:
+        pass
+    else:
+        raise AssertionError("mixed supported and unsupported intent must fail closed")
+
+
+def test_qwen_out_of_scope_does_not_fallback_to_local_compile(tmp_path: Path) -> None:
+    text_spec = tmp_path / "intent.txt"
+    text_spec.write_text("Max drawdown <= 8%; no entry before bar 3; trade budget 20.", encoding="utf-8")
+
+    def transport(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        return 200, json.dumps({"choices": [{"message": {"content": json.dumps({"status": "out_of_scope"})}}]}).encode()
+
+    try:
+        compile_spec(text_spec, use_qwen=True, qwen_model="qwen-test", qwen_api_key="test-key", qwen_transport=transport)
+    except OutOfScopeError:
+        pass
+    else:
+        raise AssertionError("qwen out_of_scope must not fall back to local compile")
+
+
+def test_import_write_lock_and_receipt_bind_playbook_identity(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+
+    imported = import_package(package, write_lock=True)
+
+    assert imported.identity_lock_hash is not None
+    lock_path = identity_lock_path(package)
+    assert lock_path.exists()
+    lock = build_identity_lock(package)
+    assert imported.identity_lock_hash == lock.lock_hash
+    assert "baseline/strategy.py" in {item.path for item in lock.locked_files}
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is not None
+    assert artifacts.receipt.package.identity_lock_hash == lock.lock_hash
+    result = verify(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert result.reason_code == ReasonCode.BASELINE_GENESIS
+
+
+def test_replayed_rejects_tampered_playbook_identity_lock_source(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    write_identity_lock(package)
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.receipt is not None
+    (package / "baseline" / "strategy.py").write_text(
+        (package / "baseline" / "strategy.py").read_text(encoding="utf-8") + "\n# tamper\n",
+        encoding="utf-8",
+    )
+
+    result = verify(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        level=VerificationLevel.REPLAYED,
+    )
+
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+
+
+def test_missing_playbook_identity_lock_is_fail_closed(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    identity_lock_path(package).unlink()
+
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_good",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    imported = CliRunner().invoke(app, ["import", str(package), "--json"])
+    assert imported.exit_code == 4
+    payload = json.loads(imported.stdout)
+    assert payload["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+    initialized = CliRunner().invoke(app, ["import", str(package), "--write-lock", "--json"])
+    assert initialized.exit_code == 0
+    payload = json.loads(initialized.stdout)
+    assert payload["identity_lock_hash"].startswith("sha256:")
+
+
 def test_import_compile_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None:
     runner = CliRunner()
     missing_package = runner.invoke(app, ["import", str(tmp_path / "missing-package"), "--json"])
@@ -3887,6 +4022,27 @@ def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
     assert result.evidence["transcript_hash"] == sha256_bytes((tmp_path / "transcript.jsonl").read_bytes())
 
 
+def test_bitget_publish_requires_durable_publish_identifier(tmp_path: Path) -> None:
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        assert url.endswith("/api/v1/playbook/publish")
+        return 200, json.dumps({"code": "00000", "data": {"status": "ok"}}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    adapter.proof_eligible = True
+
+    result = adapter.publish(draft_id="draft-1")
+
+    assert result.ok is False
+    assert result.state == SponsorState.MISMATCH
+    assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
+
+
 def test_sponsor_evidence_verifier() -> None:
     result = validate_sponsor_evidence_shape(ROOT / "artifacts/sponsor/demo-readback.json")
     assert result.ok is False
@@ -4897,6 +5053,7 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
         "ledger-checkpoint.v1.schema.json",
         "package-annotation.v1.schema.json",
         "package-import.v1.schema.json",
+        "playbook-identity-lock.v1.schema.json",
         "proof.v1.schema.json",
         "proof-verification.v1.schema.json",
         "publish-preflight.v1.schema.json",

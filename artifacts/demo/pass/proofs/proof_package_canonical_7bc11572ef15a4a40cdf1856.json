@@ -1,0 +1,11 @@
+{
+  "proof_id": "proof:package_canonical:7bc11572ef15a4a40cdf1856",
+  "phase": "import",
+  "kind": "package_canonical",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:92dd7dbdc1876eb27a3f83f03f31a6a78e37c51d84c92ae4e5b2660d363c1fbf",
+  "artifact_hash": "sha256:7bc11572ef15a4a40cdf185639a3c244b225653f56d1d3233b3670042cfd9c1f",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 --package <package> --suite <suite> --spec <spec>",
+  "meta": {}
+}

@@ -718,9 +718,7 @@ def _publish_success_evidence(evidence: dict[str, str]) -> bool:
     status = evidence.get("status")
     if status is not None and status.lower() not in {"published", "success", "succeeded", "completed", "ok"}:
         return False
-    if any(key in evidence and evidence[key] for key in ("publish_id", "published_version_id", "version_id")):
-        return True
-    return status is not None
+    return any(key in evidence and evidence[key] for key in ("publish_id", "published_version_id"))
 
 
 def _mask(value: str) -> str:

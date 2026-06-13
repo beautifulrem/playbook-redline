@@ -3,7 +3,10 @@
   "package": {
     "identity_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
     "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
-    "canonical_tar_rules": "redline.v9.canonical-tree"
+    "canonical_tar_rules": "redline.v9.canonical-tree",
+    "adapter_id": "python_strategy_sandbox",
+    "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
+    "identity_lock_path": "fixtures/demo_pack/playbook_identity.lock"
   },
   "edit_provenance": {
     "tool": "fixture",
@@ -90,8 +93,8 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:9ddd4bb631676334c1cf7859",
-      "proof:package_canonical:d626e536e38620bff850851f",
+      "proof:decision:a612f3f676b39cd98387cf0b",
+      "proof:package_canonical:7bc11572ef15a4a40cdf1856",
       "proof:probe:0b22c22a0727d2c30c2de30e",
       "proof:probe:10142a4c4d62b0f91a288df0",
       "proof:probe:3b8c87af8a7a1db1b6e073f7",
@@ -106,8 +109,8 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:94c2985f53f03de1b322aeb0",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:9ddd4bb631676334c1cf7859",
-      "proof:package_canonical:d626e536e38620bff850851f",
+      "proof:decision:a612f3f676b39cd98387cf0b",
+      "proof:package_canonical:7bc11572ef15a4a40cdf1856",
       "proof:probe:0b22c22a0727d2c30c2de30e",
       "proof:probe:10142a4c4d62b0f91a288df0",
       "proof:probe:3b8c87af8a7a1db1b6e073f7",
@@ -123,14 +126,14 @@
   },
   "proofs": [
     {
-      "proof_id": "proof:package_canonical:d626e536e38620bff850851f",
+      "proof_id": "proof:package_canonical:7bc11572ef15a4a40cdf1856",
       "phase": "import",
       "kind": "package_canonical",
       "verdict_bearing": true,
       "inputs_hash": "sha256:92dd7dbdc1876eb27a3f83f03f31a6a78e37c51d84c92ae4e5b2660d363c1fbf",
-      "artifact_hash": "sha256:d626e536e38620bff850851fcb3a3a2ce09cbd5a65e5ce1fd398ae613db7af5b",
+      "artifact_hash": "sha256:7bc11572ef15a4a40cdf185639a3c244b225653f56d1d3233b3670042cfd9c1f",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:d626e536e38620bff850851f --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 --package <package> --suite <suite> --spec <spec>",
       "meta": {}
     },
     {
@@ -493,14 +496,14 @@
       "meta": {}
     },
     {
-      "proof_id": "proof:decision:9ddd4bb631676334c1cf7859",
+      "proof_id": "proof:decision:a612f3f676b39cd98387cf0b",
       "phase": "decide",
       "kind": "decision",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:51cc5390d9934dd83bc6ed442db3e3b1ae3cca2bdaafbb4995086c04320ba4d5",
-      "artifact_hash": "sha256:1c28c358f3743575a9ad7a19078ec725f580312cf35a053109dad78ebc6ddb3d",
+      "inputs_hash": "sha256:86acab39466dfeaf72cff830427c504720f80649b6c89ceb676d2163ed30977d",
+      "artifact_hash": "sha256:11159eb904407f4403f37ed164f2476213851ebbc5fc38d8a4b9810fc6d61046",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:9ddd4bb631676334c1cf7859 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:a612f3f676b39cd98387cf0b --package <package> --suite <suite> --spec <spec>",
       "meta": {}
     }
   ],
@@ -525,7 +528,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:5426c4be46fb15d42723edcfb76fae4ab8ad3135e11acf88b9861cafcaf7d186",
+    "report_hash": "sha256:08ae6899f14446f0f479d8cdbdb1c00b2388452bfd3478bf855aff7ae000fa6d",
     "attribution_report_hash": null
   },
   "publish": {
@@ -538,5 +541,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:7df6b88087fa8205054f4f618e3a0f398b9e8976316bcdfa7b0fb0b9e113b4f8"
+  "receipt_hash": "sha256:d0aed1b0c2802a946056c0167b399f1f92aa77610ae26467516b0ed91ed80fa0"
 }

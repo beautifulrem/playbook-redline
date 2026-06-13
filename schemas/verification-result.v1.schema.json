@@ -34,7 +34,8 @@
         "FILE_NOT_FOUND",
         "PARSE_ERROR",
         "SCHEMA_INVALID",
-        "VERSION_UNSUPPORTED"
+        "VERSION_UNSUPPORTED",
+        "OUT_OF_SCOPE"
       ],
       "title": "ReasonCode",
       "type": "string"

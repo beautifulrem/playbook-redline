@@ -5,8 +5,8 @@
   "chain_status": "genesis",
   "required_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:27d76fe540a47c41fdede72e",
-    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:decision:7747239903038908783dfc3b",
+    "proof:package_canonical:41ab0f368e7162f567a761e8",
     "proof:probe:1ea0185c616b3d37f783091d",
     "proof:probe:2b0b31d7e8e89665ae2fab01",
     "proof:probe:a13bf024e0d494f47d38b48f",
@@ -19,8 +19,8 @@
   ],
   "satisfied_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:27d76fe540a47c41fdede72e",
-    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:decision:7747239903038908783dfc3b",
+    "proof:package_canonical:41ab0f368e7162f567a761e8",
     "proof:probe:1ea0185c616b3d37f783091d",
     "proof:probe:2b0b31d7e8e89665ae2fab01",
     "proof:probe:a13bf024e0d494f47d38b48f",

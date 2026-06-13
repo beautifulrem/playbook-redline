@@ -59,6 +59,11 @@ Expected demo outcomes:
 The bundled suite contains two 24-bar BTCUSDT windows and three blocking probes:
 max drawdown, crash-window no-entry, and trade budget.
 
+`fixtures/demo_pack/playbook_identity.lock` pins the adapter-supported Playbook
+source boundary. `redline import --write-lock fixtures/demo_pack --json`
+refreshes that lock; receipts record `package.identity_lock_hash`, and replayed
+verification fails closed if a locked source file drifts.
+
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
 Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses `--rerun` with the package, suite, and spec inputs.
 Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an Ed25519-signed ledger attestation verified against a protected trust policy.
@@ -75,7 +80,7 @@ uv run redline run fixtures/demo_pack \
   --json
 
 uv run redline verify-proof artifacts/demo/pass/receipt.json \
-  --proof-id proof:package_canonical:d626e536e38620bff850851f \
+  --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 \
   --package fixtures/demo_pack \
   --suite fixtures/suites/demo_suite.json \
   --spec fixtures/specs/redline_spec.json \
@@ -139,24 +144,22 @@ scripts/verify-sponsor-run.sh artifacts/sponsor/demo-readback.json artifacts/dem
 
 The script emits one machine-parseable JSON document containing both the receipt
 check and sponsor read-back result. It runs receipt verification in replayed mode
-with package binding, then calls `redline verify-sponsor-run`, which requires
-Bitget credentials and rechecks the recorded `run_id` through the sponsor
-read-back endpoint. The live read-back must match `status=completed`, `version_id`, and
-`metrics_output_hash`; otherwise it exits fail-closed. The bundled recorded
-file is not treated as live Bitget proof by itself, so
-`BITGET_CREDENTIALS_REQUIRED` / `SPONSOR_EVIDENCE_UNVERIFIED` is expected until
-real credentials are configured.
+with package binding, then calls `redline verify-sponsor-run`. The bundled
+recorded file is not treated as live Bitget proof by itself, so
+`BITGET_CREDENTIALS_REQUIRED` / `SPONSOR_EVIDENCE_UNVERIFIED` is expected unless
+a sponsor transport and credentials are configured.
 
-`redline publish --execute` is a wrapper around the live sponsor adapter. It
-requires `REDLINE_BITGET_ACCESS_KEY`, `REDLINE_BITGET_SECRET_KEY`, and
-`REDLINE_BITGET_PASSPHRASE` (or the same names without the `REDLINE_` prefix),
-writes a redacted `sponsor-transcript.jsonl`, persists `sponsor_evidence`, and
-still refuses final publish unless the local preflight is already chained and
-signed. `--final-publish` additionally requires `--execute`,
-`--yes-final-publish`, and `REDLINE_ALLOW_FINAL_PUBLISH=1`; only a live,
-credentialed readback can reach `READBACK_VERIFIED`. The current adapter uses
-injectable mock transport for tests and a conservative HMAC-signed HTTP wrapper
-for live Bitget endpoints.
+`redline publish --execute` is an experimental sponsor-adapter wrapper, not an
+official Bitget publish hook. It requires `REDLINE_BITGET_ACCESS_KEY`,
+`REDLINE_BITGET_SECRET_KEY`, and `REDLINE_BITGET_PASSPHRASE` (or the same names
+without the `REDLINE_` prefix), writes a redacted `sponsor-transcript.jsonl`,
+persists `sponsor_evidence`, and still refuses final publish unless the local
+preflight is already chained and signed. `--final-publish` additionally requires
+`--execute`, `--yes-final-publish`, and `REDLINE_ALLOW_FINAL_PUBLISH=1`; a
+credentialed response must include durable publish/readback identifiers before it
+can reach `READBACK_VERIFIED` or `PUBLISHED`. The current adapter uses injectable
+mock transport for tests plus a conservative HMAC-signed HTTP wrapper for a
+future documented Playbook sponsor contract.
 
 ## Repository Layout
 

@@ -50,6 +50,7 @@ class ReasonCode(StrEnum):
     PARSE_ERROR = "PARSE_ERROR"
     SCHEMA_INVALID = "SCHEMA_INVALID"
     VERSION_UNSUPPORTED = "VERSION_UNSUPPORTED"
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
 
 class ProofKind(StrEnum):
@@ -307,6 +308,23 @@ class PackageInfo(RedlineModel):
     identity_hash: str
     manifest_hash: str
     canonical_tar_rules: str = "redline.v9.canonical-tree"
+    adapter_id: str = "python_strategy_sandbox"
+    identity_lock_hash: str
+    identity_lock_path: str
+
+
+class PackageIdentityFile(RedlineModel):
+    path: str
+    hash: str
+
+
+class PlaybookIdentityLock(RedlineModel):
+    version: Literal["redline.playbook_identity.v1"] = "redline.playbook_identity.v1"
+    adapter_id: str = "python_strategy_sandbox"
+    canonical_tar_rules: str = "redline.v9.canonical-tree"
+    locked_files: list[PackageIdentityFile] = Field(min_length=1)
+    identity_hash: str
+    lock_hash: str
 
 
 class EditProvenance(RedlineModel):
@@ -322,6 +340,9 @@ class PackageImportResult(RedlineModel):
     path: str
     identity_hash: str
     files: list[str]
+    adapter_id: str = "python_strategy_sandbox"
+    identity_lock_hash: str
+    identity_lock_path: str
 
 
 class PublishPreflightResult(RedlineModel):

@@ -18,6 +18,7 @@ from redline.proof_kernel import REQUIRED_PROOFS
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.receipt import IssuanceLedgerConflict
 from redline.schemas import export_schemas as export_schema_files
+from redline.spec_compiler import OutOfScopeError
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import (
     capture_edit_provenance,
@@ -44,6 +45,7 @@ EXIT_BY_REASON: dict[ReasonCode, int] = {
     ReasonCode.PARSE_ERROR: 2,
     ReasonCode.SCHEMA_INVALID: 2,
     ReasonCode.VERSION_UNSUPPORTED: 2,
+    ReasonCode.OUT_OF_SCOPE: 2,
     ReasonCode.NEW_BLOCK_BREACH: 3,
     ReasonCode.RECEIPT_MISMATCH: 4,
     ReasonCode.RECEIPT_BINDING_FAILED: 4,
@@ -117,10 +119,11 @@ def run(
 @app.command("import")
 def import_cmd(
     package: Path,
+    write_lock: bool = typer.Option(False, "--write-lock", help="Write or refresh playbook_identity.lock before importing."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     try:
-        result = import_package(package)
+        result = import_package(package, write_lock=write_lock)
     except FileNotFoundError:
         _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "package path not found", package)
     except NotADirectoryError:
@@ -133,6 +136,8 @@ def import_cmd(
         table = Table("field", "value")
         table.add_row("path", result.path)
         table.add_row("identity_hash", result.identity_hash)
+        table.add_row("adapter_id", result.adapter_id)
+        table.add_row("identity_lock_hash", result.identity_lock_hash)
         table.add_row("files", str(len(result.files)))
         console.print(table)
 
@@ -152,6 +157,8 @@ def compile_cmd(
         _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, "spec source not found", source)
     except json.JSONDecodeError:
         _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "spec JSON is invalid", source)
+    except OutOfScopeError:
+        _exit_bad_input(ReasonCode.OUT_OF_SCOPE, json_out, "spec source is outside the adapter contract", source)
     except OSError:
         _exit_bad_input(ReasonCode.DATA_MISSING, json_out, "spec source could not be read", source)
     except (ValidationError, ValueError):

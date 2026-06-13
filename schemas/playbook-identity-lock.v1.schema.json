@@ -1,0 +1,65 @@
+{
+  "$defs": {
+    "PackageIdentityFile": {
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "title": "Hash",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "hash"
+      ],
+      "title": "PackageIdentityFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "adapter_id": {
+      "default": "python_strategy_sandbox",
+      "title": "Adapter Id",
+      "type": "string"
+    },
+    "canonical_tar_rules": {
+      "default": "redline.v9.canonical-tree",
+      "title": "Canonical Tar Rules",
+      "type": "string"
+    },
+    "identity_hash": {
+      "title": "Identity Hash",
+      "type": "string"
+    },
+    "lock_hash": {
+      "title": "Lock Hash",
+      "type": "string"
+    },
+    "locked_files": {
+      "items": {
+        "$ref": "#/$defs/PackageIdentityFile"
+      },
+      "minItems": 1,
+      "title": "Locked Files",
+      "type": "array"
+    },
+    "version": {
+      "const": "redline.playbook_identity.v1",
+      "default": "redline.playbook_identity.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "locked_files",
+    "identity_hash",
+    "lock_hash"
+  ],
+  "title": "PlaybookIdentityLock",
+  "type": "object"
+}

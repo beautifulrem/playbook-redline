@@ -29,24 +29,33 @@ from redline.models import (
     VerificationStatus,
 )
 from redline.canonical import sha256_bytes
+from redline.package_identity import load_identity_lock, write_identity_lock
 from redline.proof_kernel import decision_envelope_from_receipt
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, assert_local_pass, make_annotated_package_archive, make_package_archive
 from redline.spec_compiler import LLMTransport, compile_text_spec
 from redline.verifier import load_receipt, verify
 
 
-def import_package(path: Path) -> PackageImportResult:
+def import_package(path: Path, *, write_lock: bool = False) -> PackageImportResult:
     root = path.resolve()
     if not root.exists():
         raise FileNotFoundError(root)
     if not root.is_dir():
         raise NotADirectoryError(root)
+    lock = write_identity_lock(root) if write_lock else load_identity_lock(root)
     files = [
         file_path.relative_to(root).as_posix()
         for file_path in sorted(p for p in root.rglob("*") if p.is_file())
         if "__pycache__" not in file_path.parts and not file_path.name.endswith((".pyc", ".pyo"))
     ]
-    return PackageImportResult(path=str(root), identity_hash=hash_tree(root), files=files)
+    return PackageImportResult(
+        path=str(root),
+        identity_hash=hash_tree(root),
+        files=files,
+        adapter_id=lock.adapter_id,
+        identity_lock_hash=lock.lock_hash,
+        identity_lock_path=str(root / "playbook_identity.lock"),
+    )
 
 
 def compile_spec(

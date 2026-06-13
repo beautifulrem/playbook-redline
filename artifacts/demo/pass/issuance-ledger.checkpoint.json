@@ -1,12 +1,12 @@
 {
   "version": "redline.ledger.checkpoint.v1",
   "ledger_path": "issuance-ledger.jsonl",
-  "ledger_hash": "sha256:395d46aacbf554a25a956c649be2845a03c334800f59f1a1f56cbbf3eb886058",
-  "ledger_tail_hash": "sha256:c85a39e0783e606be938683664536d0cd65b876ef77d7eb4c142c044be04bedf",
+  "ledger_hash": "sha256:4da19652525ddc3d2098d0a35cb52ff8b578a240bad14213676a1d6c1fad1456",
+  "ledger_tail_hash": "sha256:92d9dbe48b748a939b3ab1569596b2acda26aea46e33c03fd77ccc327f3226d7",
   "ledger_entry_count": 1,
   "subject_receipt_hashes": [
-    "sha256:7df6b88087fa8205054f4f618e3a0f398b9e8976316bcdfa7b0fb0b9e113b4f8"
+    "sha256:d0aed1b0c2802a946056c0167b399f1f92aa77610ae26467516b0ed91ed80fa0"
   ],
   "anchor_kind": "local-artifact",
-  "checkpoint_hash": "sha256:8a2ac1902dd8c0aa1f87d8097a301d87ba55228737719d2ab2ced795cacc30b2"
+  "checkpoint_hash": "sha256:8b45cde019533c4bc60a12fae2d909989ac8bdc780c0f6cb13d0ef6ddb29cbc4"
 }

@@ -1,6 +1,11 @@
 {
   "additionalProperties": false,
   "properties": {
+    "adapter_id": {
+      "default": "python_strategy_sandbox",
+      "title": "Adapter Id",
+      "type": "string"
+    },
     "files": {
       "items": {
         "type": "string"
@@ -10,6 +15,14 @@
     },
     "identity_hash": {
       "title": "Identity Hash",
+      "type": "string"
+    },
+    "identity_lock_hash": {
+      "title": "Identity Lock Hash",
+      "type": "string"
+    },
+    "identity_lock_path": {
+      "title": "Identity Lock Path",
       "type": "string"
     },
     "path": {
@@ -26,7 +39,9 @@
   "required": [
     "path",
     "identity_hash",
-    "files"
+    "files",
+    "identity_lock_hash",
+    "identity_lock_path"
   ],
   "title": "PackageImportResult",
   "type": "object"

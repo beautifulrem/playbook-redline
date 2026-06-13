@@ -101,6 +101,7 @@ def iter_canonical_files(path: Path) -> Iterator[tuple[str, Path]]:
             or "/__pycache__/" in rel
             or rel.endswith(".pyc")
             or rel.endswith(".pyo")
+            or rel == "playbook_identity.lock"
         ):
             continue
         try:

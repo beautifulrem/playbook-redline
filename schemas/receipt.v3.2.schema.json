@@ -262,6 +262,11 @@
     "PackageInfo": {
       "additionalProperties": false,
       "properties": {
+        "adapter_id": {
+          "default": "python_strategy_sandbox",
+          "title": "Adapter Id",
+          "type": "string"
+        },
         "canonical_tar_rules": {
           "default": "redline.v9.canonical-tree",
           "title": "Canonical Tar Rules",
@@ -271,6 +276,14 @@
           "title": "Identity Hash",
           "type": "string"
         },
+        "identity_lock_hash": {
+          "title": "Identity Lock Hash",
+          "type": "string"
+        },
+        "identity_lock_path": {
+          "title": "Identity Lock Path",
+          "type": "string"
+        },
         "manifest_hash": {
           "title": "Manifest Hash",
           "type": "string"
@@ -278,7 +291,9 @@
       },
       "required": [
         "identity_hash",
-        "manifest_hash"
+        "manifest_hash",
+        "identity_lock_hash",
+        "identity_lock_path"
       ],
       "title": "PackageInfo",
       "type": "object"
@@ -463,7 +478,8 @@
         "FILE_NOT_FOUND",
         "PARSE_ERROR",
         "SCHEMA_INVALID",
-        "VERSION_UNSUPPORTED"
+        "VERSION_UNSUPPORTED",
+        "OUT_OF_SCOPE"
       ],
       "title": "ReasonCode",
       "type": "string"

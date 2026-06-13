@@ -63,8 +63,8 @@
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids": [
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:27d76fe540a47c41fdede72e",
-      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:decision:7747239903038908783dfc3b",
+      "proof:package_canonical:41ab0f368e7162f567a761e8",
       "proof:probe:1ea0185c616b3d37f783091d",
       "proof:probe:2b0b31d7e8e89665ae2fab01",
       "proof:probe:a13bf024e0d494f47d38b48f",
@@ -77,8 +77,8 @@
     ],
     "satisfied_proof_ids": [
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:27d76fe540a47c41fdede72e",
-      "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+      "proof:decision:7747239903038908783dfc3b",
+      "proof:package_canonical:41ab0f368e7162f567a761e8",
       "proof:probe:1ea0185c616b3d37f783091d",
       "proof:probe:2b0b31d7e8e89665ae2fab01",
       "proof:probe:a13bf024e0d494f47d38b48f",
@@ -92,7 +92,7 @@
     "status": "withheld"
   },
   "proof_ids": [
-    "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
+    "proof:package_canonical:41ab0f368e7162f567a761e8",
     "proof:edit_provenance:c2202c44cdf225234b155589",
     "proof:spec_compile:793a7818c323072d18bcf8d8",
     "proof:replay:c149d9a88c7c8e1a3d333339",
@@ -106,18 +106,18 @@
     "proof:coverage:07629775749a0c50afc55033",
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:8670b636e72e32d864f7e227",
-    "proof:decision:27d76fe540a47c41fdede72e"
+    "proof:decision:7747239903038908783dfc3b"
   ],
   "proofs": [
     {
-      "artifact_hash": "sha256:4cd04e9bfa40c96d2f823de9fe36cd405e48b48dddd3cece1f4f89a056f7f01d",
+      "artifact_hash": "sha256:41ab0f368e7162f567a761e869680fc3d9a09a063baceac2b94fe07a5f3acdc2",
       "assertions": [],
       "inputs_hash": "sha256:fd857c79df5dac9e88e8f8982602841a57526d6a3d04c704ffa9d049ceb61209",
       "kind": "package_canonical",
       "meta": {},
       "phase": "import",
-      "proof_id": "proof:package_canonical:4cd04e9bfa40c96d2f823de9",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:4cd04e9bfa40c96d2f823de9 --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:package_canonical:41ab0f368e7162f567a761e8",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:41ab0f368e7162f567a761e8 --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     },
     {
@@ -480,14 +480,14 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:7715934c025af026dc585b2ac1bb16df9e89e1b2f57feaa71d52adf0fc5b6089",
+      "artifact_hash": "sha256:0e09ed54e11b922318147df31ec4cb638139df7b29814d76f4c9e4ff5dccd3b9",
       "assertions": [],
-      "inputs_hash": "sha256:70ec73f1684812aa0c9b22828ba10865f9b8affa4dcb926ae3ae1899611a17ba",
+      "inputs_hash": "sha256:c3338047e2fda40d9c12904d7cb830adf54b767566d4e7fadf5cf77971b81599",
       "kind": "decision",
       "meta": {},
       "phase": "decide",
-      "proof_id": "proof:decision:27d76fe540a47c41fdede72e",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:27d76fe540a47c41fdede72e --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:decision:7747239903038908783dfc3b",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:7747239903038908783dfc3b --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     }
   ],
@@ -501,8 +501,8 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:59eb3d8f042d5ca0df27b6171ebcc5a69e535f7c223e5f6b2c683aa9b7ca4f58",
-  "report_hash": "sha256:153df3b1f9903cb06c7beb5933179b83d78722b8cb7337c6c4efac1d24a4f9c7",
+  "receipt_hash": "sha256:31c7b9f6d805292b388aaba1711928e7225b24becc5cab6dc88a835f466c17b0",
+  "report_hash": "sha256:8e4a2778321eaf27cb2ad92a79fb3defd39f9ec2ffa7d463acb6a473b142d38d",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

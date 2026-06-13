@@ -113,6 +113,9 @@ def issue_receipt(
     suite_source_path: str,
     engine_source_tree_hash: str,
     runner_lock_hash: str,
+    package_adapter_id: str,
+    package_identity_lock_hash: str,
+    package_identity_lock_path: str,
     report_hash: str = "sha256:pending",
     edit_provenance: EditProvenance | None = None,
     include_baseline_receipt: bool = False,
@@ -134,7 +137,13 @@ def issue_receipt(
     ]
     result_status = "pass" if envelope.status == Status.PASS else "withheld"
     receipt = Receipt(
-        package=PackageInfo(identity_hash=package_hash, manifest_hash=package_hash),
+        package=PackageInfo(
+            identity_hash=package_hash,
+            manifest_hash=package_hash,
+            adapter_id=package_adapter_id,
+            identity_lock_hash=package_identity_lock_hash,
+            identity_lock_path=package_identity_lock_path,
+        ),
         edit_provenance=edit_provenance
         or EditProvenance(
             prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),

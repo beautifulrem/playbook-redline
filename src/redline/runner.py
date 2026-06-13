@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from redline.canonical import hash_file, hash_obj, hash_tree
+from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.engine_adapter import DeterministicReplayEngine, ReplayEngineError
 from redline.models import (
     Assertion,
@@ -33,6 +33,7 @@ from redline.models import (
     LedgerCheckpointAttestation,
     TrustPolicy,
 )
+from redline.package_identity import load_identity_lock
 from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE, TRUSTED_PROBE_TYPES
 from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof, make_verify_proof_reproduce
@@ -128,6 +129,12 @@ def run_redline(
     _validate_spec_suite_bindings(spec, suite)
     spec_hash = hash_obj(spec)
     package_hash = hash_tree(package_dir)
+    identity_lock = None
+    identity_lock_error: ReasonCode | None = None
+    try:
+        identity_lock = load_identity_lock(package_dir)
+    except CanonicalizationError:
+        identity_lock_error = ReasonCode.RECEIPT_BINDING_FAILED
     baseline_hash = hash_tree(baseline_dir)
     candidate_hash = hash_tree(candidate_dir)
     expected_edit_diff_hash = hash_obj({"baseline": baseline_hash, "candidate": candidate_hash})
@@ -172,7 +179,13 @@ def run_redline(
             kind=ProofKind.PACKAGE_CANONICAL,
             phase="import",
             inputs={"package": "playbook", "baseline_role": baseline, "candidate_role": candidate},
-            artifact={"package_hash": package_hash, "baseline_hash": baseline_hash, "candidate_hash": candidate_hash},
+            artifact={
+                "package_hash": package_hash,
+                "baseline_hash": baseline_hash,
+                "candidate_hash": candidate_hash,
+                "adapter_id": identity_lock.adapter_id if identity_lock is not None else "missing",
+                "identity_lock_hash": identity_lock.lock_hash if identity_lock is not None else "missing",
+            },
             verdict_bearing=True,
         ),
         simple_proof(
@@ -200,7 +213,7 @@ def run_redline(
     ]
     engine = DeterministicReplayEngine()
     traces: list[ReplayTrace] = []
-    reject_reason: ReasonCode | None = baseline_receipt_error
+    reject_reason: ReasonCode | None = identity_lock_error or baseline_receipt_error
     if effective_edit_provenance.diff_hash != expected_edit_diff_hash:
         reject_reason = ReasonCode.RECEIPT_BINDING_FAILED
     try:
@@ -365,6 +378,9 @@ def run_redline(
         suite_source_path=_portable_path(suite_path),
         engine_source_tree_hash=engine_hash,
         runner_lock_hash=runner_lock_hash,
+        package_adapter_id=identity_lock.adapter_id if identity_lock is not None else "missing",
+        package_identity_lock_hash=identity_lock.lock_hash if identity_lock is not None else "missing",
+        package_identity_lock_path=_portable_path(package_dir / "playbook_identity.lock"),
         edit_provenance=effective_edit_provenance,
         **proof_reproduce_kwargs,
     )

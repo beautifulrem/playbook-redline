@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from redline.canonical import hash_obj
 from redline.models import ReasonCode, Status, TrustPolicy, VerificationLevel, VerificationStatus
 from redline.runner import run_redline
+from redline.spec_compiler import OutOfScopeError
 from redline.surfaces import compile_spec, import_package, publish_preflight
 from redline.trust import verify_trust_policy
 from redline.verifier import verify
@@ -118,6 +119,8 @@ def redline_compile_spec(
         return _mcp_bad_input(ReasonCode.FILE_NOT_FOUND, str(exc))
     except json.JSONDecodeError as exc:
         return _mcp_bad_input(ReasonCode.PARSE_ERROR, str(exc))
+    except OutOfScopeError as exc:
+        return _mcp_bad_input(ReasonCode.OUT_OF_SCOPE, str(exc))
     except ValidationError as exc:
         return _mcp_bad_input(ReasonCode.SCHEMA_INVALID, str(exc))
     except Exception as exc:

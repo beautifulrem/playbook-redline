@@ -1,0 +1,65 @@
+{
+  "version": "redline.playbook_identity.v1",
+  "adapter_id": "python_strategy_sandbox",
+  "canonical_tar_rules": "redline.v9.canonical-tree",
+  "locked_files": [
+    {
+      "path": "baseline/strategy.py",
+      "hash": "sha256:441e6d480d7f30b0734ef19af4fc2f0f68006a1e5caad1a5e3eb6aba015823ae"
+    },
+    {
+      "path": "candidate_bad/strategy.py",
+      "hash": "sha256:441e6d480d7f30b0734ef19af4fc2f0f68006a1e5caad1a5e3eb6aba015823ae"
+    },
+    {
+      "path": "candidate_ctypes/strategy.py",
+      "hash": "sha256:7896ab445972b703ab6ecc0b8a8d2c4332436cd4b663c1ba8e124c4d463486ff"
+    },
+    {
+      "path": "candidate_env_leak/strategy.py",
+      "hash": "sha256:4b3420bb831c7d1a8a6e975f8e03c2d710054cdbbe08a5d4930031cea0089245"
+    },
+    {
+      "path": "candidate_file_escape/strategy.py",
+      "hash": "sha256:3cb2178fb632dbb33bf9163d6ba3d8b01c9ad76c2d63a5caa2d87a961cf10e68"
+    },
+    {
+      "path": "candidate_forge_trace/strategy.py",
+      "hash": "sha256:f17b3ea4f4fe8853f255ec22affcdc85656b332a788881efde6ee6974e11fee2"
+    },
+    {
+      "path": "candidate_fork/strategy.py",
+      "hash": "sha256:6341c0c95ffdea3ff12310594e673b82916409429ed7e2870a77b8d1a97ee6c6"
+    },
+    {
+      "path": "candidate_good/strategy.py",
+      "hash": "sha256:441e6d480d7f30b0734ef19af4fc2f0f68006a1e5caad1a5e3eb6aba015823ae"
+    },
+    {
+      "path": "candidate_lookahead/strategy.py",
+      "hash": "sha256:2c54c92eda0afbb5bdaa8f4708ee1efe5ed3f66cba17668f3c0ae3289604b228"
+    },
+    {
+      "path": "candidate_malicious/strategy.py",
+      "hash": "sha256:e2aaa122062ca9eb1dedc3acf472081489583d3c5489acdd3885884f6bb7bd17"
+    },
+    {
+      "path": "candidate_os_open_write/strategy.py",
+      "hash": "sha256:dd18cd9411c52ad51a4556c2d4eb468b62978e35e8d20fb2ee62471098bb3cee"
+    },
+    {
+      "path": "candidate_read_bypass/strategy.py",
+      "hash": "sha256:f89aec55a9f80dabd1aab448f53f5f4d4e2a8ccfcb315e8d43215442985e94e7"
+    },
+    {
+      "path": "candidate_stdlib_import/strategy.py",
+      "hash": "sha256:aaf1814022fd20bf440f29541662c251500c87af3ce55ad81508b7900e5da1ab"
+    },
+    {
+      "path": "candidate_virtualenv_leak/strategy.py",
+      "hash": "sha256:7db5a458eae43b27fec241282710af4dd1201b98c561743af34738cbccd19d01"
+    }
+  ],
+  "identity_hash": "sha256:70a037463c52f6bfeaabdb2517d7e10812737d73572640a077fdbdb42d84fa9f",
+  "lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514"
+}

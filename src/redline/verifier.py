@@ -22,6 +22,7 @@ from redline.models import (
     VerificationResult,
     VerificationStatus,
 )
+from redline.package_identity import load_identity_lock
 from redline.proof_kernel import REQUIRED_PROOFS, decision_envelope_from_receipt, decision_proof_id
 from redline.receipt import compute_receipt_hash
 from redline.report import render_strength_summary, to_report
@@ -165,6 +166,12 @@ def verify(
         except (OSError, ValueError):
             return _bad(ReasonCode.FILE_NOT_FOUND, level)
         if package_hash != receipt.package.identity_hash:
+            return _reject(receipt, ReasonCode.RECEIPT_BINDING_FAILED, level)
+        try:
+            identity_lock = load_identity_lock(package)
+        except CanonicalizationError:
+            return _reject(receipt, ReasonCode.RECEIPT_BINDING_FAILED, level)
+        if identity_lock.lock_hash != receipt.package.identity_lock_hash:
             return _reject(receipt, ReasonCode.RECEIPT_BINDING_FAILED, level)
         proofs_error = _external_proofs_error(receipt=receipt, proofs_dir=receipt_path.parent / "proofs")
         if proofs_error is not None:
@@ -349,6 +356,8 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
                 "package_hash": receipt.package.identity_hash,
                 "baseline_hash": receipt.baseline.package_hash,
                 "candidate_hash": receipt.candidate.package_hash,
+                "adapter_id": receipt.package.adapter_id,
+                "identity_lock_hash": receipt.package.identity_lock_hash,
             }
         )
         if package_proof.artifact_hash != expected_package_artifact:
