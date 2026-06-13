@@ -277,7 +277,10 @@ def verify_decision_proof_bundle(
             proofs.append(Proof.model_validate(json.loads(path.read_text(encoding="utf-8"))))
     except Exception:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
-    decision_proof = next((proof for proof in proofs if proof.proof_id == proof_id), None)
+    decision_proofs = [proof for proof in proofs if proof.kind is ProofKind.DECISION]
+    if len(decision_proofs) != 1:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    decision_proof = decision_proofs[0] if decision_proofs[0].proof_id == proof_id else None
     if decision_proof is None or decision_proof.kind is not ProofKind.DECISION or not decision_proof.verdict_bearing:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
     non_decision_proofs = [proof for proof in proofs if proof.kind is not ProofKind.DECISION]
@@ -566,6 +569,13 @@ def _ledger_checkpoint_error(
 def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode | None:
     if not proofs_dir.exists():
         return ReasonCode.RECEIPT_MISMATCH
+    expected_files = {f"{proof.proof_id.replace(':', '_')}.json" for proof in receipt.proofs}
+    if len(expected_files) != len(receipt.proofs):
+        return ReasonCode.RECEIPT_MISMATCH
+    actual_files = {path.name for path in proofs_dir.glob("*.json")}
+    if actual_files != expected_files:
+        return ReasonCode.RECEIPT_MISMATCH
+    external_proof_ids: list[str] = []
     for proof in receipt.proofs:
         proof_id = proof.proof_id
         proof_path = proofs_dir / f"{proof_id.replace(':', '_')}.json"
@@ -573,8 +583,13 @@ def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode 
             external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
         except Exception:
             return ReasonCode.RECEIPT_MISMATCH
+        if proof_path.name != f"{external.proof_id.replace(':', '_')}.json":
+            return ReasonCode.RECEIPT_MISMATCH
+        external_proof_ids.append(external.proof_id)
         if external != proof:
             return ReasonCode.RECEIPT_MISMATCH
+    if len(set(external_proof_ids)) != len(external_proof_ids):
+        return ReasonCode.RECEIPT_MISMATCH
     return None
 
 

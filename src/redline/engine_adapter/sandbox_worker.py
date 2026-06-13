@@ -6,6 +6,7 @@ import csv
 import importlib.util
 import json
 import os
+import re
 import resource
 import site
 import sys
@@ -18,6 +19,8 @@ from redline.models import Bar, ReasonCode
 
 _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
+_MAX_SIGNAL_TEXT_BYTES = 64
+_DECIMAL_SIGNAL_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 _ALLOWED_STATIC_MODULES = {"__future__", "collections", "decimal", "fractions", "math", "statistics", "typing"}
 _FORBIDDEN_ENTROPY_MODULES = {"datetime", "random", "secrets", "time", "uuid"}
 _FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator", "platform"}
@@ -268,14 +271,16 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:file-metadata-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
-            if isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+            if isinstance(node.func, ast.Attribute) and node.func.attr in {"format", "format_map"}:
                 raise RuntimeError(f"{reason}:dynamic-format-{node.func.attr}")
             if isinstance(node.func, ast.Subscript):
                 raise RuntimeError(f"{reason}:dynamic-subscript-call")
         elif isinstance(node, ast.JoinedStr):
             raise RuntimeError(f"{reason}:dynamic-format-string")
-        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and isinstance(node.left, ast.Constant) and isinstance(node.left.value, str):
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
             raise RuntimeError(f"{reason}:dynamic-format-string")
+        elif isinstance(node, ast.Attribute) and node.attr in {"format", "format_map"}:
+            raise RuntimeError(f"{reason}:dynamic-format-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
             raise RuntimeError(f"{reason}:private-attribute-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_STATIC_MODULES:
@@ -353,6 +358,26 @@ def _read_config(path: Path) -> dict[str, object]:
         return json.load(fh)
 
 
+def _coerce_signal_value(raw: object) -> Decimal:
+    reason = ReasonCode.CANDIDATE_SANDBOX_VIOLATION.value
+    if isinstance(raw, bool):
+        raise RuntimeError(f"{reason}:signal-bool")
+    if isinstance(raw, int):
+        value = Decimal(raw)
+    elif isinstance(raw, Decimal):
+        value = raw
+    elif isinstance(raw, str):
+        text = raw.strip()
+        if len(text.encode("utf-8")) > _MAX_SIGNAL_TEXT_BYTES or _DECIMAL_SIGNAL_RE.fullmatch(text) is None:
+            raise RuntimeError(f"{reason}:signal-string")
+        value = Decimal(text)
+    else:
+        raise RuntimeError(f"{reason}:signal-type-{type(raw).__name__}")
+    if not value.is_finite():
+        raise RuntimeError(f"{reason}:signal-nonfinite")
+    return value
+
+
 def _run_signals(*, package_dir: Path, bars: list[Bar], allowed_read_roots: tuple[Path, ...]) -> list[str]:
     config = _read_config(package_dir / "config.json")
     sys.addaudithook(_make_audit_hook(allowed_read_roots))
@@ -360,7 +385,7 @@ def _run_signals(*, package_dir: Path, bars: list[Bar], allowed_read_roots: tupl
     signals: list[str] = []
     state: dict[str, object] = {}
     for bar in bars:
-        signal_value = Decimal(str(strategy.signal(bar.model_dump(mode="json"), state, config)))
+        signal_value = _coerce_signal_value(strategy.signal(bar.model_dump(mode="json"), state, config))
         signals.append(str(signal_value))
     return signals
 

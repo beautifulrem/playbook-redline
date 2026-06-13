@@ -955,6 +955,62 @@ def test_sandbox_rejects_function_repr_address_entropy(tmp_path: Path) -> None:
     assert artifacts.receipt is None
 
 
+def test_sandbox_rejects_config_format_address_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_config_format_entropy")
+    (package / "candidate_config_format_entropy" / "config.json").write_text(
+        json.dumps({"entry_bar": 4, "leverage": "0.5", "fmt": "%s"}),
+        encoding="utf-8",
+    )
+    (package / "candidate_config_format_entropy" / "strategy.py").write_text(
+        "from decimal import Decimal\n\n"
+        "def signal(bar, state, config):\n"
+        "    i = int(bar['i'])\n"
+        "    if i < int(config.get('entry_bar', 0)):\n"
+        "        return 0\n"
+        "    text = config['fmt'] % signal\n"
+        "    tail = text.rsplit('0x', 1)[1].split('>', 1)[0]\n"
+        "    return Decimal((int(tail, 16) // 4096) % 7) / Decimal('100')\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_config_format_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_object_signal_return(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_object_signal")
+    (package / "candidate_object_signal" / "strategy.py").write_text(
+        "class Signal:\n"
+        "    pass\n\n"
+        "def signal(bar, state, config):\n"
+        "    return Signal()\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_object_signal",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
 def test_sandbox_read_root_bypass_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_read_bypass", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.envelope.status == Status.REJECT
@@ -1046,6 +1102,27 @@ def test_reject_decision_proof_bundle_is_verifiable(tmp_path: Path) -> None:
     assert tampered_non_decision_result.exit_code == 4
     assert json.loads(tampered_non_decision_result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
     non_decision_path.write_text(original_non_decision, encoding="utf-8")
+
+    extra_decision_path = out_dir / "proofs" / "proof_decision_000000000000000000000000.json"
+    extra_decision = json.loads((out_dir / "proofs" / f"{decision_proof.proof_id.replace(':', '_')}.json").read_text(encoding="utf-8"))
+    extra_decision["proof_id"] = "proof:decision:" + "0" * 24
+    extra_decision_path.write_text(json.dumps(extra_decision), encoding="utf-8")
+    extra_decision_result = CliRunner().invoke(
+        app,
+        [
+            "verify-proof",
+            "--envelope",
+            str(out_dir / "envelope.json"),
+            "--proof-id",
+            decision_proof.proof_id,
+            "--proofs-dir",
+            str(out_dir / "proofs"),
+            "--json",
+        ],
+    )
+    assert extra_decision_result.exit_code == 4
+    assert json.loads(extra_decision_result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
+    extra_decision_path.unlink()
 
     proof_path = out_dir / "proofs" / f"{decision_proof.proof_id.replace(':', '_')}.json"
     tampered = json.loads(proof_path.read_text(encoding="utf-8"))
@@ -2132,6 +2209,20 @@ def test_mcp_verifies_chained_receipt_with_trust_inputs(monkeypatch, tmp_path: P
     assert trusted_export["export"]["state"] == "ANNOTATED_PACKAGE_READY"
     assert Path(trusted_export["annotation_path"]).exists()
     assert Path(trusted_export["annotated_package_path"]).exists()
+    extra_sidecar = tmp_path / "chained" / "proofs" / "zz_extra_unreferenced_duplicate.json"
+    shutil.copy2(next((tmp_path / "chained" / "proofs").glob("proof_probe_*.json")), extra_sidecar)
+    extra_sidecar_export = redline_export_if_clean(
+        str(tmp_path / "chained" / "receipt.json"),
+        str(package),
+        suite_path=str(SUITE),
+        spec_path=str(SPEC),
+        report_path=str(tmp_path / "chained" / "report.json"),
+        ledger_attestation_path=str(tmp_path / "chained" / "issuance-ledger.attestation.json"),
+        trust_policy_path=str(policy_path),
+        baseline_receipt_path=str(tmp_path / "baseline" / "receipt.json"),
+    )
+    assert extra_sidecar_export["export_allowed"] is False
+    assert extra_sidecar_export["verification"]["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
 
 
 def test_import_compile_capture_edit_and_run_bind_provenance(tmp_path: Path) -> None:
@@ -2630,6 +2721,34 @@ def test_signed_checkpoint_allows_chained_pass_publish_path(tmp_path: Path) -> N
     )
     assert verified_with_policy.status == VerificationStatus.VERIFIED
     assert verified_with_policy.reason_code == ReasonCode.PASS
+    extra_sidecar = tmp_path / "chained" / "proofs" / "zz_extra_unreferenced_duplicate.json"
+    shutil.copy2(next((tmp_path / "chained" / "proofs").glob("proof_probe_*.json")), extra_sidecar)
+    extra_sidecar_verify = verify(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        level=VerificationLevel.REPLAYED,
+    )
+    assert extra_sidecar_verify.status == VerificationStatus.REJECTED
+    assert extra_sidecar_verify.reason_code == ReasonCode.RECEIPT_MISMATCH
+    extra_sidecar_publish = publish_preflight(
+        receipt_path=tmp_path / "chained" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "publish-extra-sidecar",
+        baseline_receipt_path=tmp_path / "baseline" / "receipt.json",
+        ledger_attestation_path=attestation_path,
+        trust_policy_path=policy_path,
+        trust_policy_hash=policy.policy_hash,
+    )
+    assert extra_sidecar_publish.ok is False
+    assert extra_sidecar_publish.reason_code == ReasonCode.RECEIPT_MISMATCH
+    extra_sidecar.unlink()
 
     publish = publish_preflight(
         receipt_path=tmp_path / "chained" / "receipt.json",
