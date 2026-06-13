@@ -80,6 +80,79 @@ class ProbeType(StrEnum):
     TRADE_BUDGET = "trade_budget"
 
 
+_DECIMAL_GT_ZERO_LE_ONE_PATTERN = r"^(?:(?:0?\.[0-9]*[1-9][0-9]*)|(?:1(?:\.0*)?))$"
+_DECIMAL_ZERO_TO_ONE_PATTERN = r"^(?:(?:0(?:\.[0-9]*)?)|(?:0?\.[0-9]+)|(?:1(?:\.0*)?))$"
+_INT_ZERO_TO_1000_PATTERN = r"^0*(?:[0-9]{1,3}|1000)$"
+_INT_ZERO_TO_100000_PATTERN = r"^0*(?:[0-9]{1,5}|100000)$"
+
+_PROBE_PARAMS_SCHEMA: dict[ProbeType, dict[str, Any]] = {
+    ProbeType.MAX_DRAWDOWN: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["max_drawdown"],
+        "properties": {
+            "max_drawdown": {
+                "type": "string",
+                "pattern": _DECIMAL_GT_ZERO_LE_ONE_PATTERN,
+                "description": "Finite decimal string in (0, 1].",
+            }
+        },
+    },
+    ProbeType.NO_ENTRY_WHEN: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["scenario_id", "max_abs_position"],
+        "properties": {
+            "scenario_id": {"type": "string", "minLength": 1, "pattern": r"\S"},
+            "before_bar": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_100000_PATTERN,
+                "description": "Integer decimal string in [0, 100000].",
+            },
+            "bar_lt": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_100000_PATTERN,
+                "description": "Integer decimal string in [0, 100000].",
+            },
+            "max_abs_position": {
+                "type": "string",
+                "pattern": _DECIMAL_ZERO_TO_ONE_PATTERN,
+                "description": "Finite decimal string in [0, 1].",
+            },
+        },
+        "anyOf": [{"required": ["before_bar"]}, {"required": ["bar_lt"]}],
+    },
+    ProbeType.TRADE_BUDGET: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["max_trades"],
+        "properties": {
+            "max_trades": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_1000_PATTERN,
+                "description": "Integer decimal string in [0, 1000].",
+            }
+        },
+    },
+}
+
+_PROBE_SPEC_SCHEMA_EXTRA: dict[str, Any] = {
+    "allOf": [
+        {
+            "if": {"properties": {"type": {"const": probe_type.value}}, "required": ["type"]},
+            "then": {"properties": {"params": params_schema}},
+        }
+        for probe_type, params_schema in _PROBE_PARAMS_SCHEMA.items()
+    ],
+    "x-runtime-constraints": [
+        {
+            "name": "probe_param_semantics",
+            "enforced_by": "redline.models.ProbeSpec.require_semantic_params",
+        }
+    ],
+}
+
+
 class ChainStatus(StrEnum):
     CHAINED = "chained"
     GENESIS = "genesis"
@@ -113,6 +186,8 @@ class Capabilities(RedlineModel):
 
 
 class ProbeSpec(RedlineModel):
+    model_config = ConfigDict(json_schema_extra=_PROBE_SPEC_SCHEMA_EXTRA)
+
     id: str
     type: ProbeType
     params: dict[str, str]
@@ -148,6 +223,12 @@ class RedlineSpec(RedlineModel):
         min_length=1,
         json_schema_extra={
             "x-unique-by": "id",
+            "x-runtime-constraints": [
+                {
+                    "name": "unique_probe_ids",
+                    "enforced_by": "redline.models.RedlineSpec.require_block_probe",
+                }
+            ],
             "contains": {
                 "anyOf": [
                     {"not": {"required": ["block"]}},
@@ -183,7 +264,18 @@ class Scenario(RedlineModel):
 class Suite(RedlineModel):
     version: Literal["redline.suite.v2"] = "redline.suite.v2"
     suite_id: str
-    scenarios: list[Scenario] = Field(min_length=1, json_schema_extra={"x-unique-by": "id"})
+    scenarios: list[Scenario] = Field(
+        min_length=1,
+        json_schema_extra={
+            "x-unique-by": "id",
+            "x-runtime-constraints": [
+                {
+                    "name": "unique_scenario_ids",
+                    "enforced_by": "redline.models.Suite.require_unique_scenario_ids",
+                }
+            ],
+        },
+    )
     suite_lock_hash: str | None = None
 
     @model_validator(mode="after")

@@ -82,6 +82,12 @@
       "minItems": 1,
       "title": "Scenarios",
       "type": "array",
+      "x-runtime-constraints": [
+        {
+          "enforced_by": "redline.models.Suite.require_unique_scenario_ids",
+          "name": "unique_scenario_ids"
+        }
+      ],
       "x-unique-by": "id"
     },
     "suite_id": {

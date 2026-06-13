@@ -4,7 +4,7 @@ install:
 	uv sync --frozen --extra dev
 
 test:
-	uv run pytest -q
+	uv run --extra dev pytest -q
 
 schemas:
 	uv run redline export-schemas

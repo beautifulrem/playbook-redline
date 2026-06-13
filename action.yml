@@ -12,8 +12,8 @@ inputs:
     description: Candidate package name under the package directory.
     default: candidate_good
   allow-amber-baseline-genesis:
-    description: Treat BASELINE_GENESIS exit 10 as a successful CI outcome.
-    default: "false"
+    description: Treat the bundled demo BASELINE_GENESIS exit 10 as a successful CI outcome.
+    default: "true"
   suite:
     description: Redline suite JSON path.
     default: fixtures/suites/demo_suite.json

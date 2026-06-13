@@ -1024,6 +1024,47 @@ def test_exported_spec_schema_requires_block_probe(tmp_path: Path) -> None:
     assert errors
 
 
+def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> None:
+    export_schemas(tmp_path)
+    schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+
+    def assert_rejected(spec_data: dict[str, object]) -> None:
+        assert list(validator.iter_errors(spec_data))
+
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["probes"][0]["params"]["max_drawdown"] = "999"
+    assert_rejected(spec_data)
+
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["probes"][2]["params"]["max_trades"] = "999999"
+    assert_rejected(spec_data)
+
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"]["before_bar"] = "not-an-int"
+            probe["params"]["bar_lt"] = "4"
+    assert_rejected(spec_data)
+
+    spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    for probe in spec_data["probes"]:
+        if probe["type"] == "no_entry_when":
+            probe["params"].pop("before_bar", None)
+            probe["params"]["bar_lt"] = "3.0"
+    assert_rejected(spec_data)
+
+
+def test_exported_schemas_disclose_runtime_unique_id_constraints(tmp_path: Path) -> None:
+    export_schemas(tmp_path)
+    spec_schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    suite_schema = json.loads((tmp_path / "suite.v2.schema.json").read_text(encoding="utf-8"))
+    assert spec_schema["properties"]["probes"]["x-unique-by"] == "id"
+    assert spec_schema["properties"]["probes"]["x-runtime-constraints"][0]["name"] == "unique_probe_ids"
+    assert suite_schema["properties"]["scenarios"]["x-unique-by"] == "id"
+    assert suite_schema["properties"]["scenarios"]["x-runtime-constraints"][0]["name"] == "unique_scenario_ids"
+
+
 def test_sandbox_network_violation_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_malicious", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.envelope.status == Status.REJECT
@@ -5318,7 +5359,8 @@ def test_generated_reports_validate_against_exported_schema(tmp_path: Path) -> N
 def test_composite_action_runs_against_caller_workspace() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert 'allow-amber-baseline-genesis:' in action
-    assert 'default: "false"' in action
+    assert 'default: candidate_good' in action
+    assert 'default: "true"' in action
     assert "working-directory: ${{ github.workspace }}" in action
     assert 'uv --project "${{ github.action_path }}" run redline run "${{ github.workspace }}/${{ inputs.package }}"' in action
     assert "path: ${{ github.workspace }}/${{ inputs.out }}" in action
