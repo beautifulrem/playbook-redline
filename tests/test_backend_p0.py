@@ -44,7 +44,7 @@ from redline.models import (
 )
 from redline.probes import PROBE_REGISTRY
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, make_decision_proof
+from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, create_ledger_checkpoint, make_decision_proof
 from redline.runner import load_spec, load_suite, run_redline
 from redline.schemas import export_schemas
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
@@ -60,7 +60,7 @@ from redline.surfaces import (
     verify_annotation,
 )
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
-from redline.verifier import verify, verify_proof
+from redline.verifier import load_receipt, verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "fixtures/demo_pack"
@@ -1051,6 +1051,204 @@ def test_sandbox_rejects_import_time_file_write_in_python_fallback(tmp_path: Pat
     assert not marker.exists()
 
 
+def test_sandbox_rejects_import_time_fileio_write_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-fileio-marker"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_fileio")
+    (package / "candidate_import_time_fileio" / "strategy.py").write_text(
+        "from io import FileIO\n"
+        f"FileIO({str(marker)!r}, 'wb').write(b'escaped')\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_fileio",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_sandbox_rejects_import_time_loader_write_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-loader-marker"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_loader_write")
+    (package / "candidate_import_time_loader_write" / "strategy.py").write_text(
+        f"__loader__.set_data({str(marker)!r}, b'escaped')\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_loader_write",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_sandbox_rejects_import_time_loader_read_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    secret = tmp_path / "outside-loader-secret"
+    secret.write_text("7", encoding="utf-8")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_loader_read")
+    (package / "candidate_import_time_loader_read" / "strategy.py").write_text(
+        f"ENTRY = int(__loader__.get_data({str(secret)!r}).decode())\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0 if int(bar['i']) < ENTRY else 1\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_loader_read",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
+def test_sandbox_rejects_import_time_path_unlink_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-path-marker"
+    marker.write_text("keep", encoding="utf-8")
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_path_unlink")
+    (package / "candidate_import_time_path_unlink" / "strategy.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).unlink()\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_path_unlink",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_sandbox_rejects_import_time_path_mkdir_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-path-dir"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_path_mkdir")
+    (package / "candidate_import_time_path_mkdir" / "strategy.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).mkdir()\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_path_mkdir",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_sandbox_rejects_import_time_sqlite_write_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-import-time.db"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_import_time_sqlite")
+    (package / "candidate_import_time_sqlite" / "strategy.py").write_text(
+        "import sqlite3\n"
+        f"con = sqlite3.connect({str(marker)!r})\n"
+        "con.execute('create table t(x)')\n"
+        "con.execute('insert into t values (1)')\n"
+        "con.commit()\n"
+        "con.close()\n\n"
+        "def signal(bar, state, config):\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_import_time_sqlite",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_sandbox_rejects_runtime_sqlite_write_in_python_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REDLINE_DISABLE_OS_SANDBOX", "1")
+    package = tmp_path / "package"
+    marker = tmp_path / "outside-runtime.db"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_runtime_sqlite")
+    (package / "candidate_runtime_sqlite" / "strategy.py").write_text(
+        "import sqlite3\n\n"
+        "def signal(bar, state, config):\n"
+        "    if not state:\n"
+        f"        con = sqlite3.connect({str(marker)!r})\n"
+        "        con.execute('create table t(x)')\n"
+        "        con.execute('insert into t values (1)')\n"
+        "        con.commit()\n"
+        "        con.close()\n"
+        "        state['done'] = True\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_runtime_sqlite",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
 def test_sandbox_rejects_object_address_entropy(tmp_path: Path) -> None:
     package = tmp_path / "package"
     shutil.copytree(PACKAGE, package)
@@ -1146,9 +1344,9 @@ def test_sandbox_allows_stdlib_import(tmp_path: Path) -> None:
 
 def test_candidate_cannot_forge_trusted_trace_from_worker_globals(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_forge_trace", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
-    assert artifacts.envelope.status == Status.WITHHELD
-    assert artifacts.envelope.reason_code == ReasonCode.NEW_BLOCK_BREACH
-    assert artifacts.receipt is not None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
 
 
 def test_verdict_path_network_violation_rejects(monkeypatch, tmp_path: Path) -> None:
@@ -3734,3 +3932,42 @@ def test_anti_reroll_ledger_rejects_same_status_reroll(tmp_path: Path) -> None:
     else:
         raise AssertionError("same-key historical verdict must block receipt issuance")
     assert not (tmp_path / "receipt.json").exists()
+
+
+def test_verifier_rejects_duplicate_same_key_ledger_entry(tmp_path: Path) -> None:
+    source = ROOT / "artifacts/demo/withheld"
+    for name in ("receipt.json", "issuance-ledger.jsonl"):
+        shutil.copyfile(source / name, tmp_path / name)
+    receipt = load_receipt(tmp_path / "receipt.json")
+    key_hash = hash_obj(
+        {
+            "package_hash": receipt.package.identity_hash,
+            "candidate_hash": receipt.candidate.package_hash,
+            "suite_lock_hash": receipt.suite.suite_lock_hash,
+            "spec_hash": receipt.spec.spec_hash,
+        }
+    )
+    ledger_path = tmp_path / "issuance-ledger.jsonl"
+    last_entry = json.loads(ledger_path.read_text(encoding="utf-8").splitlines()[-1])
+    duplicate = {
+        "key_hash": key_hash,
+        "status": receipt.result.status,
+        "receipt_hash": "sha256:" + "1" * 64,
+        "previous_entry_hash": last_entry["entry_hash"],
+        "written_at": "2026-06-10T00:00:01Z",
+    }
+    duplicate["entry_hash"] = hash_obj(duplicate)
+    with ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(duplicate, sort_keys=True))
+        fh.write("\n")
+    create_ledger_checkpoint(
+        ledger_path=ledger_path,
+        checkpoint_path=tmp_path / "issuance-ledger.checkpoint.json",
+        subject_receipt_hashes=[receipt.receipt_hash],
+        ledger_path_label="issuance-ledger.jsonl",
+    )
+
+    result = verify(receipt_path=tmp_path / "receipt.json", level=VerificationLevel.HASH_ONLY)
+
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH

@@ -43,8 +43,8 @@
   },
   "runner": {
     "engine": "deterministic",
-    "engine_source_tree_hash": "sha256:898ae4c05f3069ff32412c4d1e271459227032828c32bc379bd47658832deb66",
-    "runner_lock_hash": "sha256:d23ba535017c8af091de1026cf195af668c73fca4f114f2b7c038ec61be74511",
+    "engine_source_tree_hash": "sha256:667394d7aa9ab8f20cfe357f38787fc5252c3a6d61991abf7e52d2c6ec68d5af",
+    "runner_lock_hash": "sha256:47d7d60c1dc772a4f8dd1d0b7f3f5f3273e1b8577107d4a0656ca343a109c5ae",
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
@@ -553,5 +553,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:806c7fe1b01b9f4be2e51fe711fcdbfe47ac4f1379df3479c32554d57dfada09"
+  "receipt_hash": "sha256:510766e1ee1f3d66aabcbd374640082fac4d7642aac50bff545767542ecc5f38"
 }

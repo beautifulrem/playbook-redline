@@ -406,6 +406,7 @@ def _ledger_error(
         }
     )
     matched = False
+    seen_key = False
     previous_entry_hash = "sha256:genesis"
     entry_count = 0
     try:
@@ -424,10 +425,14 @@ def _ledger_error(
                 previous_entry_hash = entry_hash
                 if entry.get("key_hash") != key_hash:
                     continue
+                if seen_key:
+                    return ReasonCode.RECEIPT_MISMATCH
+                seen_key = True
                 if entry.get("status") != receipt.result.status:
                     return ReasonCode.RECEIPT_MISMATCH
-                if entry.get("receipt_hash") == receipt.receipt_hash:
-                    matched = True
+                if entry.get("receipt_hash") != receipt.receipt_hash:
+                    return ReasonCode.RECEIPT_MISMATCH
+                matched = True
     except (OSError, json.JSONDecodeError):
         return ReasonCode.RECEIPT_MISMATCH
     if not matched:

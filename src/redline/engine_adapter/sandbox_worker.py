@@ -20,7 +20,24 @@ _MAX_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 _MAX_CPU_SECONDS = 3
 _FORBIDDEN_ENTROPY_MODULES = {"datetime", "random", "secrets", "time", "uuid"}
 _FORBIDDEN_REFLECTION_MODULES = {"inspect", "operator", "platform"}
-_FORBIDDEN_STATIC_MODULES = {"builtins", "importlib", "os", "sys", *_FORBIDDEN_ENTROPY_MODULES, *_FORBIDDEN_REFLECTION_MODULES}
+_FORBIDDEN_STATIC_MODULES = {
+    "builtins",
+    "cffi",
+    "ctypes",
+    "importlib",
+    "io",
+    "os",
+    "shutil",
+    "sqlite3",
+    "socket",
+    "subprocess",
+    "sys",
+    "tarfile",
+    "tempfile",
+    "zipfile",
+    *_FORBIDDEN_ENTROPY_MODULES,
+    *_FORBIDDEN_REFLECTION_MODULES,
+}
 _FORBIDDEN_DYNAMIC_CALLS = {
     "__import__",
     "compile",
@@ -39,8 +56,25 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "type",
     "vars",
 }
+_FORBIDDEN_MODULE_GLOBAL_NAMES = {"__builtins__", "__cached__", "__file__", "__loader__", "__package__", "__spec__"}
 _FORBIDDEN_FILE_READ_CALLS = {"open", "read_bytes", "read_text"}
-_FORBIDDEN_FILE_WRITE_CALLS = {"touch", "write_bytes", "write_text"}
+_FORBIDDEN_FILE_WRITE_CALLS = {
+    "chmod",
+    "hardlink_to",
+    "lchmod",
+    "link_to",
+    "mkdir",
+    "rename",
+    "replace",
+    "rmdir",
+    "symlink_to",
+    "touch",
+    "unlink",
+    "write_bytes",
+    "write_text",
+}
+_FORBIDDEN_FILE_CONSTRUCTOR_CALLS = {"FileIO", "fdopen"}
+_FORBIDDEN_LOADER_ACCESS_CALLS = {"get_data", "set_data"}
 _FORBIDDEN_FILE_METADATA_CALLS = {
     "absolute",
     "exists",
@@ -182,12 +216,18 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:file-read-{node.func.id}")
             if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_FILE_WRITE_CALLS:
                 raise RuntimeError(f"{reason}:file-write-{node.func.id}")
+            if isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_FILE_CONSTRUCTOR_CALLS:
+                raise RuntimeError(f"{reason}:file-constructor-{node.func.id}")
             if isinstance(node.func, ast.Call):
                 raise RuntimeError(f"{reason}:dynamic-call-result")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_READ_CALLS:
                 raise RuntimeError(f"{reason}:file-read-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_WRITE_CALLS:
                 raise RuntimeError(f"{reason}:file-write-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_CONSTRUCTOR_CALLS:
+                raise RuntimeError(f"{reason}:file-constructor-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_LOADER_ACCESS_CALLS:
+                raise RuntimeError(f"{reason}:loader-file-access-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_DYNAMIC_CALLS:
                 raise RuntimeError(f"{reason}:dynamic-code-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_FILE_METADATA_CALLS:
@@ -202,8 +242,10 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
             raise RuntimeError(f"{reason}:module-reexport-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("__") and node.attr.endswith("__"):
             raise RuntimeError(f"{reason}:dynamic-dunder-{node.attr}")
-        elif isinstance(node, ast.Name) and node.id == "__builtins__":
-            raise RuntimeError(f"{reason}:dynamic-builtins")
+        elif isinstance(node, ast.Name) and node.id in _FORBIDDEN_MODULE_GLOBAL_NAMES:
+            raise RuntimeError(f"{reason}:module-global-{node.id}")
+        elif isinstance(node, ast.Name) and node.id.startswith("__") and node.id.endswith("__"):
+            raise RuntimeError(f"{reason}:dynamic-dunder-name-{node.id}")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             _reject_forbidden_string(node.value, reason)
 
@@ -213,7 +255,13 @@ def _reject_forbidden_string(value: str, reason: str) -> None:
         raise RuntimeError(f"{reason}:dynamic-dunder-string")
     if value in _FORBIDDEN_DYNAMIC_CALLS:
         raise RuntimeError(f"{reason}:dynamic-code-string-{value}")
-    if value in _FORBIDDEN_FILE_READ_CALLS or value in _FORBIDDEN_FILE_WRITE_CALLS or value in _FORBIDDEN_FILE_METADATA_CALLS:
+    if (
+        value in _FORBIDDEN_FILE_READ_CALLS
+        or value in _FORBIDDEN_FILE_WRITE_CALLS
+        or value in _FORBIDDEN_FILE_METADATA_CALLS
+        or value in _FORBIDDEN_FILE_CONSTRUCTOR_CALLS
+        or value in _FORBIDDEN_LOADER_ACCESS_CALLS
+    ):
         raise RuntimeError(f"{reason}:file-access-string-{value}")
     if value in _FORBIDDEN_ENTROPY_ATTRS:
         raise RuntimeError(f"{reason}:entropy-string-{value}")
