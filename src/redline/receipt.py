@@ -39,7 +39,10 @@ def make_verify_proof_reproduce(
     proof_id: str,
     include_baseline_receipt: bool = False,
     include_trust_policy: bool = False,
+    envelope_bundle: bool = False,
 ) -> str:
+    if envelope_bundle:
+        return f"uv run redline verify-proof --envelope envelope.json --proof-id {proof_id} --proofs-dir proofs"
     command = f"uv run redline verify-proof receipt.json --proof-id {proof_id} --package <package> --suite <suite> --spec <spec>"
     if include_baseline_receipt:
         command += " --baseline-receipt <baseline-receipt>"
@@ -54,11 +57,14 @@ def make_decision_proof(
     proofs: list[Proof],
     include_baseline_receipt: bool = False,
     include_trust_policy: bool = False,
+    envelope_bundle: bool = False,
 ) -> Proof:
+    proof_ids = sorted(proof.proof_id for proof in proofs)
+    proof_fingerprints = sorted(hash_obj(proof) for proof in proofs)
     proof_id = decision_proof_id(
         status=envelope.status,
         reason_code=envelope.reason_code,
-        proof_ids=[proof.proof_id for proof in proofs],
+        proof_ids=proof_ids,
         coverage=envelope.coverage,
     )
     return Proof(
@@ -66,13 +72,14 @@ def make_decision_proof(
         phase="decide",
         kind=ProofKind.DECISION,
         verdict_bearing=True,
-        inputs_hash=hash_obj({"proof_ids": [proof.proof_id for proof in proofs], "coverage": envelope.coverage}),
+        inputs_hash=hash_obj({"proof_fingerprints": proof_fingerprints, "proof_ids": proof_ids, "coverage": envelope.coverage}),
         artifact_hash=hash_obj(envelope),
         assertions=[],
         reproduce=make_verify_proof_reproduce(
             proof_id=proof_id,
             include_baseline_receipt=include_baseline_receipt,
             include_trust_policy=include_trust_policy,
+            envelope_bundle=envelope_bundle,
         ),
     )
 

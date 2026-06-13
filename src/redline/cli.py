@@ -29,7 +29,7 @@ from redline.surfaces import (
     verify_annotation,
 )
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation
-from redline.verifier import load_receipt, verify, verify_proof
+from redline.verifier import load_receipt, verify, verify_decision_proof_bundle, verify_proof
 from redline.models import LedgerCheckpoint, LedgerCheckpointAttestation
 
 app = typer.Typer(no_args_is_help=True)
@@ -616,8 +616,10 @@ def verify_ledger_attestation_cmd(
 
 @app.command("verify-proof")
 def verify_proof_cmd(
-    receipt: Path,
+    receipt: Optional[Path] = typer.Argument(None),
     proof_id: str = typer.Option(..., "--proof-id"),
+    envelope: Optional[Path] = typer.Option(None, "--envelope"),
+    proofs_dir: Optional[Path] = typer.Option(None, "--proofs-dir"),
     package: Optional[Path] = typer.Option(None, "--package"),
     suite: Path = Path("fixtures/suites/demo_suite.json"),
     spec: Path = Path("fixtures/specs/redline_spec.json"),
@@ -625,15 +627,21 @@ def verify_proof_cmd(
     trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    result = verify_proof(
-        receipt_path=receipt,
-        proof_id=proof_id,
-        package=package,
-        suite_path=suite if package is not None else None,
-        spec_path=spec if package is not None else None,
-        baseline_receipt_path=baseline_receipt,
-        trust_policy_path=trust_policy,
-    )
+    if envelope is not None:
+        result = verify_decision_proof_bundle(envelope_path=envelope, proof_id=proof_id, proofs_dir=proofs_dir)
+    elif receipt is not None:
+        result = verify_proof(
+            receipt_path=receipt,
+            proof_id=proof_id,
+            proofs_dir=proofs_dir,
+            package=package,
+            suite_path=suite if package is not None else None,
+            spec_path=spec if package is not None else None,
+            baseline_receipt_path=baseline_receipt,
+            trust_policy_path=trust_policy,
+        )
+    else:
+        result = verify_decision_proof_bundle(envelope_path=Path("__missing_envelope__.json"), proof_id=proof_id)
     if json_out:
         console.print_json(data=result.model_dump(mode="json"))
     else:

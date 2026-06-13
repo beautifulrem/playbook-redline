@@ -3,18 +3,19 @@ from __future__ import annotations
 from typing import Any
 
 from redline.canonical import hash_obj, normalize
-from redline.models import DecisionEnvelope, Receipt, ReplayTrace
+from redline.models import DecisionEnvelope, Proof, Receipt, ReplayTrace
 
 
-def to_report(*, envelope: DecisionEnvelope, receipt: Receipt | None, traces: list[ReplayTrace]) -> dict[str, Any]:
+def to_report(*, envelope: DecisionEnvelope, receipt: Receipt | None, traces: list[ReplayTrace], proofs: list[Proof] | None = None) -> dict[str, Any]:
+    report_proofs = receipt.proofs if receipt else (proofs or [])
     report = {
         "version": "redline.report.v1",
         "envelope": envelope.model_dump(mode="python"),
         "receipt_hash": receipt.receipt_hash if receipt else None,
         "strength_summary": receipt.strength_summary if receipt else "",
         "traces": [trace.model_dump(mode="python") for trace in traces],
-        "proof_ids": [proof.proof_id for proof in receipt.proofs] if receipt else [],
-        "proofs": [proof.model_dump(mode="python") for proof in receipt.proofs] if receipt else [],
+        "proof_ids": [proof.proof_id for proof in report_proofs],
+        "proofs": [proof.model_dump(mode="python") for proof in report_proofs],
         "edit_provenance": receipt.edit_provenance.model_dump(mode="python") if receipt else None,
         "publish": receipt.publish.model_dump(mode="python") if receipt else None,
         "coverage_missing": receipt.coverage.missing if receipt else envelope.coverage.missing,

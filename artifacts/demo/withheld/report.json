@@ -482,7 +482,7 @@
     {
       "artifact_hash": "sha256:7715934c025af026dc585b2ac1bb16df9e89e1b2f57feaa71d52adf0fc5b6089",
       "assertions": [],
-      "inputs_hash": "sha256:846936b5a9157db5441291ad3d210a8414e831e367d6ac448ec84a9cf5cbecb3",
+      "inputs_hash": "sha256:70ec73f1684812aa0c9b22828ba10865f9b8affa4dcb926ae3ae1899611a17ba",
       "kind": "decision",
       "meta": {},
       "phase": "decide",
@@ -501,8 +501,8 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:f7ae532ffadc789f5996d4886147a44bae4a80c166cc30cfaffb2b38613c2795",
-  "report_hash": "sha256:61d24bd57a5d59429516de24d456af6a022c19b05d94d023aabc9efa34abfe51",
+  "receipt_hash": "sha256:5e6ee396ceba5637744db90c619757cf467da1be43f9b859c62ae996efdc0337",
+  "report_hash": "sha256:153df3b1f9903cb06c7beb5933179b83d78722b8cb7337c6c4efac1d24a4f9c7",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {

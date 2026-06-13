@@ -54,11 +54,13 @@ _FORBIDDEN_STATIC_MODULES = {
 }
 _FORBIDDEN_DYNAMIC_CALLS = {
     "__import__",
+    "ascii",
     "compile",
     "delattr",
     "dir",
     "eval",
     "exec",
+    "format",
     "getattr",
     "globals",
     "hash",
@@ -67,6 +69,7 @@ _FORBIDDEN_DYNAMIC_CALLS = {
     "object",
     "repr",
     "setattr",
+    "str",
     "type",
     "vars",
 }
@@ -265,8 +268,14 @@ def _reject_entropy_sources(strategy_path: Path) -> None:
                 raise RuntimeError(f"{reason}:file-metadata-{node.func.attr}")
             if isinstance(node.func, ast.Attribute) and node.func.attr in _FORBIDDEN_ENTROPY_ATTRS:
                 raise RuntimeError(f"{reason}:entropy-{node.func.attr}")
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+                raise RuntimeError(f"{reason}:dynamic-format-{node.func.attr}")
             if isinstance(node.func, ast.Subscript):
                 raise RuntimeError(f"{reason}:dynamic-subscript-call")
+        elif isinstance(node, ast.JoinedStr):
+            raise RuntimeError(f"{reason}:dynamic-format-string")
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and isinstance(node.left, ast.Constant) and isinstance(node.left.value, str):
+            raise RuntimeError(f"{reason}:dynamic-format-string")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
             raise RuntimeError(f"{reason}:private-attribute-{node.attr}")
         elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_STATIC_MODULES:

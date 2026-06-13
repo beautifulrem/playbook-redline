@@ -45,7 +45,8 @@ from redline.models import (
     VerificationLevel,
     VerificationStatus,
 )
-from redline.probes import PROBE_REGISTRY
+from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE
+from redline.probes.drawdown import MaxDrawdownProbe
 from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import IssuanceLedgerConflict, atomic_write_receipt, compute_receipt_hash, create_ledger_checkpoint, make_decision_proof
 from redline.runner import load_spec, load_suite, run_redline
@@ -63,6 +64,7 @@ from redline.surfaces import (
     verify_annotation,
 )
 from redline.trust import generate_trust_keypair, make_trust_policy, sign_checkpoint, verify_checkpoint_attestation, verify_trust_policy
+from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
 from redline.verifier import load_receipt, verify, verify_proof
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -927,6 +929,32 @@ def test_sandbox_rejects_default_arg_open_alias(tmp_path: Path) -> None:
     assert artifacts.receipt is None
 
 
+def test_sandbox_rejects_function_repr_address_entropy(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_repr_entropy")
+    (package / "candidate_repr_entropy" / "strategy.py").write_text(
+        "def signal(bar, state, config):\n"
+        "    text = str(signal)\n"
+        "    addr = int(text.rsplit('x', 1)[1].rstrip('>'), 16)\n"
+        "    if int(bar['i']) < int(config.get('entry_bar', 0)):\n"
+        "        return 0\n"
+        "    return ((addr // 16) % 1000) / 1000\n",
+        encoding="utf-8",
+    )
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_repr_entropy",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+
+
 def test_sandbox_read_root_bypass_rejects(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_read_bypass", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.envelope.status == Status.REJECT
@@ -960,6 +988,121 @@ def test_sandbox_ctypes_rejects(tmp_path: Path) -> None:
     assert artifacts.envelope.status == Status.REJECT
     assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
     assert artifacts.receipt is None
+
+
+def test_reject_decision_proof_bundle_is_verifiable(tmp_path: Path) -> None:
+    out_dir = tmp_path / "reject-run"
+    artifacts = run_redline(
+        package_dir=PACKAGE,
+        baseline="baseline",
+        candidate="candidate_malicious",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=out_dir,
+    )
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.CANDIDATE_SANDBOX_VIOLATION
+    assert artifacts.receipt is None
+    decision_proof = next(proof for proof in artifacts.proofs if proof.kind == ProofKind.DECISION)
+    assert "--envelope envelope.json" in (decision_proof.reproduce or "")
+    report = json.loads((out_dir / "report.json").read_text(encoding="utf-8"))
+    assert decision_proof.proof_id in report["proof_ids"]
+    assert any(proof["proof_id"] == decision_proof.proof_id for proof in report["proofs"])
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify-proof",
+            "--envelope",
+            str(out_dir / "envelope.json"),
+            "--proof-id",
+            decision_proof.proof_id,
+            "--proofs-dir",
+            str(out_dir / "proofs"),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["status"] == "proof_verified"
+
+    non_decision_path = next(path for path in sorted((out_dir / "proofs").glob("*.json")) if not path.name.startswith("proof_decision_"))
+    original_non_decision = non_decision_path.read_text(encoding="utf-8")
+    tampered_non_decision = json.loads(original_non_decision)
+    tampered_non_decision["artifact_hash"] = "sha256:" + "0" * 64
+    non_decision_path.write_text(json.dumps(tampered_non_decision), encoding="utf-8")
+    tampered_non_decision_result = CliRunner().invoke(
+        app,
+        [
+            "verify-proof",
+            "--envelope",
+            str(out_dir / "envelope.json"),
+            "--proof-id",
+            decision_proof.proof_id,
+            "--proofs-dir",
+            str(out_dir / "proofs"),
+            "--json",
+        ],
+    )
+    assert tampered_non_decision_result.exit_code == 4
+    assert json.loads(tampered_non_decision_result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
+    non_decision_path.write_text(original_non_decision, encoding="utf-8")
+
+    proof_path = out_dir / "proofs" / f"{decision_proof.proof_id.replace(':', '_')}.json"
+    tampered = json.loads(proof_path.read_text(encoding="utf-8"))
+    tampered["artifact_hash"] = "sha256:" + "0" * 64
+    proof_path.write_text(json.dumps(tampered), encoding="utf-8")
+    tampered_result = CliRunner().invoke(
+        app,
+        [
+            "verify-proof",
+            "--envelope",
+            str(out_dir / "envelope.json"),
+            "--proof-id",
+            decision_proof.proof_id,
+            "--proofs-dir",
+            str(out_dir / "proofs"),
+            "--json",
+        ],
+    )
+    assert tampered_result.exit_code == 4
+    assert json.loads(tampered_result.output)["reason_code"] == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_extreme_numeric_signal_fails_closed(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    shutil.copytree(package / "candidate_good", package / "candidate_extreme")
+    (package / "candidate_extreme" / "strategy.py").write_text(
+        "from decimal import Decimal\n\n"
+        "def signal(bar, state, config):\n"
+        "    return Decimal('1e1000000')\n",
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "run"
+    result = CliRunner().invoke(
+        app,
+        [
+            "run",
+            str(package),
+            "--baseline",
+            "baseline",
+            "--candidate",
+            "candidate_extreme",
+            "--suite",
+            str(SUITE),
+            "--spec",
+            str(SPEC),
+            "--out",
+            str(out_dir),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 4, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == Status.REJECT
+    assert payload["reason_code"] == ReasonCode.NONFINITE_VALUE
+    assert (out_dir / "envelope.json").exists()
+    assert not (out_dir / "receipt.json").exists()
 
 
 def test_sandbox_environment_is_sanitized(monkeypatch, tmp_path: Path) -> None:
@@ -1577,6 +1720,51 @@ def test_verdict_path_network_violation_rejects(monkeypatch, tmp_path: Path) -> 
     assert artifacts.envelope.status == Status.REJECT
     assert artifacts.envelope.reason_code == ReasonCode.VERDICT_PATH_VIOLATION
     assert artifacts.receipt is None
+
+
+def test_verdict_path_rejects_spoofed_probe_identity_before_side_effect(monkeypatch, tmp_path: Path) -> None:
+    marker = tmp_path / "probe-marker.txt"
+    monkeypatch.setenv("REDLINE_TRIPWIRE_SECRET", "leaked-env")
+
+    class SpoofedProbe:
+        __module__ = "redline.probes.evil"
+
+        def evaluate(self, *, baseline: ReplayTrace, candidate: ReplayTrace, params: dict[str, str]) -> ProbeResult:
+            marker.write_text(os.environ["REDLINE_TRIPWIRE_SECRET"], encoding="utf-8")
+            return ProbeResult(outcome=ProbeOutcome.PASS, assertions=[])
+
+    monkeypatch.setitem(PROBE_REGISTRY, ProbeType.MAX_DRAWDOWN, SpoofedProbe())
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.VERDICT_PATH_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_verdict_path_rejects_monkeypatched_trusted_probe_method(monkeypatch, tmp_path: Path) -> None:
+    marker = tmp_path / "trusted-method-marker"
+    original_evaluate = MaxDrawdownProbe.evaluate
+
+    def evil_evaluate(self, *, baseline: ReplayTrace, candidate: ReplayTrace, params: dict[str, str]) -> ProbeResult:
+        marker.mkdir()
+        return original_evaluate(self, baseline=baseline, candidate=candidate, params=params)
+
+    monkeypatch.setattr(MaxDrawdownProbe, "evaluate", evil_evaluate)
+    with pytest.raises(TypeError):
+        TRUSTED_PROBE_EVALUATE[ProbeType.MAX_DRAWDOWN] = evil_evaluate  # type: ignore[index]
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.VERDICT_PATH_VIOLATION
+    assert artifacts.receipt is None
+    assert not marker.exists()
+
+
+def test_verdict_path_tripwire_blocks_directory_creation(tmp_path: Path) -> None:
+    marker = tmp_path / "blocked-dir"
+    with pytest.raises(VerdictPathViolation):
+        with verdict_path_tripwire():
+            marker.mkdir()
+    assert not marker.exists()
 
 
 def test_verdict_path_llm_import_violation_rejects(monkeypatch, tmp_path: Path) -> None:

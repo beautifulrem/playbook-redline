@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj, hash_tree
 from redline.models import (
+    DecisionEnvelope,
     LedgerCheckpoint,
     LedgerCheckpointAttestation,
     Proof,
@@ -255,6 +256,52 @@ def verify_proof(
     return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=receipt_proof.artifact_hash)
 
 
+def verify_decision_proof_bundle(
+    *,
+    envelope_path: Path,
+    proof_id: str,
+    proofs_dir: Path | None = None,
+) -> ProofVerification:
+    try:
+        envelope = DecisionEnvelope.model_validate(json.loads(envelope_path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError):
+        return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.PARSE_ERROR)
+    except ValidationError:
+        return ProofVerification(status="proof_unreplayable", proof_id=proof_id, reason_code=ReasonCode.SCHEMA_INVALID)
+    proofs_root = proofs_dir or envelope_path.parent / "proofs"
+    if not proofs_root.exists():
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    proofs: list[Proof] = []
+    try:
+        for path in sorted(proofs_root.glob("*.json")):
+            proofs.append(Proof.model_validate(json.loads(path.read_text(encoding="utf-8"))))
+    except Exception:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    decision_proof = next((proof for proof in proofs if proof.proof_id == proof_id), None)
+    if decision_proof is None or decision_proof.kind is not ProofKind.DECISION or not decision_proof.verdict_bearing:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    non_decision_proofs = [proof for proof in proofs if proof.kind is not ProofKind.DECISION]
+    non_decision_ids = sorted(proof.proof_id for proof in non_decision_proofs)
+    expected_proof_id = decision_proof_id(
+        status=envelope.status,
+        reason_code=envelope.reason_code,
+        proof_ids=non_decision_ids,
+        coverage=envelope.coverage,
+    )
+    if decision_proof.proof_id != expected_proof_id:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    expected_inputs_hash = hash_obj(
+        {
+            "proof_fingerprints": sorted(hash_obj(proof) for proof in non_decision_proofs),
+            "proof_ids": non_decision_ids,
+            "coverage": envelope.coverage,
+        }
+    )
+    if decision_proof.inputs_hash != expected_inputs_hash or decision_proof.artifact_hash != hash_obj(envelope):
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+    return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=decision_proof.artifact_hash)
+
+
 def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
     required_kinds = REQUIRED_PROOFS[status]
     proofs_by_kind = {}
@@ -304,7 +351,8 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
         return ReasonCode.RECEIPT_MISMATCH
     decision_proof = _single_proof(receipt, ProofKind.DECISION)
     if decision_proof is not None:
-        non_decision_ids = [proof.proof_id for proof in receipt.proofs if proof.kind is not ProofKind.DECISION]
+        non_decision_proofs = [proof for proof in receipt.proofs if proof.kind is not ProofKind.DECISION]
+        non_decision_ids = [proof.proof_id for proof in non_decision_proofs]
         expected_decision_id = decision_proof_id(
             status=Status(receipt.result.status),
             reason_code=receipt.decision.reason_code,
@@ -312,6 +360,15 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
             coverage=receipt.coverage,
         )
         if decision_proof.proof_id != expected_decision_id:
+            return ReasonCode.RECEIPT_MISMATCH
+        expected_inputs_hash = hash_obj(
+            {
+                "proof_fingerprints": sorted(hash_obj(proof) for proof in non_decision_proofs),
+                "proof_ids": sorted(non_decision_ids),
+                "coverage": receipt.coverage,
+            }
+        )
+        if decision_proof.inputs_hash != expected_inputs_hash:
             return ReasonCode.RECEIPT_MISMATCH
         expected_envelope = decision_envelope_from_receipt(receipt)
         if decision_proof.artifact_hash != hash_obj(expected_envelope):

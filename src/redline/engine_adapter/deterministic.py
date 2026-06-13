@@ -7,11 +7,16 @@ import platform
 import shutil
 import subprocess
 import sys
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from pathlib import Path
 
-from redline.canonical import hash_obj
+from redline.canonical import CanonicalizationError, hash_obj
 from redline.models import Bar, ReasonCode, ReplayPoint, ReplayTrace, Scenario
+
+_MAX_ABS_SIGNAL = Decimal("1000")
+_MAX_ABS_LEVERAGE = Decimal("1000")
+_MAX_ABS_POSITION = Decimal("1000")
+_MAX_ABS_NAV = Decimal("1e18")
 
 
 class ReplayEngineError(RuntimeError):
@@ -59,14 +64,19 @@ class DeterministicReplayEngine:
             raise ReplayEngineError(ReasonCode.SCHEMA_INVALID, "worker returned invalid signal list") from exc
         if len(signals) != len(bars):
             raise ReplayEngineError(ReasonCode.SCHEMA_INVALID, "worker signal count mismatch")
-        return _build_trace(
-            scenario_id=scenario.id,
-            role=role,
-            bars=bars,
-            config=config,
-            strategy_source=strategy_source,
-            signals=signals,
-        )
+        try:
+            return _build_trace(
+                scenario_id=scenario.id,
+                role=role,
+                bars=bars,
+                config=config,
+                strategy_source=strategy_source,
+                signals=signals,
+            )
+        except ReplayEngineError:
+            raise
+        except (CanonicalizationError, DecimalException, ArithmeticError) as exc:
+            raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "deterministic replay numeric bounds exceeded") from exc
 
 
 def build_worker_command(*, package: Path, scenario_id: str, scenario_path: Path, role: str) -> list[str]:
@@ -153,15 +163,15 @@ def _build_trace(
         leverage = Decimal(str(config.get("leverage", "1")))
     except Exception as exc:
         raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "invalid leverage") from exc
-    if not leverage.is_finite():
-        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "non-finite leverage")
+    _require_bounded_decimal(leverage, label="leverage", max_abs=_MAX_ABS_LEVERAGE)
     for bar, signal_value in zip(bars, signals, strict=True):
-        if not signal_value.is_finite():
-            raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "non-finite signal")
+        _require_bounded_decimal(signal_value, label="signal", max_abs=_MAX_ABS_SIGNAL)
         position = signal_value * leverage
+        _require_bounded_decimal(position, label="position", max_abs=_MAX_ABS_POSITION)
         if bar.i > 0:
             ret = (bar.close - previous_close) / previous_close
             nav = nav * (Decimal("1") + position * ret)
+            _require_bounded_decimal(nav, label="nav", max_abs=_MAX_ABS_NAV)
         if position != previous_position:
             trade_count += 1
         previous_position = position
@@ -169,6 +179,8 @@ def _build_trace(
         if nav > peak:
             peak = nav
         drawdown = Decimal("0") if peak == 0 else (peak - nav) / peak
+        _require_bounded_decimal(peak, label="peak", max_abs=_MAX_ABS_NAV)
+        _require_bounded_decimal(drawdown, label="drawdown")
         points.append(
             ReplayPoint(
                 bar=bar.i,
@@ -191,3 +203,10 @@ def _build_trace(
     }
     artifact_hash = hash_obj(trace_without_hash)
     return ReplayTrace(**trace_without_hash, artifact_hash=artifact_hash)
+
+
+def _require_bounded_decimal(value: Decimal, *, label: str, max_abs: Decimal | None = None) -> None:
+    if not value.is_finite():
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, f"non-finite {label}")
+    if max_abs is not None and abs(value) > max_abs:
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, f"{label} outside deterministic numeric bounds")

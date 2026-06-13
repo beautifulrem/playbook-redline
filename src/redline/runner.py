@@ -32,7 +32,7 @@ from redline.models import (
     LedgerCheckpointAttestation,
     TrustPolicy,
 )
-from redline.probes import PROBE_REGISTRY
+from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE, TRUSTED_PROBE_TYPES
 from redline.proof_kernel import REQUIRED_PROOFS, decide
 from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof, make_verify_proof_reproduce
 from redline.report import to_report
@@ -248,7 +248,7 @@ def run_redline(
                 if probe is None:
                     missing.append(f"{scenario.id}:{probe_spec.id}:errored")
                     continue
-                if not probe.__class__.__module__.startswith("redline.probes."):
+                if not _is_trusted_probe(probe_spec.type, probe):
                     reject_reason = ReasonCode.VERDICT_PATH_VIOLATION
                     missing.append(f"{scenario.id}:{probe_spec.id}:untrusted_probe")
                     break
@@ -367,17 +367,17 @@ def run_redline(
         **proof_reproduce_kwargs,
     )
     if receipt is None:
-        decision_proof = make_decision_proof(envelope=envelope, proofs=proofs, **proof_reproduce_kwargs)
+        decision_proof = make_decision_proof(envelope=envelope, proofs=proofs, envelope_bundle=True, **proof_reproduce_kwargs)
         if decision_proof.proof_id not in {proof.proof_id for proof in proofs}:
             proofs.append(decision_proof)
-    report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
+    report_json = to_report(envelope=envelope, receipt=receipt, traces=traces, proofs=proofs)
     if receipt is not None:
         receipt = receipt.model_copy(update={"report": receipt.report.model_copy(update={"report_hash": report_json["report_hash"]})})
         receipt = receipt.model_copy(update={"receipt_hash": ""})
         from redline.receipt import compute_receipt_hash
 
         receipt = receipt.model_copy(update={"receipt_hash": compute_receipt_hash(receipt)})
-        report_json = to_report(envelope=envelope, receipt=receipt, traces=traces)
+        report_json = to_report(envelope=envelope, receipt=receipt, traces=traces, proofs=proofs)
     artifacts = RunArtifacts(envelope=envelope, receipt=receipt, proofs=proofs, traces=traces, report_json=report_json, out_dir=out_dir)
     if out_dir is not None:
         write_artifacts(artifacts, out_dir=out_dir, ledger_written_at=ledger_written_at, ledger_path_label=ledger_path_label)
@@ -477,6 +477,18 @@ def _wellformed_assertions(traces: list[ReplayTrace]) -> list[Assertion]:
 
 def _candidate_absolute_assertions(assertions: list[Assertion]) -> list[Assertion]:
     return [assertion for assertion in assertions if assertion.metric in {"max_drawdown", "trade_budget"}]
+
+
+def _is_trusted_probe(probe_type: ProbeType, probe: object) -> bool:
+    expected_type = TRUSTED_PROBE_TYPES.get(probe_type)
+    expected_evaluate = TRUSTED_PROBE_EVALUATE.get(probe_type)
+    if expected_type is None or expected_evaluate is None:
+        return False
+    if type(probe) is not expected_type:
+        return False
+    if "evaluate" in getattr(probe, "__dict__", {}):
+        return False
+    return getattr(type(probe), "evaluate", None) is expected_evaluate
 
 
 def parse_run_inputs(package_dir: Path, suite_path: Path, spec_path: Path) -> tuple[Path, Path, Path]:
