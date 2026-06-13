@@ -20,6 +20,7 @@ import redline.surfaces as surfaces_module
 import redline.receipt as receipt_module
 import redline.cli as cli_module
 import redline.sponsor.bitget as bitget_module
+import redline.runner as runner_module
 
 from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree, sha256_bytes
 from redline.cli import app
@@ -356,6 +357,7 @@ def test_candidate_entropy_source_is_sandbox_violation(tmp_path: Path) -> None:
         "    return random.choice([0, 1])\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -379,6 +381,7 @@ def test_candidate_builtins_eval_bypass_is_sandbox_violation(tmp_path: Path) -> 
         "    return builtins.__dict__['eval']('0')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -403,6 +406,7 @@ def test_candidate_allowed_module_dunder_reexport_eval_bypass_is_sandbox_violati
         "    return e('(id(object()) // 16384) % 2')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -428,6 +432,7 @@ def test_candidate_operator_attrgetter_globals_bypass_is_sandbox_violation(tmp_p
         "    return int.from_bytes(importer('os').urandom(1), 'big') % 2\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -452,6 +457,7 @@ def test_candidate_platform_os_reexport_is_sandbox_violation(tmp_path: Path) -> 
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -476,6 +482,7 @@ def test_candidate_pathlib_metadata_read_is_sandbox_violation(tmp_path: Path) ->
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -666,6 +673,25 @@ def test_replayed_rejects_forged_runner_identity_even_when_hashes_recomputed(tmp
 
     assert result.status == VerificationStatus.REJECTED
     assert result.reason_code == ReasonCode.ENGINE_IDENTITY_MISMATCH
+
+
+def test_runner_lock_hash_ignores_python_patch_version(monkeypatch) -> None:
+    class VersionInfo:
+        def __init__(self, *, major: int, minor: int, micro: int) -> None:
+            self.major = major
+            self.minor = minor
+            self.micro = micro
+
+    engine_hash = "sha256:" + "a" * 64
+    monkeypatch.setattr(runner_module.sys, "version_info", VersionInfo(major=3, minor=12, micro=1))
+    first = runner_module._runner_lock_hash(engine_hash)
+    monkeypatch.setattr(runner_module.sys, "version_info", VersionInfo(major=3, minor=12, micro=99))
+    second = runner_module._runner_lock_hash(engine_hash)
+    monkeypatch.setattr(runner_module.sys, "version_info", VersionInfo(major=3, minor=13, micro=0))
+    third = runner_module._runner_lock_hash(engine_hash)
+
+    assert first == second
+    assert first != third
 
 
 def test_verifier_rejects_non_verdict_proof_marked_verdict_bearing(tmp_path: Path) -> None:
@@ -1025,6 +1051,7 @@ def test_sandbox_rejects_default_arg_open_alias(tmp_path: Path) -> None:
         "    return byte % 2\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1051,6 +1078,7 @@ def test_sandbox_rejects_function_repr_address_entropy(tmp_path: Path) -> None:
         "    return ((addr // 16) % 1000) / 1000\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1083,6 +1111,7 @@ def test_sandbox_rejects_config_format_address_entropy(tmp_path: Path) -> None:
         "    return Decimal((int(tail, 16) // 4096) % 7) / Decimal('100')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1119,6 +1148,7 @@ def test_sandbox_rejects_poisoned_numeric_modulo_format_entropy(tmp_path: Path) 
         "    return Decimal((int(tail, 16) // 4096) % 7) / Decimal('100')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1143,6 +1173,7 @@ def test_sandbox_rejects_object_signal_return(tmp_path: Path) -> None:
         "    return Signal()\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1172,6 +1203,7 @@ def test_sandbox_rejects_set_identity_hash_entropy(tmp_path: Path) -> None:
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1195,6 +1227,7 @@ def test_sandbox_allows_numeric_modulo_strategy(tmp_path: Path) -> None:
         "    return 1 if i % 2 == 0 else 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1217,6 +1250,7 @@ def test_sandbox_rejects_stdout_pollution(tmp_path: Path) -> None:
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1424,6 +1458,7 @@ def test_extreme_numeric_signal_fails_closed(tmp_path: Path) -> None:
         "    return Decimal('1e1000000')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     out_dir = tmp_path / "run"
     result = CliRunner().invoke(
         app,
@@ -1475,6 +1510,7 @@ def test_sandbox_rejects_indirect_dynamic_entropy(tmp_path: Path) -> None:
         "    return getattr(__builtins__, 'eval')(\"__import__('os').urandom(1)[0] % 2\")\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1498,6 +1534,7 @@ def test_sandbox_rejects_importlib_dynamic_builtin_access(tmp_path: Path) -> Non
         "    return importlib.import_module('builtins').eval('1')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1521,6 +1558,7 @@ def test_sandbox_rejects_sys_modules_builtin_access(tmp_path: Path) -> None:
         "    return sys.modules['builtins'].eval('1')\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1545,6 +1583,7 @@ def test_sandbox_rejects_private_module_reexport_eval_access(tmp_path: Path) -> 
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1570,6 +1609,7 @@ def test_sandbox_rejects_import_time_file_write_in_python_fallback(tmp_path: Pat
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1597,6 +1637,7 @@ def test_sandbox_rejects_import_time_fileio_write_in_python_fallback(monkeypatch
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1623,6 +1664,7 @@ def test_sandbox_rejects_import_time_loader_write_in_python_fallback(monkeypatch
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1650,6 +1692,7 @@ def test_sandbox_rejects_import_time_loader_read_in_python_fallback(monkeypatch,
         "    return 0 if int(bar['i']) < ENTRY else 1\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1676,6 +1719,7 @@ def test_sandbox_rejects_import_time_linecache_read(tmp_path: Path) -> None:
         "    return SECRET_SIGNAL\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1704,6 +1748,7 @@ def test_sandbox_rejects_import_time_configparser_read(tmp_path: Path) -> None:
         "    return ALLOW\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1731,6 +1776,7 @@ def test_sandbox_rejects_import_time_runpy_read(tmp_path: Path) -> None:
         "    return ALLOW\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1762,6 +1808,7 @@ def test_sandbox_rejects_import_time_genericpath_metadata(tmp_path: Path) -> Non
         "    return 1\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1793,6 +1840,7 @@ def test_sandbox_rejects_runtime_genericpath_metadata(tmp_path: Path) -> None:
         "    return 1\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1820,6 +1868,7 @@ def test_sandbox_rejects_import_time_logging_filehandler_in_python_fallback(monk
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1848,6 +1897,7 @@ def test_sandbox_rejects_import_time_path_unlink_in_python_fallback(monkeypatch,
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1875,6 +1925,7 @@ def test_sandbox_rejects_import_time_path_mkdir_in_python_fallback(monkeypatch, 
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1906,6 +1957,7 @@ def test_sandbox_rejects_import_time_sqlite_write_in_python_fallback(monkeypatch
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1939,6 +1991,7 @@ def test_sandbox_rejects_runtime_sqlite_write_in_python_fallback(monkeypatch, tm
         "    return 0\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1962,6 +2015,7 @@ def test_sandbox_rejects_object_address_entropy(tmp_path: Path) -> None:
         "    return hash(str(object())) % 2\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -1986,6 +2040,7 @@ def test_sandbox_rejects_runtime_file_read_leak(tmp_path: Path) -> None:
         "        return fh.read(1)[0]\n",
         encoding="utf-8",
     )
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -2333,6 +2388,39 @@ def test_mcp_package_path_defaults_to_replayed_and_checks_proof_sidecars(tmp_pat
     assert result["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
 
 
+def test_cli_check_package_defaults_to_replayed_and_hash_only_is_explicit(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    runner = CliRunner()
+
+    replayed = runner.invoke(app, ["check", str(tmp_path / "run" / "receipt.json"), "--package", str(PACKAGE), "--json"])
+    assert replayed.exit_code == 10
+    payload = json.loads(replayed.stdout)
+    assert payload["verification_level"] == VerificationLevel.REPLAYED.value
+    assert payload["reason_code"] == ReasonCode.BASELINE_GENESIS.value
+
+    hash_only = runner.invoke(app, ["check", str(tmp_path / "run" / "receipt.json"), "--package", str(PACKAGE), "--hash-only", "--json"])
+    assert hash_only.exit_code == 6
+    payload = json.loads(hash_only.stdout)
+    assert payload["verification_level"] == VerificationLevel.HASH_ONLY.value
+    assert payload["reason_code"] == ReasonCode.UNVERIFIED_NO_VERDICT.value
+
+    both = runner.invoke(app, ["check", str(tmp_path / "run" / "receipt.json"), "--rerun", "--hash-only", "--json"])
+    assert both.exit_code == 2
+    assert json.loads(both.stdout)["reason_code"] == ReasonCode.SCHEMA_INVALID.value
+
+
+def test_cli_check_package_default_replay_checks_proof_sidecars(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    next((tmp_path / "run" / "proofs").glob("proof_probe_*.json")).unlink()
+    result = CliRunner().invoke(app, ["check", str(tmp_path / "run" / "receipt.json"), "--package", str(PACKAGE), "--json"])
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert payload["verification_level"] == VerificationLevel.REPLAYED.value
+    assert payload["reason_code"] == ReasonCode.RECEIPT_MISMATCH.value
+
+
 def test_mcp_verify_receipt_alias_matches_check_surface(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
     assert artifacts.receipt is not None
@@ -2670,6 +2758,7 @@ def test_import_write_lock_and_receipt_bind_playbook_identity(tmp_path: Path) ->
     lock = build_identity_lock(package)
     assert imported.identity_lock_hash == lock.lock_hash
     assert "baseline/strategy.py" in {item.path for item in lock.locked_files}
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -2745,6 +2834,31 @@ def test_missing_playbook_identity_lock_is_fail_closed(tmp_path: Path) -> None:
     assert initialized.exit_code == 0
     payload = json.loads(initialized.stdout)
     assert payload["identity_lock_hash"].startswith("sha256:")
+
+
+def test_unlocked_new_playbook_source_is_fail_closed(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    new_candidate = package / "candidate_unlocked"
+    shutil.copytree(package / "candidate_good", new_candidate)
+
+    artifacts = run_redline(
+        package_dir=package,
+        baseline="baseline",
+        candidate="candidate_unlocked",
+        suite_path=SUITE,
+        spec_path=SPEC,
+        out_dir=tmp_path / "run",
+    )
+
+    assert artifacts.receipt is None
+    assert artifacts.envelope.status == Status.REJECT
+    assert artifacts.envelope.reason_code == ReasonCode.RECEIPT_BINDING_FAILED
+    imported = CliRunner().invoke(app, ["import", str(package), "--json"])
+    assert imported.exit_code == 4
+    assert json.loads(imported.stdout)["reason_code"] == ReasonCode.RECEIPT_BINDING_FAILED.value
+    refreshed = CliRunner().invoke(app, ["import", str(package), "--write-lock", "--json"])
+    assert refreshed.exit_code == 0
 
 
 def test_import_compile_cli_bad_inputs_return_typed_json(tmp_path: Path) -> None:
@@ -3784,6 +3898,8 @@ def test_doctor_json_runs_backend_smoke() -> None:
     assert checks["fixture-inputs"]["evidence"]["scenario_count"] == "2"
     assert checks["deterministic-pass-smoke"]["evidence"]["reason_code"] == ReasonCode.BASELINE_GENESIS.value
     assert checks["withheld-smoke"]["evidence"]["reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
+    assert checks["checked-in-demo-artifacts"]["evidence"]["pass_reason_code"] == ReasonCode.BASELINE_GENESIS.value
+    assert checks["checked-in-demo-artifacts"]["evidence"]["withheld_reason_code"] == ReasonCode.NEW_BLOCK_BREACH.value
     assert int(checks["schema-export-smoke"]["evidence"]["schema_count"]) >= 17
 
 
@@ -4002,10 +4118,37 @@ def test_bitget_sponsor_readback_rejects_metric_mismatch(tmp_path: Path) -> None
     assert readback.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
 
 
-def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
+def _publish_ready_bitget_adapter(tmp_path: Path, publish_payload: dict[str, str]) -> BitgetSponsorAdapter:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+
     def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
-        assert url.endswith("/api/v1/playbook/publish")
-        return 200, json.dumps({"code": "00000", "data": {"status": "failed"}}).encode()
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1", "version_id": "version-1"}).encode()
+        if url.endswith("/api/v1/playbook/run") and method == "POST":
+            return 200, json.dumps({"run_id": "run-1", "status": "started"}).encode()
+        if "/api/v1/playbook/run?" in url and method == "GET":
+            metrics_output = {
+                "status": artifacts.receipt.result.status,
+                "breaches": [assertion.model_dump(mode="json") for assertion in artifacts.receipt.result.new_breaches],
+            }
+            return 200, json.dumps(
+                {
+                    "code": "00000",
+                    "data": {
+                        "run_id": "run-1",
+                        "version_id": "version-1",
+                        "status": "completed",
+                        "metrics_output": metrics_output,
+                        "package_hash": artifacts.receipt.package.identity_hash,
+                        "package_archive_hash": sha256_bytes(archive.read_bytes()),
+                    },
+                }
+            ).encode()
+        if url.endswith("/api/v1/playbook/publish"):
+            return 200, json.dumps({"code": "00000", "data": publish_payload}).encode()
+        return 404, b"{}"
 
     adapter = BitgetSponsorAdapter(
         access_key="abcd1234secret5678",
@@ -4014,8 +4157,104 @@ def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
         transcript_path=tmp_path / "transcript.jsonl",
         transport=transport,
     )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    assert upload.ok is True
+    run = adapter.run(version_id=upload.evidence["version_id"])
+    assert run.ok is True
     adapter.proof_eligible = True
+    readback = adapter.readback(
+        run_id=run.evidence["run_id"],
+        expected_version_id=upload.evidence["version_id"],
+        expected_metrics_output_hash=artifacts.receipt.result.result_hash,
+        expected_package_hash=artifacts.receipt.package.identity_hash,
+        expected_package_archive_hash=upload.evidence["package_archive_hash"],
+    )
+    assert readback.ok is True
+    assert readback.state == SponsorState.READBACK_VERIFIED
+    return adapter
+
+
+def test_bitget_sponsor_run_requires_upload_session(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append(url)
+        return 200, json.dumps({"run_id": "run-1"}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+
+    result = adapter.run(version_id="version-1")
+
+    assert result.ok is False
+    assert result.state == SponsorState.LOCAL_PASS_REQUIRED
+    assert result.evidence["required_step"] == "upload"
+    assert calls == []
+
+
+def test_bitget_sponsor_run_requires_uploaded_version_id(tmp_path: Path) -> None:
+    package, artifacts = _make_chained_pass_fixture(tmp_path)
+    assert artifacts.receipt is not None
+    archive = make_package_archive(package_dir=package, out_path=tmp_path / "package.tar.gz")
+    calls: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append(url)
+        if url.endswith("/api/v1/playbook/upload"):
+            return 200, json.dumps({"draft_id": "draft-1"}).encode()
+        return 200, json.dumps({"run_id": "run-1"}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+    upload = adapter.upload(envelope=artifacts.envelope, package_hash=artifacts.receipt.package.identity_hash, package_archive=archive)
+    assert upload.ok is True
+
+    result = adapter.run(version_id="version-1")
+
+    assert result.ok is False
+    assert result.state == SponsorState.LOCAL_PASS_REQUIRED
+    assert result.evidence["required_step"] == "upload.version_id"
+    assert len(calls) == 1
+
+
+def test_bitget_sponsor_publish_requires_verified_readback_session(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        calls.append(url)
+        return 200, json.dumps({"code": "00000", "data": {"status": "ok", "publish_id": "publish-1"}}).encode()
+
+    adapter = BitgetSponsorAdapter(
+        access_key="abcd1234secret5678",
+        secret_key="secret-key-1",
+        passphrase="passphrase-1",
+        transcript_path=tmp_path / "transcript.jsonl",
+        transport=transport,
+    )
+
     result = adapter.publish(draft_id="draft-1")
+
+    assert result.ok is False
+    assert result.state == SponsorState.LOCAL_PASS_REQUIRED
+    assert result.evidence["required_step"] == "readback"
+    assert calls == []
+
+
+def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
+    adapter = _publish_ready_bitget_adapter(tmp_path, {"status": "failed", "publish_id": "publish-1"})
+
+    result = adapter.publish(draft_id="draft-1")
+
     assert result.ok is False
     assert result.state == SponsorState.MISMATCH
     assert result.reason_code == ReasonCode.SPONSOR_READBACK_MISMATCH
@@ -4023,18 +4262,7 @@ def test_bitget_publish_rejects_failed_terminal_status(tmp_path: Path) -> None:
 
 
 def test_bitget_publish_requires_durable_publish_identifier(tmp_path: Path) -> None:
-    def transport(method: str, url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
-        assert url.endswith("/api/v1/playbook/publish")
-        return 200, json.dumps({"code": "00000", "data": {"status": "ok"}}).encode()
-
-    adapter = BitgetSponsorAdapter(
-        access_key="abcd1234secret5678",
-        secret_key="secret-key-1",
-        passphrase="passphrase-1",
-        transcript_path=tmp_path / "transcript.jsonl",
-        transport=transport,
-    )
-    adapter.proof_eligible = True
+    adapter = _publish_ready_bitget_adapter(tmp_path, {"status": "ok"})
 
     result = adapter.publish(draft_id="draft-1")
 
@@ -4509,6 +4737,7 @@ def test_execute_sponsor_readback_rejects_platform_metric_mismatch(monkeypatch, 
     baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
     assert baseline.receipt is not None
     _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -4615,6 +4844,7 @@ def test_execute_sponsor_readback_final_publish_uses_publish_transcript_hash(mon
     baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
     assert baseline.receipt is not None
     _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",
@@ -4714,6 +4944,7 @@ def test_execute_sponsor_readback_rejects_tampered_receipt_before_adapter(monkey
     baseline = run_redline(package_dir=package, baseline="baseline", candidate="baseline", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "baseline")
     assert baseline.receipt is not None
     _sign_run_checkpoint(tmp_path / "baseline", private_key, policy_id="sponsor-policy", key_id="sponsor-key", issuer="sponsor-ci")
+    write_identity_lock(package)
     artifacts = run_redline(
         package_dir=package,
         baseline="baseline",

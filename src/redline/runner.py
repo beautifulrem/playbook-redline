@@ -42,6 +42,7 @@ from redline.trust import verify_checkpoint_attestation
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
 
 DEFAULT_EDIT_PROVENANCE_CAPTURED_AT = "2026-06-10T00:00:00Z"
+RUNNER_SEMANTIC_VERSION = "redline-deterministic-runner.v1"
 
 
 def load_spec(path: Path) -> RedlineSpec:
@@ -633,9 +634,9 @@ def _runner_lock_hash(engine_hash: str) -> str:
     uv_lock = repo_root / "uv.lock"
     return hash_obj(
         {
-            "engine": "deterministic",
+            "engine": RUNNER_SEMANTIC_VERSION,
             "engine_source_tree_hash": engine_hash,
-            "python": f"{sys.implementation.name}-{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "python_runtime": f"{sys.implementation.name}-{sys.version_info.major}.{sys.version_info.minor}",
             "uv_lock_hash": hash_file(uv_lock) if uv_lock.exists() else None,
         }
     )

@@ -265,15 +265,19 @@ def check(
     trust_policy: Optional[Path] = typer.Option(None, "--trust-policy"),
     baseline_receipt: Optional[Path] = typer.Option(None, "--baseline-receipt"),
     rerun: bool = False,
+    hash_only: bool = typer.Option(False, "--hash-only", help="Force integrity-only verification even when --package is provided."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    level = VerificationLevel.REPLAYED if rerun else VerificationLevel.HASH_ONLY
+    if rerun and hash_only:
+        _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "--rerun and --hash-only are mutually exclusive", receipt)
+    effective_rerun = (rerun or package is not None) and not hash_only
+    level = VerificationLevel.REPLAYED if effective_rerun else VerificationLevel.HASH_ONLY
     result = verify(
         receipt_path=receipt,
         package=package,
         level=level,
-        suite_path=suite if rerun else None,
-        spec_path=spec if rerun else None,
+        suite_path=suite if effective_rerun else None,
+        spec_path=spec if effective_rerun else None,
         report_path=report,
         ledger_path=ledger,
         ledger_checkpoint_path=ledger_checkpoint,
@@ -869,6 +873,7 @@ def _run_doctor(*, package: Path, suite: Path, spec: Path) -> DoctorResult:
     checks.append(_doctor_check("fixture-inputs", lambda: _doctor_fixture_inputs(package=package, suite=suite, spec=spec)))
     checks.append(_doctor_check("deterministic-pass-smoke", lambda: _doctor_deterministic_pass_smoke(package=package, suite=suite, spec=spec)))
     checks.append(_doctor_check("withheld-smoke", lambda: _doctor_withheld_smoke(package=package, suite=suite, spec=spec)))
+    checks.append(_doctor_check("checked-in-demo-artifacts", lambda: _doctor_checked_in_demo_artifacts(package=package, suite=suite, spec=spec)))
     checks.append(_doctor_check("schema-export-smoke", lambda: _doctor_schema_export_smoke()))
     first_failed = next((check for check in checks if not check.ok), None)
     return DoctorResult(ok=first_failed is None, reason_code=first_failed.reason_code if first_failed is not None else ReasonCode.PASS, checks=checks)
@@ -943,6 +948,23 @@ def _doctor_withheld_smoke(*, package: Path, suite: Path, spec: Path) -> dict[st
         "status": artifacts.envelope.status.value,
         "reason_code": artifacts.envelope.reason_code.value,
         "receipt_hash": artifacts.receipt.receipt_hash,
+    }
+
+
+def _doctor_checked_in_demo_artifacts(*, package: Path, suite: Path, spec: Path) -> dict[str, str]:
+    pass_receipt = Path("artifacts/demo/pass/receipt.json")
+    withheld_receipt = Path("artifacts/demo/withheld/receipt.json")
+    pass_result = verify(receipt_path=pass_receipt, package=package, suite_path=suite, spec_path=spec, level=VerificationLevel.REPLAYED)
+    withheld_result = verify(receipt_path=withheld_receipt, package=package, suite_path=suite, spec_path=spec, level=VerificationLevel.REPLAYED)
+    if pass_result.status != VerificationStatus.UNVERIFIED_NO_VERDICT or pass_result.reason_code != ReasonCode.BASELINE_GENESIS:
+        raise ValueError(f"checked-in pass artifact drift: {pass_result.status.value}/{pass_result.reason_code.value}")
+    if withheld_result.status != VerificationStatus.VERIFIED or withheld_result.reason_code != ReasonCode.NEW_BLOCK_BREACH:
+        raise ValueError(f"checked-in withheld artifact drift: {withheld_result.status.value}/{withheld_result.reason_code.value}")
+    return {
+        "pass_reason_code": pass_result.reason_code.value,
+        "pass_receipt_hash": pass_result.receipt_hash or "",
+        "withheld_reason_code": withheld_result.reason_code.value,
+        "withheld_receipt_hash": withheld_result.receipt_hash or "",
     }
 
 

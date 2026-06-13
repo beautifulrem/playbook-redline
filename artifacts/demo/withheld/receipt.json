@@ -47,7 +47,7 @@
   "runner": {
     "engine": "deterministic",
     "engine_source_tree_hash": "sha256:9c88403c1ede46fc115693092b00892bf6c5ef3b42e57666e59cca09130dcf05",
-    "runner_lock_hash": "sha256:871aa940c424cd77717ebbbe350a1c81a104191319a858496264f6e3b32dc4a8",
+    "runner_lock_hash": "sha256:b42f54edef58cffc25831f79c03aa33f006be6a7a5d92a02d2f88d168268314d",
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
@@ -556,5 +556,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:31c7b9f6d805292b388aaba1711928e7225b24becc5cab6dc88a835f466c17b0"
+  "receipt_hash": "sha256:bf7b024e433b7c13dff754254ff57b7e9bc59c9d2186ab3253669faecd400b6e"
 }

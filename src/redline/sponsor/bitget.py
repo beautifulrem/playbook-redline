@@ -332,7 +332,10 @@ class BitgetSponsorAdapter:
             and _is_official_bitget_base_url(self.base_url)
         )
         self.transcript = SponsorTranscript(transcript_path)
+        self._upload_accepted = False
+        self._readback_verified = False
         self._expected_version_id: str | None = None
+        self._expected_draft_id: str | None = None
         self._expected_package_hash: str | None = None
         self._expected_package_archive_hash: str | None = None
 
@@ -389,9 +392,23 @@ class BitgetSponsorAdapter:
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
         if self.proof_eligible and (response_package_hash != package_hash or response_archive_hash != package_archive_hash):
             return SponsorStepResult(ok=False, state=SponsorState.MISMATCH, evidence=result.evidence, reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH)
+        self._upload_accepted = True
+        self._expected_version_id = result.evidence.get("version_id") or result.evidence.get("suggested_version")
+        self._expected_draft_id = result.evidence.get("draft_id")
         return result
 
     def run(self, *, version_id: str) -> SponsorStepResult:
+        if not self._upload_accepted:
+            return _sponsor_session_required("run", "upload")
+        if self._expected_version_id is None:
+            return _sponsor_session_required("run", "upload.version_id")
+        if self._expected_version_id is not None and version_id != self._expected_version_id:
+            return SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={"version_id": version_id, "expected_version_id": self._expected_version_id},
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
         self._expected_version_id = version_id
         return self._json_request(
             step=SponsorState.RUN_STARTED,
@@ -480,6 +497,7 @@ class BitgetSponsorAdapter:
                 evidence=evidence,
                 reason_code=ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED,
             )
+        self._readback_verified = True
         return SponsorStepResult(
             ok=True,
             state=SponsorState.READBACK_VERIFIED,
@@ -487,6 +505,17 @@ class BitgetSponsorAdapter:
         )
 
     def publish(self, *, draft_id: str, bump_type: str = "patch") -> SponsorStepResult:
+        if not self._readback_verified:
+            return _sponsor_session_required("publish", "readback")
+        if self._expected_draft_id is None:
+            return _sponsor_session_required("publish", "upload.draft_id")
+        if self._expected_draft_id is not None and draft_id != self._expected_draft_id:
+            return SponsorStepResult(
+                ok=False,
+                state=SponsorState.MISMATCH,
+                evidence={"draft_id": draft_id, "expected_draft_id": self._expected_draft_id},
+                reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+            )
         result = self._json_request(
             step=SponsorState.PUBLISHED,
             method="POST",
@@ -719,6 +748,15 @@ def _publish_success_evidence(evidence: dict[str, str]) -> bool:
     if status is not None and status.lower() not in {"published", "success", "succeeded", "completed", "ok"}:
         return False
     return any(key in evidence and evidence[key] for key in ("publish_id", "published_version_id"))
+
+
+def _sponsor_session_required(call_site: str, required_step: str) -> SponsorStepResult:
+    return SponsorStepResult(
+        ok=False,
+        state=SponsorState.LOCAL_PASS_REQUIRED,
+        evidence={"call_site": call_site, "required_step": required_step},
+        reason_code=ReasonCode.SPONSOR_READBACK_MISMATCH,
+    )
 
 
 def _mask(value: str) -> str:

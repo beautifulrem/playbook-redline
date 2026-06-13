@@ -13,7 +13,7 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Bitget relevance: focuses on copy-trading/playbook safety before publication, with a sponsor read-back path for live run verification.
 - Technical depth: combines deterministic replay, canonical hashing, proof coverage, sandboxing, signed ledger checkpoints, a narrow MCP receipt-check tool, JSON schemas, and CI integration.
 - Product clarity: the primary user is a strategy author or reviewer who needs a yes/no publish gate plus machine-checkable evidence, not another dashboard without enforceable provenance.
-- Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --rerun` let judges replay the evidence locally.
+- Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --package` let judges replay the evidence locally.
 - Extensibility: probe definitions, suites, package import, report rendering, internal MCP helper surfaces, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel; the public FastMCP registration exposes only the safe receipt-check tool.
 
 ## What Is Included
@@ -65,7 +65,7 @@ refreshes that lock; receipts record `package.identity_lock_hash`, and replayed
 verification fails closed if a locked source file drifts.
 
 `BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
-Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses `--rerun` with the package, suite, and spec inputs.
+Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses package-bound replay. `redline check --package ...` now replays by default, while `--hash-only` must be supplied explicitly for integrity-only inspection.
 Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an Ed25519-signed ledger attestation verified against a protected trust policy.
 
 ## CLI
@@ -159,7 +159,10 @@ preflight is already chained and signed. `--final-publish` additionally requires
 credentialed response must include durable publish/readback identifiers before it
 can reach `READBACK_VERIFIED` or `PUBLISHED`. The current adapter uses injectable
 mock transport for tests plus a conservative HMAC-signed HTTP wrapper for a
-future documented Playbook sponsor contract.
+future documented Playbook sponsor contract. Without those credentials and a
+proof-eligible live read-back, the award evidence is the local proof kernel,
+receipt verifier, proof sidecars, signed ledger path, and reproducible checked-in
+artifacts; the recorded sponsor file is only a schema fixture.
 
 ## Repository Layout
 

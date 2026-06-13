@@ -59,6 +59,9 @@ def load_identity_lock(package: Path) -> PlaybookIdentityLock:
 def _validate_locked_files(package: Path, lock: PlaybookIdentityLock) -> None:
     root = package.resolve()
     seen: set[str] = set()
+    current_locked_paths = [rel for rel, _path in iter_canonical_files(package) if _is_identity_source_file(rel)]
+    if [item.path for item in lock.locked_files] != current_locked_paths:
+        raise CanonicalizationError("playbook identity lock file set mismatch", ReasonCode.RECEIPT_BINDING_FAILED)
     for item in lock.locked_files:
         if item.path in seen or item.path.startswith("/") or ".." in Path(item.path).parts:
             raise CanonicalizationError("playbook identity lock contains unsafe path", ReasonCode.RECEIPT_BINDING_FAILED)
