@@ -2340,7 +2340,7 @@ def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
         proof_fingerprints.add(tuple(proof.artifact_hash for proof in artifacts.receipt.proofs))
         trace_fingerprints.add(tuple(trace.artifact_hash for trace in artifacts.traces))
 
-    assert receipt_hashes == {"sha256:91e3c7e50e70bcdbbd46bfedf348062a5af2f91735de82b51ec24b89b3ce224a"}
+    assert receipt_hashes == {"sha256:4660341334ba5b7f21c69ac4c204b7ef5efb71b37ad9c4fffc77a27d09a7ecda"}
     assert len(report_hashes) == 1
     assert len(proof_fingerprints) == 1
     assert len(trace_fingerprints) == 1

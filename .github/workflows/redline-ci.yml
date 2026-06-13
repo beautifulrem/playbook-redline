@@ -13,8 +13,14 @@ jobs:
       - run: uv sync --frozen --extra dev
       - run: uv run python scripts/check-verdict-path-imports.py
       - run: uv run --extra dev pytest
+      - run: bash scripts/service-smoke.sh
       - run: uv run redline export-schemas --out /tmp/redline-schemas
-      - run: diff -ru schemas /tmp/redline-schemas
+      - run: |
+          cp -R schemas /tmp/checked-schemas
+          rm -f /tmp/checked-schemas/service-openapi.json
+          diff -ru /tmp/checked-schemas /tmp/redline-schemas
+      - run: uv run python scripts/export-service-openapi.py --out /tmp/service-openapi.json
+      - run: diff -u schemas/service-openapi.json /tmp/service-openapi.json
       - run: uv run redline make-demo
       - run: uv run python scripts/verify-sponsor-fixture.py
       - run: git diff --exit-code -- schemas artifacts/demo artifacts/sponsor

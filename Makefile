@@ -1,4 +1,4 @@
-.PHONY: install audit test schemas demo verify-demo verify-sponsor-fixture goldens goldens-check
+.PHONY: install audit test schemas openapi service-smoke demo verify-demo verify-sponsor-fixture goldens goldens-check
 
 install:
 	uv sync --frozen --extra dev
@@ -11,6 +11,12 @@ test:
 
 schemas:
 	uv run redline export-schemas
+
+openapi:
+	uv run python scripts/export-service-openapi.py --out schemas/service-openapi.json
+
+service-smoke:
+	bash scripts/service-smoke.sh
 
 demo:
 	uv run redline make-demo
@@ -28,7 +34,7 @@ verify-demo:
 verify-sponsor-fixture:
 	uv run python scripts/verify-sponsor-fixture.py
 
-goldens: schemas demo verify-demo
+goldens: schemas openapi demo verify-demo
 
 goldens-check: goldens verify-sponsor-fixture
 	git diff --exit-code -- schemas artifacts/demo artifacts/sponsor

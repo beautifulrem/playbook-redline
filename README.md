@@ -26,6 +26,7 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Proof-level verification command
 - Machine-readable backend doctor for Day-0 fixture, schema, replay, and proof-map smoke checks
 - Static verdict-path import gate for proof/probe/verifier code
+- FastAPI service boundary with token-gated run creation, SQLite run state, OpenAPI, package upload/import, and artifact download
 - JSON schemas for receipts, reports, specs, suites, decisions, doctor results, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
 - Fail-closed tests for sandbox and verdict-path violations
@@ -139,6 +140,37 @@ The Python wheel installs the CLI and library only. The bundled fixture package,
 schemas, GitHub Action, and checked-in demo artifacts are repository assets; use
 a repository checkout for the complete demo.
 
+## Service API
+
+The HTTP service is a thin FastAPI boundary over the same proof kernel. It does
+not shell out to the CLI and does not create a second verdict path: workers call
+`run_redline`, persist run state in SQLite, and expose the generated
+receipt/report/proof artifacts from isolated per-run directories.
+
+```bash
+REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
+```
+
+Minimal local flow:
+
+```bash
+curl -s http://127.0.0.1:8080/health
+
+curl -s -X POST http://127.0.0.1:8080/v1/packages/import \
+  -H 'content-type: application/json' \
+  -H 'x-redline-token: redline-demo' \
+  -d '{"package_path":"fixtures/demo_pack"}'
+
+curl -s -X POST http://127.0.0.1:8080/v1/runs \
+  -H 'content-type: application/json' \
+  -H 'x-redline-token: redline-demo' \
+  -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}'
+```
+
+The service OpenAPI contract is checked in at `schemas/service-openapi.json`.
+Frontend-facing endpoint semantics and response examples are documented in
+`SERVICE_API.md`.
+
 ## Verification Script
 
 ```bash
@@ -179,5 +211,6 @@ fixtures/         demo packages, suites, specs
 schemas/          exported JSON schemas
 artifacts/demo/   checked-in demo receipts and proof artifacts
 artifacts/sponsor recorded sponsor-attestation shape fixture
+SERVICE_API.md    service API contract for frontend/demo integration
 scripts/          helper verification scripts
 ```
