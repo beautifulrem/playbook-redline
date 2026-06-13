@@ -872,6 +872,25 @@ def test_missing_required_proof_is_unverified(tmp_path: Path) -> None:
     assert result.reason_code == ReasonCode.UNVERIFIED_NO_VERDICT
 
 
+@pytest.mark.parametrize("missing_kind", sorted(REQUIRED_PROOFS[Status.PASS], key=lambda item: item.value))
+def test_pass_receipt_rejects_missing_each_required_verdict_proof_kind(tmp_path: Path, missing_kind: ProofKind) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.receipt is not None
+    receipt_path = tmp_path / "receipt.json"
+    data = json.loads(receipt_path.read_text(encoding="utf-8"))
+    removed = [proof["proof_id"] for proof in data["proofs"] if proof["kind"] == missing_kind.value and proof["verdict_bearing"]]
+    assert removed
+    data["proofs"] = [proof for proof in data["proofs"] if proof["proof_id"] not in removed]
+    data["receipt_hash"] = compute_receipt_hash(Receipt.model_validate(data))
+    receipt_path.write_text(json.dumps(data), encoding="utf-8")
+
+    result = verify(receipt_path=receipt_path, level=VerificationLevel.HASH_ONLY)
+
+    assert result.status == VerificationStatus.UNVERIFIED_NO_VERDICT
+    assert result.reason_code == ReasonCode.UNVERIFIED_NO_VERDICT
+    assert missing_kind.value in result.missing_proof_ids or any(proof_id in result.missing_proof_ids for proof_id in removed)
+
+
 def test_partial_coverage_never_passes() -> None:
     coverage = CoverageManifest(cells=[("scenario", "probe")], complete=False, missing=["scenario:probe"])
     envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
@@ -2298,6 +2317,48 @@ def test_replay_hash_is_stable() -> None:
     first = engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate")
     hashes = {engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate").artifact_hash for _ in range(100)}
     assert hashes == {first.artifact_hash}
+
+
+def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
+    receipt_hashes: set[str] = set()
+    report_hashes: set[str] = set()
+    proof_fingerprints: set[tuple[str, ...]] = set()
+    trace_fingerprints: set[tuple[str, ...]] = set()
+
+    for _ in range(100):
+        artifacts = run_redline(
+            package_dir=PACKAGE,
+            baseline="baseline",
+            candidate="candidate_good",
+            suite_path=SUITE,
+            spec_path=SPEC,
+            out_dir=None,
+        )
+        assert artifacts.receipt is not None
+        receipt_hashes.add(artifacts.receipt.receipt_hash)
+        report_hashes.add(artifacts.report_json["report_hash"])
+        proof_fingerprints.add(tuple(proof.artifact_hash for proof in artifacts.receipt.proofs))
+        trace_fingerprints.add(tuple(trace.artifact_hash for trace in artifacts.traces))
+
+    assert receipt_hashes == {"sha256:91e3c7e50e70bcdbbd46bfedf348062a5af2f91735de82b51ec24b89b3ce224a"}
+    assert len(report_hashes) == 1
+    assert len(proof_fingerprints) == 1
+    assert len(trace_fingerprints) == 1
+
+
+def test_spec_hash_is_invariant_to_json_key_order(tmp_path: Path) -> None:
+    def reverse_keys(value: object) -> object:
+        if isinstance(value, dict):
+            return {key: reverse_keys(value[key]) for key in reversed(list(value.keys()))}
+        if isinstance(value, list):
+            return [reverse_keys(item) for item in value]
+        return value
+
+    original = json.loads(SPEC.read_text(encoding="utf-8"))
+    reordered_path = tmp_path / "redline_spec_reordered.json"
+    reordered_path.write_text(json.dumps(reverse_keys(original), indent=2), encoding="utf-8")
+
+    assert hash_obj(load_spec(reordered_path)) == hash_obj(load_spec(SPEC))
 
 
 def test_replay_hash_is_stable_across_parent_hash_seeds() -> None:
@@ -6016,6 +6077,35 @@ def test_public_json_artifacts_validate_against_exported_schemas(tmp_path: Path)
     validate("doctor-result.v1.schema.json", doctor_result.model_dump(mode="json"))
 
 
+def test_checked_in_demo_reports_validate_and_bind_receipts(tmp_path: Path) -> None:
+    schema_dir = tmp_path / "schemas"
+    export_schemas(schema_dir)
+    report_schema = json.loads((schema_dir / "report.v1.schema.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(report_schema)
+
+    for run_name in ["pass", "withheld"]:
+        run_dir = ROOT / "artifacts/demo" / run_name
+        report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+        receipt = Receipt.model_validate(json.loads((run_dir / "receipt.json").read_text(encoding="utf-8")))
+        envelope = DecisionEnvelope.model_validate(json.loads((run_dir / "envelope.json").read_text(encoding="utf-8")))
+        sidecar_proofs = [
+            Proof.model_validate(json.loads(path.read_text(encoding="utf-8")))
+            for path in sorted((run_dir / "proofs").glob("*.json"))
+        ]
+
+        validator.validate(report)
+        ReportJson.model_validate(report)
+        assert report["envelope"] == envelope.model_dump(mode="json")
+        assert report["receipt_hash"] == receipt.receipt_hash
+        assert report["strength_summary"] == receipt.strength_summary
+        assert report["proof_ids"] == [proof.proof_id for proof in receipt.proofs]
+        assert sorted(report["proof_ids"]) == sorted(proof.proof_id for proof in sidecar_proofs)
+        hash_payload = {key: value for key, value in report.items() if key != "report_hash"}
+        hash_payload["receipt_hash"] = None
+        assert report["report_hash"] == hash_obj(hash_payload)
+        assert report["report_hash"] == receipt.report.report_hash
+
+
 def test_composite_action_runs_against_caller_workspace() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert 'allow-amber-baseline-genesis:' in action
@@ -6068,6 +6158,93 @@ def test_composite_action_workspace_path_resolver_rejects_escape_and_metachar_ex
     assert not marker.exists()
 
 
+def test_composite_action_run_and_enforce_steps_execute_with_fake_uv(tmp_path: Path) -> None:
+    action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    run_section = action.split("    - name: Run Redline", 1)[1].split("    - uses: actions/upload-artifact@v4", 1)[0]
+    run_block = textwrap.dedent(run_section.split("      run: |\n", 1)[1])
+    enforce_section = action.split("    - name: Enforce Redline result", 1)[1]
+    enforce_block = textwrap.dedent(enforce_section.split("      run: |\n", 1)[1])
+    workspace = tmp_path / "workspace"
+    action_path = tmp_path / "action"
+    fake_bin = tmp_path / "bin"
+    output_path = tmp_path / "github-output.txt"
+    log_path = tmp_path / "uv.log"
+    (workspace / "fixtures/demo_pack").mkdir(parents=True)
+    (workspace / "fixtures/suites").mkdir(parents=True)
+    (workspace / "fixtures/specs").mkdir(parents=True)
+    (workspace / "fixtures/suites/demo_suite.json").write_text("{}", encoding="utf-8")
+    (workspace / "fixtures/specs/redline_spec.json").write_text("{}", encoding="utf-8")
+    (action_path / "fixtures/demo_pack").mkdir(parents=True)
+    fake_bin.mkdir()
+    fake_uv = fake_bin / "uv"
+    fake_uv.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$FAKE_UV_LOG"
+if [ "${4:-}" = "python" ]; then
+  cat >/dev/null
+  target="${@: -1}"
+  if [ "$target" = "$GITHUB_ACTION_PATH/fixtures/demo_pack" ]; then
+    printf '%s\n' "$FAKE_DEMO_HASH"
+  else
+    printf '%s\n' "$FAKE_PACKAGE_HASH"
+  fi
+  exit 0
+fi
+if [ "${4:-}" = "redline" ] && [ "${5:-}" = "run" ]; then
+  exit "${FAKE_REDLINE_EXIT:-0}"
+fi
+exit 70
+""",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
+        "GITHUB_WORKSPACE": str(workspace),
+        "GITHUB_ACTION_PATH": str(action_path),
+        "GITHUB_OUTPUT": str(output_path),
+        "REDLINE_ACTION_PACKAGE": "fixtures/demo_pack",
+        "REDLINE_ACTION_BASELINE": "baseline",
+        "REDLINE_ACTION_CANDIDATE": "candidate_good",
+        "REDLINE_ACTION_SUITE": "fixtures/suites/demo_suite.json",
+        "REDLINE_ACTION_SPEC": "fixtures/specs/redline_spec.json",
+        "REDLINE_ACTION_OUT": "artifacts/action-redline",
+        "FAKE_PACKAGE_HASH": "sha256:" + "1" * 64,
+        "FAKE_DEMO_HASH": "sha256:" + "1" * 64,
+        "FAKE_REDLINE_EXIT": "10",
+        "FAKE_UV_LOG": str(log_path),
+    }
+
+    run_result = subprocess.run(["bash", "-c", run_block], cwd=workspace, env=env, check=False, capture_output=True, text=True)
+
+    assert run_result.returncode == 0, run_result.stderr
+    outputs = dict(line.split("=", 1) for line in output_path.read_text(encoding="utf-8").splitlines())
+    assert outputs["exit_code"] == "10"
+    assert outputs["package_hash"] == env["FAKE_PACKAGE_HASH"]
+    assert outputs["demo_package_hash"] == env["FAKE_DEMO_HASH"]
+    assert outputs["out_path"] == str(workspace / "artifacts/action-redline")
+    uv_log = log_path.read_text(encoding="utf-8")
+    assert "redline run" in uv_log
+    assert str(workspace / "fixtures/demo_pack") in uv_log
+
+    enforce_script = enforce_block.replace("${{ steps.redline.outputs.exit_code }}", outputs["exit_code"])
+    enforce_env = {
+        **os.environ,
+        "REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS": "true",
+        "REDLINE_ACTION_PACKAGE": "fixtures/demo_pack",
+        "REDLINE_ACTION_PACKAGE_HASH": outputs["package_hash"],
+        "REDLINE_ACTION_DEMO_PACKAGE_HASH": outputs["demo_package_hash"],
+    }
+    assert subprocess.run(["bash", "-c", enforce_script], check=False, env=enforce_env).returncode == 0
+    enforce_env["REDLINE_ACTION_DEMO_PACKAGE_HASH"] = "sha256:" + "2" * 64
+    assert subprocess.run(["bash", "-c", enforce_script], check=False, env=enforce_env).returncode == 10
+    enforce_env["REDLINE_ACTION_DEMO_PACKAGE_HASH"] = outputs["demo_package_hash"]
+    enforce_env["REDLINE_ACTION_ALLOW_AMBER_BASELINE_GENESIS"] = "false"
+    assert subprocess.run(["bash", "-c", enforce_script], check=False, env=enforce_env).returncode == 10
+
+
 def test_composite_action_amber_exception_requires_demo_package_hash(tmp_path: Path) -> None:
     def enforce(package: str, *, allow: str = "true", package_hash: str = "sha256:" + "1" * 64, demo_hash: str = "sha256:" + "1" * 64) -> int:
         marker = tmp_path / "marker"
@@ -6104,6 +6281,45 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow
     assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow
+
+
+def test_locked_golden_case_manifest_matches_spec() -> None:
+    manifest = [
+        {"case": "pass-receipt", "artifact": "artifacts/demo/pass/receipt.json", "expected_exit": 10, "reason_code": ReasonCode.BASELINE_GENESIS},
+        {"case": "withheld-receipt", "artifact": "artifacts/demo/withheld/receipt.json", "expected_exit": 3, "reason_code": ReasonCode.NEW_BLOCK_BREACH},
+        {"case": "tampered-reject", "mutator": "receipt_hash_zero", "expected_exit": 4, "reason_code": ReasonCode.RECEIPT_MISMATCH},
+        {"case": "missing-proof-reject", "mutator": "drop_required_verdict_proof", "expected_exit": 6, "reason_code": ReasonCode.UNVERIFIED_NO_VERDICT},
+        {"case": "genesis", "artifact": "artifacts/demo/pass/issuance-ledger.checkpoint.json", "expected_exit": 10, "reason_code": ReasonCode.BASELINE_GENESIS},
+        {"case": "echo-mismatch", "mutator": "sponsor_request_hash_echo_mismatch", "expected_exit": 8, "reason_code": ReasonCode.SPONSOR_READBACK_MISMATCH},
+        {"case": "crash-baseline", "artifact": "fixtures/suites/btc_crash.csv", "expected_exit": 0, "reason_code": ReasonCode.PASS},
+        {"case": "crash-candidate", "artifact": "fixtures/suites/btc_crash.csv", "expected_exit": 3, "reason_code": ReasonCode.NEW_BLOCK_BREACH},
+        {"case": "chop-baseline", "artifact": "fixtures/suites/btc_chop.csv", "expected_exit": 0, "reason_code": ReasonCode.PASS},
+        {"case": "chop-candidate", "artifact": "fixtures/suites/btc_chop.csv", "expected_exit": 0, "reason_code": ReasonCode.PASS},
+        {"case": "provenance-locked", "artifact": "fixtures/demo_pack/playbook_identity.lock", "expected_exit": 4, "reason_code": ReasonCode.RECEIPT_BINDING_FAILED},
+        {"case": "sponsor-readback-evidence-shape", "artifact": "artifacts/sponsor/demo-readback.json", "expected_exit": 6, "reason_code": ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED},
+    ]
+
+    assert [item["case"] for item in manifest] == [
+        "pass-receipt",
+        "withheld-receipt",
+        "tampered-reject",
+        "missing-proof-reject",
+        "genesis",
+        "echo-mismatch",
+        "crash-baseline",
+        "crash-candidate",
+        "chop-baseline",
+        "chop-candidate",
+        "provenance-locked",
+        "sponsor-readback-evidence-shape",
+    ]
+    assert len(manifest) == 12
+    for item in manifest:
+        assert isinstance(item["expected_exit"], int)
+        assert item["reason_code"] in ReasonCode
+        assert ("artifact" in item) ^ ("mutator" in item)
+        if "artifact" in item:
+            assert (ROOT / str(item["artifact"])).exists()
 
 
 def test_decision_envelope_construction_stays_in_proof_kernel() -> None:
