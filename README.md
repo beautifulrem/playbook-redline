@@ -187,8 +187,10 @@ non-default 32+ character `REDLINE_SERVICE_TOKEN`, explicit CORS origins, and
 Postgres connection string when `REDLINE_SERVICE_METADATA_STORE=postgres`.
 After Render is live, use `make remote-smoke` for the frontend flow and
 `make remote-production-check` for OpenAPI parity, CORS, 401/404, optional 429,
-and error-redaction checks. Deployment details, cleanup, and the judge runbook
-are in `DEPLOYMENT.md`.
+and error-redaction checks. `make remote-smoke-actions` stores the remote URL,
+token, and frontend origin as GitHub Actions secrets, then triggers the manual
+remote smoke workflow. Deployment details, cleanup, and the judge runbook are in
+`DEPLOYMENT.md`.
 
 ## Verification Script
 

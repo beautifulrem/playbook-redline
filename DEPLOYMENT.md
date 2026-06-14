@@ -103,11 +103,20 @@ The image runs as a non-root user and stores service state under
 
 Deploy sequence:
 
-1. Create a Render Blueprint from this repository.
-2. Fill `REDLINE_SERVICE_CORS_ORIGINS` in the Render Dashboard.
-3. Let Render generate `REDLINE_SERVICE_TOKEN`; copy it into the judging smoke
+1. Validate the Blueprint locally if Render credentials are available:
+
+```bash
+make render-preflight
+```
+
+Without the Render CLI, this target uses the Render Blueprint validation API and
+requires `RENDER_API_KEY` plus `RENDER_OWNER_ID`.
+
+2. Create a Render Blueprint from this repository.
+3. Fill `REDLINE_SERVICE_CORS_ORIGINS` in the Render Dashboard.
+4. Let Render generate `REDLINE_SERVICE_TOKEN`; copy it into the judging smoke
    environment or GitHub Actions secret.
-4. After deploy, run:
+5. After deploy, run:
 
 ```bash
 curl -s https://<render-service>.onrender.com/health
@@ -122,6 +131,21 @@ make remote-production-check
 
 Render Postgres should be accessed through its internal connection string from
 the web service. External database access is not required for judging.
+
+To configure GitHub Actions secrets and trigger the manual remote smoke in one
+step:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+REDLINE_REMOTE_RATE_LIMIT_PROBES=130 \
+make remote-smoke-actions
+```
+
+The target writes `REDLINE_REMOTE_BASE_URL`, `REDLINE_REMOTE_TOKEN`, and
+`REDLINE_REMOTE_FRONTEND_ORIGIN` as repository secrets, triggers
+`workflow_dispatch` with `remote_smoke=true`, and watches the run to completion.
 
 ## Production Environment
 

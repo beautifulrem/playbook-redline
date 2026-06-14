@@ -83,6 +83,16 @@ Set `REDLINE_REMOTE_RATE_LIMIT_PROBES=0` to skip the live 429 probe. The script
 still verifies exact OpenAPI parity, frontend CORS, wrong-token 401, missing-run
 404, and redacted error envelopes.
 
+To save the deployed URL/token/origin as GitHub repository secrets and run the
+manual remote smoke workflow:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://<service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+make remote-smoke-actions
+```
+
 ## Endpoints
 
 `POST /v1/packages/import`

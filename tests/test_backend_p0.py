@@ -6565,6 +6565,11 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow
     assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "render-preflight:" in makefile
+    assert "remote-smoke-actions:" in makefile
+    assert (ROOT / "scripts/render-blueprint-preflight.sh").is_file()
+    assert (ROOT / "scripts/remote-smoke-actions.sh").is_file()
 
 
 def test_locked_golden_case_manifest_matches_spec() -> None:
