@@ -109,8 +109,10 @@ Deploy sequence:
 make render-preflight
 ```
 
-Without the Render CLI, this target uses the Render Blueprint validation API and
-requires `RENDER_API_KEY` plus `RENDER_OWNER_ID`.
+With `RENDER_API_KEY` plus `RENDER_OWNER_ID`, this target uses Render's
+Blueprint validation API. Without Render credentials, it falls back to the
+public Render schema plus project-specific checks for the expected web service,
+Postgres database, persistent disk, and production environment variables.
 
 2. Create a Render Blueprint from this repository.
 3. Fill `REDLINE_SERVICE_CORS_ORIGINS` in the Render Dashboard.
