@@ -1,4 +1,4 @@
-.PHONY: install audit test schemas openapi service-smoke deployment-smoke remote-smoke service-cleanup docker-build demo verify-demo verify-sponsor-fixture goldens goldens-check
+.PHONY: install audit test schemas openapi service-smoke deployment-smoke remote-smoke remote-production-check service-cleanup docker-build demo verify-demo verify-sponsor-fixture goldens goldens-check
 
 install:
 	uv sync --frozen --extra dev
@@ -23,6 +23,9 @@ deployment-smoke:
 
 remote-smoke:
 	bash scripts/remote-smoke.sh
+
+remote-production-check:
+	uv run python scripts/remote-production-check.py
 
 service-cleanup:
 	uv run python scripts/service-cleanup.py

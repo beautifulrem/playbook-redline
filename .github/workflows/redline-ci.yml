@@ -10,6 +10,11 @@ on:
         required: false
         type: boolean
         default: false
+      remote_rate_limit_probes:
+        description: Authenticated probes for deployed-service 429 verification. Use 0 to skip.
+        required: false
+        type: string
+        default: "0"
 
 jobs:
   backend:
@@ -43,7 +48,11 @@ jobs:
         env:
           REDLINE_REMOTE_BASE_URL: ${{ secrets.REDLINE_REMOTE_BASE_URL }}
           REDLINE_REMOTE_TOKEN: ${{ secrets.REDLINE_REMOTE_TOKEN }}
-        run: bash scripts/remote-smoke.sh
+          REDLINE_REMOTE_FRONTEND_ORIGIN: ${{ secrets.REDLINE_REMOTE_FRONTEND_ORIGIN }}
+          REDLINE_REMOTE_RATE_LIMIT_PROBES: ${{ inputs.remote_rate_limit_probes }}
+        run: |
+          bash scripts/remote-smoke.sh
+          uv run python scripts/remote-production-check.py --require-cors
       - run: uv run redline export-schemas --out /tmp/redline-schemas
       - run: |
           cp -R schemas /tmp/checked-schemas

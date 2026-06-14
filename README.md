@@ -185,8 +185,10 @@ REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
 CI runs the same flow against the Docker image. Production mode requires a
 non-default 32+ character `REDLINE_SERVICE_TOKEN`, explicit CORS origins, and
 Postgres connection string when `REDLINE_SERVICE_METADATA_STORE=postgres`.
-Deployment details, remote smoke, cleanup, and the judge runbook are in
-`DEPLOYMENT.md`.
+After Render is live, use `make remote-smoke` for the frontend flow and
+`make remote-production-check` for OpenAPI parity, CORS, 401/404, optional 429,
+and error-redaction checks. Deployment details, cleanup, and the judge runbook
+are in `DEPLOYMENT.md`.
 
 ## Verification Script
 

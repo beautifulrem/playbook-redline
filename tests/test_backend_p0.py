@@ -6560,6 +6560,8 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "postgres:18" in workflow
     assert "REDLINE_TEST_POSTGRES_URL" in workflow
     assert "bash scripts/remote-smoke.sh" in workflow
+    assert "scripts/remote-production-check.py --require-cors" in workflow
+    assert "REDLINE_REMOTE_FRONTEND_ORIGIN" in workflow
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow
     assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow

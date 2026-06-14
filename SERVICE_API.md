@@ -69,6 +69,20 @@ REDLINE_REMOTE_TOKEN=<token> \
 make remote-smoke
 ```
 
+For deployed-service contract, CORS, and failure-path checks:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://<service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+REDLINE_REMOTE_RATE_LIMIT_PROBES=130 \
+make remote-production-check
+```
+
+Set `REDLINE_REMOTE_RATE_LIMIT_PROBES=0` to skip the live 429 probe. The script
+still verifies exact OpenAPI parity, frontend CORS, wrong-token 401, missing-run
+404, and redacted error envelopes.
+
 ## Endpoints
 
 `POST /v1/packages/import`

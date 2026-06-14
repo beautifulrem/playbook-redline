@@ -49,8 +49,29 @@ REDLINE_REMOTE_TOKEN=<service token> \
 make remote-smoke
 ```
 
+Then run the production-facing remote checks:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://playbook-redline-api.onrender.com \
+REDLINE_REMOTE_TOKEN=<service token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+REDLINE_REMOTE_RATE_LIMIT_PROBES=130 \
+make remote-production-check
+```
+
+`remote-production-check` verifies remote health, exact OpenAPI schema parity
+with `schemas/service-openapi.json`, CORS for the frontend origin, wrong-token
+401, missing-run 404, optional rate-limit 429, and redacted error envelopes.
+Artifact hash-mismatch fail-closed behavior is covered by service tests because
+creating the mismatch on a live service would require privileged artifact
+tampering on the persistent disk.
+
 GitHub Actions also exposes a manual `workflow_dispatch` remote smoke path gated
-by `REDLINE_REMOTE_BASE_URL` and `REDLINE_REMOTE_TOKEN` repository secrets.
+by `REDLINE_REMOTE_BASE_URL`, `REDLINE_REMOTE_TOKEN`, and
+`REDLINE_REMOTE_FRONTEND_ORIGIN` repository secrets. Set
+`remote_rate_limit_probes` to a value above the deployed
+`REDLINE_SERVICE_RATE_LIMIT_PER_MINUTE` when you want the manual workflow to
+verify 429 behavior.
 
 ## Container
 
@@ -93,6 +114,10 @@ curl -s https://<render-service>.onrender.com/health
 REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
 REDLINE_REMOTE_TOKEN=<token> \
 make remote-smoke
+REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+make remote-production-check
 ```
 
 Render Postgres should be accessed through its internal connection string from
@@ -166,6 +191,15 @@ REDLINE_SERVICE_TOKEN=redline-demo uv run python scripts/frontend-demo-flow.py \
   --allow-demo-baseline-genesis
 ```
 
+After the frontend origin is known, verify the deployed contract and CORS:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+make remote-production-check
+```
+
 ## Persistence Boundary
 
 The shipped adapters are:
@@ -214,6 +248,10 @@ make install
 make audit
 make goldens-check
 REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
+REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+REDLINE_REMOTE_FRONTEND_ORIGIN=https://<frontend-origin> \
+make remote-smoke remote-production-check
 ```
 
 Expected service result:
