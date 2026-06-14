@@ -1,4 +1,4 @@
-.PHONY: install audit test schemas openapi service-smoke deployment-smoke docker-build demo verify-demo verify-sponsor-fixture goldens goldens-check
+.PHONY: install audit test schemas openapi service-smoke deployment-smoke remote-smoke service-cleanup docker-build demo verify-demo verify-sponsor-fixture goldens goldens-check
 
 install:
 	uv sync --frozen --extra dev
@@ -20,6 +20,12 @@ service-smoke:
 
 deployment-smoke:
 	bash scripts/deployment-smoke.sh
+
+remote-smoke:
+	bash scripts/remote-smoke.sh
+
+service-cleanup:
+	uv run python scripts/service-cleanup.py
 
 docker-build:
 	docker build -t playbook-redline-service:local .

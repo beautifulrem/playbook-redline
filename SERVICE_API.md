@@ -19,6 +19,8 @@ REDLINE_SERVICE_ENV=production
 REDLINE_SERVICE_TOKEN=<32+ character secret>
 REDLINE_SERVICE_ROOT=/data/redline-service
 REDLINE_SERVICE_CORS_ORIGINS=http://localhost:3000
+REDLINE_SERVICE_METADATA_STORE=postgres
+REDLINE_DATABASE_URL=<postgres connection string>
 ```
 
 Production rejects default demo tokens and wildcard CORS origins. Unknown server
@@ -57,6 +59,14 @@ REDLINE_SERVICE_TOKEN=redline-demo uv run python scripts/frontend-demo-flow.py \
   --base-url http://127.0.0.1:8080 \
   --token redline-demo \
   --allow-demo-baseline-genesis
+```
+
+For a deployed service:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://<service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+make remote-smoke
 ```
 
 ## Endpoints
@@ -170,5 +180,16 @@ use:
 REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
 ```
 
-The smoke test verifies the HTTP flow, artifact manifest hashes, replayed
-receipt result, and sponsor preflight.
+The smoke test verifies health, OpenAPI, the HTTP flow, artifact manifest
+hashes, replayed receipt result, and sponsor preflight.
+
+## Persistence And Queue
+
+The service supports `REDLINE_SERVICE_METADATA_STORE=sqlite` for local/CI and
+`REDLINE_SERVICE_METADATA_STORE=postgres` for Render production. Runs are stored
+as database rows and claimed by workers from the metadata store, so a restarted
+container requeues interrupted `running` rows instead of losing in-memory work.
+
+Artifacts remain on the configured local artifact root. In production this root
+must be a persistent disk. The download endpoint always recomputes SHA-256 from
+the stored artifact before returning it.

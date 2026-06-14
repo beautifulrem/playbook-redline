@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from redline.service.config import ServiceConfig
-from redline.service.models import ArtifactInfo, ArtifactManifest, PackageResponse, RunCreateRequest, RunResponse, RunState
+from redline.service.models import ArtifactInfo, ArtifactManifest, PackageResponse, RunCreateRequest, RunResponse, RunState, RunWorkItem
 from redline.service.store import ServiceStore
 
 
@@ -40,9 +40,19 @@ class RunMetadataStore(Protocol):
 
     def mark_error(self, *, run_id: str, error_code: str, message: str) -> None: ...
 
+    def claim_next_run(self, *, worker_id: str) -> RunWorkItem | None: ...
+
+    def requeue_interrupted_runs(self) -> int: ...
+
     def get_run(self, run_id: str) -> RunResponse | None: ...
 
     def list_runs(self, *, limit: int = 50) -> list[RunResponse]: ...
+
+    def count_packages(self) -> int: ...
+
+    def count_runs(self, *, states: set[RunState] | None = None) -> int: ...
+
+    def prune_runs_before(self, cutoff_iso: str) -> list[Path]: ...
 
 
 class ArtifactStore(Protocol):
@@ -86,6 +96,11 @@ class LocalArtifactStore:
 def create_metadata_store(config: ServiceConfig) -> RunMetadataStore:
     if config.metadata_store == "sqlite":
         return ServiceStore(config.db_path)
+    if config.metadata_store == "postgres":
+        from redline.service.postgres_store import PostgresServiceStore
+
+        assert config.database_url is not None
+        return PostgresServiceStore(config.database_url)
     raise ValueError(f"unsupported metadata store: {config.metadata_store}")
 
 

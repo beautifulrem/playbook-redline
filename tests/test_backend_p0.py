@@ -2340,7 +2340,7 @@ def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
         proof_fingerprints.add(tuple(proof.artifact_hash for proof in artifacts.receipt.proofs))
         trace_fingerprints.add(tuple(trace.artifact_hash for trace in artifacts.traces))
 
-    assert receipt_hashes == {"sha256:4660341334ba5b7f21c69ac4c204b7ef5efb71b37ad9c4fffc77a27d09a7ecda"}
+    assert receipt_hashes == {"sha256:469ef684b3706357e311b46690497abc4588eb2d4cd05886de598cb60cae7450"}
     assert len(report_hashes) == 1
     assert len(proof_fingerprints) == 1
     assert len(trace_fingerprints) == 1
@@ -6557,6 +6557,9 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "astral-sh/setup-uv@v8.2.0" in workflow
     assert "uv run python scripts/verify-sponsor-fixture.py" in workflow
     assert "bash scripts/deployment-smoke.sh" in workflow
+    assert "postgres:18" in workflow
+    assert "REDLINE_TEST_POSTGRES_URL" in workflow
+    assert "bash scripts/remote-smoke.sh" in workflow
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow
     assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow

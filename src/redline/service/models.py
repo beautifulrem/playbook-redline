@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -128,3 +130,12 @@ class SponsorResponse(ApiModel):
     state: str
     reason_code: str | None = None
     evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RunWorkItem:
+    run_id: str
+    request_id: str
+    request: RunCreateRequest
+    package_path: Path
+    out_dir: Path

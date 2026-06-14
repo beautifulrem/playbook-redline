@@ -7,6 +7,8 @@ from typing import Literal
 
 
 ServiceEnvironment = Literal["local", "ci", "production"]
+MetadataStoreKind = Literal["sqlite", "postgres"]
+ArtifactStoreKind = Literal["local"]
 
 
 @dataclass(frozen=True)
@@ -20,9 +22,15 @@ class ServiceConfig:
     port: int = 8080
     cors_origins: tuple[str, ...] = ()
     log_level: str = "INFO"
-    metadata_store: Literal["sqlite"] = "sqlite"
-    artifact_store: Literal["local"] = "local"
+    metadata_store: MetadataStoreKind = "sqlite"
+    artifact_store: ArtifactStoreKind = "local"
+    database_url: str | None = None
     expose_error_details: bool = True
+    request_rate_limit_per_minute: int = 120
+    max_packages: int = 100
+    max_active_runs: int = 8
+    max_runs_total: int = 500
+    run_retention_seconds: int = 7 * 24 * 60 * 60
 
     def __post_init__(self) -> None:
         if self.environment not in {"local", "ci", "production"}:
@@ -33,12 +41,23 @@ class ServiceConfig:
             raise ValueError("REDLINE_SERVICE_WORKERS must be positive")
         if not (1 <= self.port <= 65535):
             raise ValueError("REDLINE_SERVICE_PORT must be between 1 and 65535")
-        if self.metadata_store != "sqlite":
-            raise ValueError("only sqlite metadata store is implemented")
+        if self.metadata_store not in {"sqlite", "postgres"}:
+            raise ValueError("REDLINE_SERVICE_METADATA_STORE must be sqlite or postgres")
+        if self.metadata_store == "postgres" and not self.database_url:
+            raise ValueError("REDLINE_DATABASE_URL or DATABASE_URL is required when REDLINE_SERVICE_METADATA_STORE=postgres")
         if self.artifact_store != "local":
             raise ValueError("only local artifact store is implemented")
         if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             raise ValueError("REDLINE_SERVICE_LOG_LEVEL must be DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+        for name, value in {
+            "REDLINE_SERVICE_RATE_LIMIT_PER_MINUTE": self.request_rate_limit_per_minute,
+            "REDLINE_SERVICE_MAX_PACKAGES": self.max_packages,
+            "REDLINE_SERVICE_MAX_ACTIVE_RUNS": self.max_active_runs,
+            "REDLINE_SERVICE_MAX_RUNS_TOTAL": self.max_runs_total,
+            "REDLINE_SERVICE_RUN_RETENTION_SECONDS": self.run_retention_seconds,
+        }.items():
+            if value < 0:
+                raise ValueError(f"{name} must be non-negative")
         if self.environment == "production":
             if self.token in {"", "redline-demo", "redline-smoke", "test-token"} or len(self.token) < 32:
                 raise ValueError("production service requires a non-default REDLINE_SERVICE_TOKEN with at least 32 characters")
@@ -61,7 +80,13 @@ class ServiceConfig:
             log_level=os.environ.get("REDLINE_SERVICE_LOG_LEVEL", "INFO").upper(),
             metadata_store=os.environ.get("REDLINE_SERVICE_METADATA_STORE", "sqlite"),  # type: ignore[arg-type]
             artifact_store=os.environ.get("REDLINE_SERVICE_ARTIFACT_STORE", "local"),  # type: ignore[arg-type]
+            database_url=os.environ.get("REDLINE_DATABASE_URL") or os.environ.get("DATABASE_URL"),
             expose_error_details=_parse_bool("REDLINE_SERVICE_EXPOSE_ERROR_DETAILS", expose_default),
+            request_rate_limit_per_minute=_parse_nonnegative_int("REDLINE_SERVICE_RATE_LIMIT_PER_MINUTE", 120),
+            max_packages=_parse_nonnegative_int("REDLINE_SERVICE_MAX_PACKAGES", 100),
+            max_active_runs=_parse_nonnegative_int("REDLINE_SERVICE_MAX_ACTIVE_RUNS", 8),
+            max_runs_total=_parse_nonnegative_int("REDLINE_SERVICE_MAX_RUNS_TOTAL", 500),
+            run_retention_seconds=_parse_nonnegative_int("REDLINE_SERVICE_RUN_RETENTION_SECONDS", 7 * 24 * 60 * 60),
         )
 
     @property
@@ -87,6 +112,19 @@ def _parse_positive_int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer") from exc
     if value <= 0:
         raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _parse_nonnegative_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
     return value
 
 

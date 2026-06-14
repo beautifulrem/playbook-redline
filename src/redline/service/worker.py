@@ -18,8 +18,10 @@ def execute_run(
     package_path: Path,
     out_dir: Path,
     expose_error_details: bool = True,
+    mark_running: bool = True,
 ) -> None:
-    store.mark_running(run_id)
+    if mark_running:
+        store.mark_running(run_id)
     try:
         artifacts = run_redline(
             package_dir=package_path,

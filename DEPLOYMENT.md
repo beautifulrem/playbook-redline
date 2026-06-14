@@ -6,9 +6,20 @@ writes receipt/proof artifacts, and needs a durable state directory. A
 serverless function shape would make long-running jobs and artifact binding
 less predictable.
 
-The same image can run on Render, Fly.io, Railway, or any container host that
-provides a persistent volume. Local development and CI fixture mode still use
-the same HTTP API and proof kernel.
+The selected remote target is Render. The repository includes `render.yaml`
+because Render Blueprints can define the Docker web service, managed Postgres,
+environment variables, and persistent disk in one Git-backed file. Local
+development and CI fixture mode still use the same HTTP API and proof kernel.
+
+Why Render over Fly.io or Railway for this backend:
+
+- Render Blueprints keep the web service, Postgres, disk, and secrets prompt in
+  one reviewer-visible file.
+- Render Postgres exposes a single connection string, which maps directly to
+  `REDLINE_DATABASE_URL`.
+- Render persistent disks preserve local artifact files under one mounted path,
+  which fits the current hash-verifying artifact download path without adding
+  unverified object-storage behavior.
 
 ## One-Command Smoke
 
@@ -26,9 +37,20 @@ REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
 ```
 
 The smoke test starts a real service, imports `fixtures/demo_pack`, creates a
-run, polls status, downloads artifacts, verifies artifact SHA-256 values,
-replays the downloaded receipt with the local verifier, and calls sponsor
-preflight with the demo genesis boundary explicitly enabled.
+run, verifies OpenAPI, polls status, downloads artifacts, verifies artifact
+SHA-256 values, replays the downloaded receipt with the local verifier, and
+calls sponsor preflight with the demo genesis boundary explicitly enabled.
+
+Run the same flow against a deployed service:
+
+```bash
+REDLINE_REMOTE_BASE_URL=https://playbook-redline-api.onrender.com \
+REDLINE_REMOTE_TOKEN=<service token> \
+make remote-smoke
+```
+
+GitHub Actions also exposes a manual `workflow_dispatch` remote smoke path gated
+by `REDLINE_REMOTE_BASE_URL` and `REDLINE_REMOTE_TOKEN` repository secrets.
 
 ## Container
 
@@ -45,6 +67,37 @@ docker run --rm -p 8080:8080 \
 The image runs as a non-root user and stores service state under
 `/data/redline-service`.
 
+## Render
+
+`render.yaml` provisions:
+
+- Docker web service: `playbook-redline-api`
+- Health check: `/health`
+- Render Postgres database: `playbook-redline-db`
+- Metadata store: `postgres`
+- Artifact store: `local`, backed by a Render persistent disk mounted at
+  `/data/redline-service`
+- Generated `REDLINE_SERVICE_TOKEN`
+- Dashboard-provided `REDLINE_SERVICE_CORS_ORIGINS`
+
+Deploy sequence:
+
+1. Create a Render Blueprint from this repository.
+2. Fill `REDLINE_SERVICE_CORS_ORIGINS` in the Render Dashboard.
+3. Let Render generate `REDLINE_SERVICE_TOKEN`; copy it into the judging smoke
+   environment or GitHub Actions secret.
+4. After deploy, run:
+
+```bash
+curl -s https://<render-service>.onrender.com/health
+REDLINE_REMOTE_BASE_URL=https://<render-service>.onrender.com \
+REDLINE_REMOTE_TOKEN=<token> \
+make remote-smoke
+```
+
+Render Postgres should be accessed through its internal connection string from
+the web service. External database access is not required for judging.
+
 ## Production Environment
 
 Required:
@@ -52,6 +105,8 @@ Required:
 - `REDLINE_SERVICE_ENV=production`
 - `REDLINE_SERVICE_TOKEN`: non-default, at least 32 characters
 - `REDLINE_SERVICE_ROOT`: persistent state root, default `/data/redline-service`
+- `REDLINE_SERVICE_METADATA_STORE`: `sqlite` for local/CI, `postgres` for Render
+- `REDLINE_DATABASE_URL`: required when metadata store is `postgres`
 
 Recommended:
 
@@ -59,6 +114,11 @@ Recommended:
 - `REDLINE_SERVICE_WORKERS`: run worker count, default `2`
 - `REDLINE_SERVICE_MAX_UPLOAD_BYTES`: upload/extracted archive limit
 - `REDLINE_SERVICE_LOG_LEVEL`: `INFO`, `WARNING`, or `ERROR`
+- `REDLINE_SERVICE_RATE_LIMIT_PER_MINUTE`
+- `REDLINE_SERVICE_MAX_PACKAGES`
+- `REDLINE_SERVICE_MAX_ACTIVE_RUNS`
+- `REDLINE_SERVICE_MAX_RUNS_TOTAL`
+- `REDLINE_SERVICE_RUN_RETENTION_SECONDS`
 
 Live sponsor mode also needs:
 
@@ -69,6 +129,22 @@ Live sponsor mode also needs:
 Production refuses default demo tokens and wildcard CORS origins. Unknown server
 errors are redacted from responses; use `x-request-id` and service logs for
 debugging.
+
+## Job Queue
+
+Runs are stored as database rows and claimed by workers from the metadata store.
+On startup, interrupted `running` jobs are requeued before workers start
+claiming new jobs. This gives the container deployment a DB-backed job boundary
+without adding Redis, Celery, or another queue service for the hackathon demo.
+
+The service still returns the same terminal states:
+
+- `queued`
+- `running`
+- `pass`
+- `amber`
+- `fail`
+- `error`
 
 ## Frontend Contract Flow
 
@@ -92,16 +168,42 @@ REDLINE_SERVICE_TOKEN=redline-demo uv run python scripts/frontend-demo-flow.py \
 
 ## Persistence Boundary
 
-The current shipped adapters are:
+The shipped adapters are:
 
 - metadata store: `sqlite`
+- metadata store: `postgres`
 - artifact store: `local`
 
-They sit behind `RunMetadataStore` and `ArtifactStore` protocols. A production
-volume is enough for the hackathon demo. The next adapter step is Postgres for
-run metadata plus S3/R2/Blob for artifact objects. Those modes are intentionally
-not accepted by configuration until the adapters and hash-verifying download
-path are implemented.
+They sit behind `RunMetadataStore` and `ArtifactStore` protocols. Render uses
+Postgres for metadata and a persistent disk for local artifacts.
+
+Object storage design boundary:
+
+- R2/S3/Blob should be added as a new `ArtifactStore` implementation.
+- Workers should still write to a safe local staging directory first.
+- After `build_artifact_manifest`, every manifest entry must be uploaded with
+  its SHA-256 and byte count.
+- Downloads must stream or stage the object and recompute SHA-256 before
+  returning it.
+- Configuration must continue to reject unsupported artifact store modes until
+  their hash-verifying download path has tests.
+
+This keeps the current production path honest: durable Render disk today, object
+storage adapter later, no unverified remote artifact shortcut.
+
+## Retention
+
+Prune expired terminal runs and artifact directories:
+
+```bash
+REDLINE_SERVICE_ROOT=/data/redline-service \
+REDLINE_SERVICE_METADATA_STORE=postgres \
+REDLINE_DATABASE_URL=<internal database url> \
+uv run python scripts/service-cleanup.py --older-than-seconds 604800
+```
+
+The cleanup command only deletes terminal runs and refuses paths outside
+`REDLINE_SERVICE_ROOT/runs`.
 
 ## Judge Demo Script
 

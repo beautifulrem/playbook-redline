@@ -26,7 +26,7 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Proof-level verification command
 - Machine-readable backend doctor for Day-0 fixture, schema, replay, and proof-map smoke checks
 - Static verdict-path import gate for proof/probe/verifier code
-- FastAPI service boundary with token-gated run creation, SQLite run state, OpenAPI, package upload/import, artifact download, and container deployment smoke
+- FastAPI service boundary with token-gated run creation, SQLite/Postgres run state, DB-backed queue claiming, OpenAPI, package upload/import, artifact download, and container deployment smoke
 - Frontend-facing demo flow script that verifies HTTP artifacts, receipt replay, and sponsor preflight
 - JSON schemas for receipts, reports, specs, suites, decisions, doctor results, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
 - Demo fixtures and generated demo artifacts for pass and withheld cases
@@ -172,17 +172,21 @@ The service OpenAPI contract is checked in at `schemas/service-openapi.json`.
 Frontend-facing endpoint semantics and response examples are documented in
 `SERVICE_API.md`.
 
-Deployment shape: containerized FastAPI service with persistent state under
-`REDLINE_SERVICE_ROOT`. This keeps long-running proof jobs and artifact hashes
-inside one stable runtime boundary instead of relying on a serverless filesystem.
+Deployment shape: Render Blueprint + containerized FastAPI service. Local/CI can
+use SQLite under `REDLINE_SERVICE_ROOT`; Render uses Postgres metadata plus a
+persistent disk for hash-verified artifacts. This keeps long-running proof jobs
+and artifact hashes inside one stable runtime boundary instead of relying on a
+serverless filesystem.
 
 ```bash
 REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
 ```
 
 CI runs the same flow against the Docker image. Production mode requires a
-non-default 32+ character `REDLINE_SERVICE_TOKEN` and explicit CORS origins.
-Deployment details and the judge runbook are in `DEPLOYMENT.md`.
+non-default 32+ character `REDLINE_SERVICE_TOKEN`, explicit CORS origins, and
+Postgres connection string when `REDLINE_SERVICE_METADATA_STORE=postgres`.
+Deployment details, remote smoke, cleanup, and the judge runbook are in
+`DEPLOYMENT.md`.
 
 ## Verification Script
 

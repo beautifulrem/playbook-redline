@@ -26,6 +26,11 @@ def main() -> int:
     health = client.json("GET", "/health")
     if health.get("ok") is not True:
         raise RuntimeError(f"service is unhealthy: {health}")
+    openapi = client.json("GET", "/openapi.json")
+    paths = openapi.get("paths") or {}
+    for required_path in {"/v1/packages/import", "/v1/runs", "/v1/runs/{run_id}/artifacts/{artifact_id}"}:
+        if required_path not in paths:
+            raise RuntimeError(f"OpenAPI contract is missing {required_path}")
 
     package = client.json("POST", "/v1/packages/import", {"package_path": args.package_path})
     run = client.json(

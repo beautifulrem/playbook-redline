@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: playbook-redline-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    region: oregon
+    disk:
+      name: redline-service-data
+      mountPath: /data/redline-service
+      sizeGB: 5
+    envVars:
+      - key: REDLINE_SERVICE_ENV
+        value: production
+      - key: REDLINE_SERVICE_ROOT
+        value: /data/redline-service
+      - key: REDLINE_SERVICE_HOST
+        value: 0.0.0.0
+      - key: REDLINE_SERVICE_PORT
+        value: "8080"
+      - key: REDLINE_SERVICE_TOKEN
+        generateValue: true
+      - key: REDLINE_SERVICE_CORS_ORIGINS
+        sync: false
+      - key: REDLINE_SERVICE_METADATA_STORE
+        value: postgres
+      - key: REDLINE_DATABASE_URL
+        fromDatabase:
+          name: playbook-redline-db
+          property: connectionString
+      - key: REDLINE_SERVICE_ARTIFACT_STORE
+        value: local
+      - key: REDLINE_SERVICE_MAX_UPLOAD_BYTES
+        value: "52428800"
+      - key: REDLINE_SERVICE_WORKERS
+        value: "2"
+      - key: REDLINE_SERVICE_MAX_ACTIVE_RUNS
+        value: "8"
+      - key: REDLINE_SERVICE_MAX_RUNS_TOTAL
+        value: "500"
+      - key: REDLINE_SERVICE_MAX_PACKAGES
+        value: "100"
+      - key: REDLINE_SERVICE_RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: REDLINE_SERVICE_RUN_RETENTION_SECONDS
+        value: "604800"
+      - key: REDLINE_SERVICE_LOG_LEVEL
+        value: INFO
+
+databases:
+  - name: playbook-redline-db
+    plan: basic-256mb
+    databaseName: redline
+    user: redline
+    region: oregon
+    ipAllowList: []

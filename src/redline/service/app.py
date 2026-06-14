@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import threading
 import time
 import uuid
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,6 +33,7 @@ from redline.service.models import (
     RunCreateRequest,
     RunListResponse,
     RunResponse,
+    RunState,
     SponsorRequest,
     SponsorResponse,
 )
@@ -52,7 +55,9 @@ class RedlineService:
         ensure_safe_output_dir(self.artifacts.packages_dir)
         ensure_safe_output_dir(self.artifacts.runs_dir)
         self.store: RunMetadataStore = create_metadata_store(config)
+        requeued = self.store.requeue_interrupted_runs()
         self.executor = ThreadPoolExecutor(max_workers=config.workers, thread_name_prefix="redline-run")
+        self.rate_limiter = SlidingWindowRateLimiter(limit=config.request_rate_limit_per_minute, window_seconds=60)
         LOGGER.info(
             "redline service configured",
             extra={
@@ -60,13 +65,17 @@ class RedlineService:
                 "metadata_store": config.metadata_store,
                 "artifact_store": config.artifact_store,
                 "workers": config.workers,
+                "requeued_runs": requeued,
             },
         )
+        if requeued:
+            self.kick_queue()
 
     def close(self) -> None:
         self.executor.shutdown(wait=True, cancel_futures=False)
 
     def import_local_package(self, request: PackageImportRequest) -> PackageResponse:
+        self._assert_package_quota()
         result = import_package(Path(request.package_path), write_lock=request.write_lock)
         package_id = _package_id(result.identity_hash)
         response = PackageResponse(
@@ -81,6 +90,7 @@ class RedlineService:
         return response
 
     def create_run(self, *, request_id: str, request: RunCreateRequest) -> RunResponse:
+        self._assert_run_quota()
         package_path = self._resolve_package_path(request)
         run_id = _run_id(request.model_dump(mode="json"))
         out_dir = self.artifacts.run_dir(run_id)
@@ -92,16 +102,43 @@ class RedlineService:
             out_dir=out_dir,
         )
         LOGGER.info("run queued", extra={"request_id": request_id, "run_id": run_id})
-        self.executor.submit(
-            execute_run,
-            store=self.store,
-            run_id=run_id,
-            request=request,
-            package_path=package_path,
-            out_dir=out_dir,
-            expose_error_details=self.config.expose_error_details,
-        )
+        self.kick_queue()
         return run
+
+    def kick_queue(self) -> None:
+        for _ in range(self.config.workers):
+            self.executor.submit(self._drain_queue, worker_id=f"worker_{uuid.uuid4().hex[:8]}")
+
+    def _drain_queue(self, *, worker_id: str) -> None:
+        while True:
+            work = self.store.claim_next_run(worker_id=worker_id)
+            if work is None:
+                return
+            LOGGER.info("run claimed", extra={"request_id": work.request_id, "run_id": work.run_id, "worker_id": worker_id})
+            execute_run(
+                store=self.store,
+                run_id=work.run_id,
+                request=work.request,
+                package_path=work.package_path,
+                out_dir=work.out_dir,
+                expose_error_details=self.config.expose_error_details,
+                mark_running=False,
+            )
+
+    def check_rate_limit(self, key: str) -> None:
+        if not self.rate_limiter.allow(key):
+            raise HTTPException(status_code=429, detail="Redline service request quota exceeded")
+
+    def _assert_package_quota(self) -> None:
+        if self.config.max_packages and self.store.count_packages() >= self.config.max_packages:
+            raise HTTPException(status_code=429, detail="Redline service package quota exceeded")
+
+    def _assert_run_quota(self) -> None:
+        if self.config.max_runs_total and self.store.count_runs() >= self.config.max_runs_total:
+            raise HTTPException(status_code=429, detail="Redline service run quota exceeded")
+        active = self.store.count_runs(states={RunState.QUEUED, RunState.RUNNING})
+        if self.config.max_active_runs and active >= self.config.max_active_runs:
+            raise HTTPException(status_code=429, detail="Redline service active run quota exceeded")
 
     def _resolve_package_path(self, request: RunCreateRequest) -> Path:
         if request.package_id is not None:
@@ -198,6 +235,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
         request: Request,
         archive: Annotated[UploadFile, File(description="Canonical playbook package archive as .tar.gz")],
     ) -> PackageResponse:
+        service._assert_package_quota()
         if archive.content_type not in {"application/gzip", "application/x-gzip", "application/tar", "application/octet-stream"}:
             raise HTTPException(status_code=415, detail="package upload must be a tar archive")
         upload_id = f"pkg_{uuid.uuid4().hex}"
@@ -331,6 +369,28 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
     return app
 
 
+class SlidingWindowRateLimiter:
+    def __init__(self, *, limit: int, window_seconds: float) -> None:
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._events: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        if self.limit <= 0:
+            return True
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+        with self._lock:
+            events = self._events[key]
+            while events and events[0] < cutoff:
+                events.popleft()
+            if len(events) >= self.limit:
+                return False
+            events.append(now)
+            return True
+
+
 def main() -> None:
     config = ServiceConfig.from_env()
     uvicorn.run(create_app(config), host=config.host, port=config.port, reload=False, log_level=config.log_level.lower())
@@ -347,6 +407,7 @@ async def _require_token(
         supplied = authorization.removeprefix("Bearer ").strip()
     if not expected or not supplied or not secrets.compare_digest(supplied, expected):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing or invalid Redline service token")
+    request.app.state.redline_service.check_rate_limit(supplied)
 
 
 def _error_response(request: Request, *, status_code: int, error_code: str, message: str) -> JSONResponse:

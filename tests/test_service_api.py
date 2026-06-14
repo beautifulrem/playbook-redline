@@ -3,17 +3,21 @@ from __future__ import annotations
 import io
 import json
 import os
-import shutil
+import sqlite3
 import tarfile
 import time
 from pathlib import Path
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from redline.service.cleanup import cleanup_expired_runs
 from redline.service.app import create_app
 from redline.service.config import ServiceConfig
 from redline.service.storage import LocalArtifactStore, create_artifact_store, create_metadata_store
+from redline.service.postgres_store import PostgresServiceStore
+from redline.service.models import PackageResponse, RunCreateRequest, RunState
 from redline.service.store import ServiceStore
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +33,10 @@ def _client(tmp_path: Path, *, max_upload_bytes: int = 50 * 1024 * 1024) -> Test
 
 def _headers() -> dict[str, str]:
     return {"X-Redline-Token": "test-token"}
+
+
+def _run_request() -> RunCreateRequest:
+    return RunCreateRequest(package_path=str(PACKAGE), candidate="candidate_good", suite_path=str(SUITE), spec_path=str(SPEC))
 
 
 def _wait_for_run(client: TestClient, run_id: str, *, timeout: float = 10.0) -> dict:
@@ -103,6 +111,25 @@ def test_service_config_rejects_invalid_log_level(monkeypatch) -> None:
         ServiceConfig.from_env()
 
 
+def test_service_config_accepts_postgres_metadata_store(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_SERVICE_METADATA_STORE", "postgres")
+    monkeypatch.setenv("REDLINE_DATABASE_URL", "postgresql://redline:redline@localhost:5432/redline")
+
+    config = ServiceConfig.from_env()
+
+    assert config.metadata_store == "postgres"
+    assert config.database_url == "postgresql://redline:redline@localhost:5432/redline"
+
+
+def test_service_config_rejects_postgres_without_database_url(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_SERVICE_METADATA_STORE", "postgres")
+    monkeypatch.delenv("REDLINE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(ValueError, match="REDLINE_DATABASE_URL"):
+        ServiceConfig.from_env()
+
+
 def test_service_cors_origin_is_configurable(tmp_path: Path) -> None:
     app = create_app(ServiceConfig(root=tmp_path / "service", token="test-token", cors_origins=("http://localhost:3000",)))
     client = TestClient(app)
@@ -129,6 +156,83 @@ def test_service_uses_swappable_storage_adapters(tmp_path: Path) -> None:
     assert isinstance(metadata_store, ServiceStore)
     assert isinstance(artifact_store, LocalArtifactStore)
     assert artifact_store.run_dir("run_abc") == config.runs_dir / "run_abc"
+
+
+def test_sqlite_store_claims_and_requeues_runs(tmp_path: Path) -> None:
+    store = ServiceStore(tmp_path / "service.sqlite3")
+    request = _run_request()
+    store.create_run(run_id="run_queue_test", request_id="req_1", request=request, package_path=PACKAGE, out_dir=tmp_path / "run")
+
+    work = store.claim_next_run(worker_id="worker_1")
+
+    assert work is not None
+    assert work.run_id == "run_queue_test"
+    assert work.request.candidate == "candidate_good"
+    assert store.get_run("run_queue_test").state == RunState.RUNNING
+    assert store.claim_next_run(worker_id="worker_2") is None
+    assert store.requeue_interrupted_runs() == 1
+    assert store.get_run("run_queue_test").state == RunState.QUEUED
+
+
+def test_service_rate_limit_fails_closed(tmp_path: Path) -> None:
+    app = create_app(ServiceConfig(root=tmp_path / "service", token="test-token", request_rate_limit_per_minute=2))
+    client = TestClient(app)
+
+    assert client.get("/v1/runs", headers=_headers()).status_code == 200
+    assert client.get("/v1/runs", headers=_headers()).status_code == 200
+    response = client.get("/v1/runs", headers=_headers())
+
+    assert response.status_code == 429
+    assert response.json()["ok"] is False
+
+
+def test_service_run_quota_fails_closed(tmp_path: Path) -> None:
+    app = create_app(ServiceConfig(root=tmp_path / "service", token="test-token", max_runs_total=1))
+    client = TestClient(app)
+
+    first = client.post(
+        "/v1/runs",
+        headers=_headers(),
+        json={"package_path": str(PACKAGE), "candidate": "candidate_good", "suite_path": str(SUITE), "spec_path": str(SPEC)},
+    )
+    assert first.status_code == 202
+    second = client.post(
+        "/v1/runs",
+        headers=_headers(),
+        json={"package_path": str(PACKAGE), "candidate": "candidate_good", "suite_path": str(SUITE), "spec_path": str(SPEC)},
+    )
+
+    assert second.status_code == 429
+    assert second.json()["ok"] is False
+
+
+def test_service_package_quota_fails_closed(tmp_path: Path) -> None:
+    app = create_app(ServiceConfig(root=tmp_path / "service", token="test-token", max_packages=1))
+    client = TestClient(app)
+
+    assert client.post("/v1/packages/import", headers=_headers(), json={"package_path": str(PACKAGE)}).status_code == 201
+    response = client.post("/v1/packages/import", headers=_headers(), json={"package_path": str(PACKAGE)})
+
+    assert response.status_code == 429
+    assert response.json()["ok"] is False
+
+
+def test_service_cleanup_prunes_terminal_runs_and_artifacts(tmp_path: Path) -> None:
+    config = ServiceConfig(root=tmp_path / "service", token="test-token", run_retention_seconds=0)
+    store = ServiceStore(config.db_path)
+    out_dir = config.runs_dir / "run_cleanup"
+    out_dir.mkdir(parents=True)
+    store.create_run(run_id="run_cleanup", request_id="req_1", request=_run_request(), package_path=PACKAGE, out_dir=out_dir)
+    store.mark_error(run_id="run_cleanup", error_code="DATA_MISSING", message="done")
+    with sqlite3.connect(config.db_path) as conn:
+        conn.execute("UPDATE runs SET updated_at = ? WHERE run_id = ?", ("2020-01-01T00:00:00Z", "run_cleanup"))
+
+    result = cleanup_expired_runs(config=config, older_than_seconds=0)
+
+    assert result.deleted_runs == 1
+    assert result.deleted_artifact_dirs == 1
+    assert store.get_run("run_cleanup") is None
+    assert not out_dir.exists()
 
 
 def test_service_import_run_and_download_artifacts(tmp_path: Path) -> None:
@@ -506,3 +610,37 @@ def test_service_openapi_exposes_frontend_contract(tmp_path: Path) -> None:
     assert "/v1/runs" in paths
     assert "/v1/packages/upload" in paths
     assert "/v1/runs/{run_id}/artifacts/{artifact_id}" in paths
+
+
+@pytest.mark.skipif(not os.environ.get("REDLINE_TEST_POSTGRES_URL"), reason="REDLINE_TEST_POSTGRES_URL is not configured")
+def test_postgres_store_claims_and_persists_runs(tmp_path: Path) -> None:
+    database_url = os.environ["REDLINE_TEST_POSTGRES_URL"]
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS runs")
+            cur.execute("DROP TABLE IF EXISTS packages")
+    store = PostgresServiceStore(database_url)
+    package = PackageResponse(
+        package_id="pkg_postgres",
+        path=str(PACKAGE),
+        identity_hash="sha256:" + "1" * 64,
+        identity_lock_hash="sha256:" + "2" * 64,
+        files=["baseline/strategy.py"],
+        created_at="2026-06-14T00:00:00Z",
+    )
+    store.upsert_package(package)
+    request = RunCreateRequest(package_id="pkg_postgres", candidate="candidate_good", suite_path=str(SUITE), spec_path=str(SPEC))
+    store.create_run(run_id="run_postgres", request_id="req_pg", request=request, package_path=PACKAGE, out_dir=tmp_path / "run")
+
+    work = store.claim_next_run(worker_id="worker_pg")
+    assert work is not None
+    assert work.request.package_id == "pkg_postgres"
+    assert store.count_packages() == 1
+    assert store.count_runs(states={RunState.RUNNING}) == 1
+
+    store.mark_error(run_id="run_postgres", error_code="DATA_MISSING", message="failed closed")
+    run = store.get_run("run_postgres")
+
+    assert run is not None
+    assert run.state == RunState.ERROR
+    assert run.error_message == "failed closed"
