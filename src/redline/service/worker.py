@@ -7,16 +7,17 @@ from redline.models import ReasonCode, Status
 from redline.runner import run_redline
 from redline.service.artifacts import build_artifact_manifest
 from redline.service.models import RunCreateRequest, RunState
-from redline.service.store import ServiceStore
+from redline.service.storage import RunMetadataStore
 
 
 def execute_run(
     *,
-    store: ServiceStore,
+    store: RunMetadataStore,
     run_id: str,
     request: RunCreateRequest,
     package_path: Path,
     out_dir: Path,
+    expose_error_details: bool = True,
 ) -> None:
     store.mark_running(run_id)
     try:
@@ -49,9 +50,9 @@ def execute_run(
     except CanonicalizationError as exc:
         store.mark_error(run_id=run_id, error_code=exc.reason_code.value, message=str(exc))
     except FileNotFoundError as exc:
-        store.mark_error(run_id=run_id, error_code=ReasonCode.FILE_NOT_FOUND.value, message=str(exc))
+        store.mark_error(run_id=run_id, error_code=ReasonCode.FILE_NOT_FOUND.value, message=_error_message(exc, expose_error_details=expose_error_details))
     except Exception as exc:
-        store.mark_error(run_id=run_id, error_code=ReasonCode.DATA_MISSING.value, message=str(exc))
+        store.mark_error(run_id=run_id, error_code=ReasonCode.DATA_MISSING.value, message=_error_message(exc, expose_error_details=expose_error_details))
 
 
 def _map_run_state(status: Status, reason_code: ReasonCode) -> RunState:
@@ -62,3 +63,9 @@ def _map_run_state(status: Status, reason_code: ReasonCode) -> RunState:
     if status == Status.WITHHELD:
         return RunState.FAIL
     return RunState.ERROR
+
+
+def _error_message(exc: Exception, *, expose_error_details: bool) -> str:
+    if expose_error_details:
+        return str(exc)
+    return "run failed; inspect server logs with the request_id and run_id"

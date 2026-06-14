@@ -14,6 +14,7 @@ jobs:
       - run: uv run python scripts/check-verdict-path-imports.py
       - run: uv run --extra dev pytest
       - run: bash scripts/service-smoke.sh
+      - run: bash scripts/deployment-smoke.sh
       - run: uv run redline export-schemas --out /tmp/redline-schemas
       - run: |
           cp -R schemas /tmp/checked-schemas

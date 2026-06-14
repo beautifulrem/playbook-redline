@@ -30,6 +30,9 @@ class ErrorEnvelope(ApiModel):
 class HealthResponse(ApiModel):
     ok: bool
     service: Literal["redline-api"] = "redline-api"
+    environment: str = "local"
+    metadata_store: str = "sqlite"
+    artifact_store: str = "local"
 
 
 class PackageImportRequest(ApiModel):

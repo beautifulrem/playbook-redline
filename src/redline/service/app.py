@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
 import secrets
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -11,13 +13,14 @@ from typing import Annotated
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from redline.canonical import CanonicalizationError, hash_file, hash_obj
 from redline.io_safety import ensure_safe_output_dir
 from redline.models import ReasonCode
-from redline.service.artifacts import extract_package_archive, resolve_artifact_path, save_upload_stream
+from redline.service.artifacts import extract_package_archive, save_upload_stream
 from redline.service.config import ServiceConfig
 from redline.service.models import (
     ArtifactInfo,
@@ -31,19 +34,34 @@ from redline.service.models import (
     SponsorRequest,
     SponsorResponse,
 )
-from redline.service.store import ServiceStore, utc_now
+from redline.service.storage import ArtifactStore, RunMetadataStore, create_artifact_store, create_metadata_store
+from redline.service.store import utc_now
 from redline.service.worker import execute_run
 from redline.surfaces import execute_sponsor_readback, import_package, publish_preflight
+
+
+LOGGER = logging.getLogger("redline.service")
 
 
 class RedlineService:
     def __init__(self, config: ServiceConfig) -> None:
         self.config = config
+        _configure_logging(config)
         ensure_safe_output_dir(config.root)
-        ensure_safe_output_dir(config.packages_dir)
-        ensure_safe_output_dir(config.runs_dir)
-        self.store = ServiceStore(config.db_path)
+        self.artifacts: ArtifactStore = create_artifact_store(config)
+        ensure_safe_output_dir(self.artifacts.packages_dir)
+        ensure_safe_output_dir(self.artifacts.runs_dir)
+        self.store: RunMetadataStore = create_metadata_store(config)
         self.executor = ThreadPoolExecutor(max_workers=config.workers, thread_name_prefix="redline-run")
+        LOGGER.info(
+            "redline service configured",
+            extra={
+                "environment": config.environment,
+                "metadata_store": config.metadata_store,
+                "artifact_store": config.artifact_store,
+                "workers": config.workers,
+            },
+        )
 
     def close(self) -> None:
         self.executor.shutdown(wait=True, cancel_futures=False)
@@ -65,7 +83,7 @@ class RedlineService:
     def create_run(self, *, request_id: str, request: RunCreateRequest) -> RunResponse:
         package_path = self._resolve_package_path(request)
         run_id = _run_id(request.model_dump(mode="json"))
-        out_dir = self.config.runs_dir / run_id
+        out_dir = self.artifacts.run_dir(run_id)
         run = self.store.create_run(
             run_id=run_id,
             request_id=request_id,
@@ -73,7 +91,16 @@ class RedlineService:
             package_path=package_path,
             out_dir=out_dir,
         )
-        self.executor.submit(execute_run, store=self.store, run_id=run_id, request=request, package_path=package_path, out_dir=out_dir)
+        LOGGER.info("run queued", extra={"request_id": request_id, "run_id": run_id})
+        self.executor.submit(
+            execute_run,
+            store=self.store,
+            run_id=run_id,
+            request=request,
+            package_path=package_path,
+            out_dir=out_dir,
+            expose_error_details=self.config.expose_error_details,
+        )
         return run
 
     def _resolve_package_path(self, request: RunCreateRequest) -> Path:
@@ -101,14 +128,34 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
         summary="Production-style HTTP boundary for Redline proof runs and artifacts.",
         lifespan=lifespan,
     )
+    if service.config.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(service.config.cors_origins),
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Redline-Token", "X-Request-Id"],
+            expose_headers=["x-request-id"],
+        )
     app.state.redline_service = service
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
         request_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex}"
         request.state.request_id = request_id
+        started = time.perf_counter()
         response = await call_next(request)
         response.headers["x-request-id"] = request_id
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+        LOGGER.info(
+            "request complete",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": elapsed_ms,
+            },
+        )
         return response
 
     @app.exception_handler(StarletteHTTPException)
@@ -126,11 +173,18 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
-        return _error_response(request, status_code=500, error_code=ReasonCode.DATA_MISSING.value, message=str(exc))
+        LOGGER.exception("unhandled service exception", extra={"request_id": getattr(request.state, "request_id", "req_unknown")})
+        message = str(exc) if service.config.expose_error_details else "internal server error"
+        return _error_response(request, status_code=500, error_code=ReasonCode.DATA_MISSING.value, message=message)
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     def health() -> HealthResponse:
-        return HealthResponse(ok=True)
+        return HealthResponse(
+            ok=True,
+            environment=service.config.environment,
+            metadata_store=service.config.metadata_store,
+            artifact_store=service.config.artifact_store,
+        )
 
     router = APIRouter(prefix="/v1", dependencies=[Depends(_require_token)], tags=["redline"])
 
@@ -147,7 +201,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
         if archive.content_type not in {"application/gzip", "application/x-gzip", "application/tar", "application/octet-stream"}:
             raise HTTPException(status_code=415, detail="package upload must be a tar archive")
         upload_id = f"pkg_{uuid.uuid4().hex}"
-        upload_dir = service.config.packages_dir / upload_id
+        upload_dir = service.artifacts.package_upload_dir(upload_id)
         ensure_safe_output_dir(upload_dir)
         archive_path = upload_dir / "package.tar.gz"
         chunks: list[bytes] = []
@@ -205,7 +259,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
         artifact = _artifact_manifest_entry(run, artifact_id)
-        path = resolve_artifact_path(Path(run.out_dir), artifact.path)
+        path = service.artifacts.resolve_download_path(run, artifact)
         if hash_file(path) != artifact.sha256:
             raise CanonicalizationError("artifact hash mismatch", ReasonCode.RECEIPT_MISMATCH)
         return FileResponse(path, filename=path.name)
@@ -278,7 +332,8 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
 
 
 def main() -> None:
-    uvicorn.run(create_app(), host="127.0.0.1", port=8080, reload=False)
+    config = ServiceConfig.from_env()
+    uvicorn.run(create_app(config), host=config.host, port=config.port, reload=False, log_level=config.log_level.lower())
 
 
 async def _require_token(
@@ -315,3 +370,10 @@ def _artifact_manifest_entry(run: RunResponse, artifact_id: str) -> ArtifactInfo
         if artifact.artifact_id == artifact_id:
             return artifact
     raise HTTPException(status_code=404, detail="artifact not found")
+
+
+def _configure_logging(config: ServiceConfig) -> None:
+    logging.basicConfig(
+        level=getattr(logging, config.log_level, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )

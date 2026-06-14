@@ -93,6 +93,21 @@
       "HealthResponse": {
         "additionalProperties": false,
         "properties": {
+          "artifact_store": {
+            "default": "local",
+            "title": "Artifact Store",
+            "type": "string"
+          },
+          "environment": {
+            "default": "local",
+            "title": "Environment",
+            "type": "string"
+          },
+          "metadata_store": {
+            "default": "sqlite",
+            "title": "Metadata Store",
+            "type": "string"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"

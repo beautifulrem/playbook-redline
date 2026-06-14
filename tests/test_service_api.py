@@ -8,10 +8,13 @@ import tarfile
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from redline.service.app import create_app
 from redline.service.config import ServiceConfig
+from redline.service.storage import LocalArtifactStore, create_artifact_store, create_metadata_store
+from redline.service.store import ServiceStore
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "fixtures/demo_pack"
@@ -74,6 +77,58 @@ def test_service_rejects_wrong_demo_token(tmp_path: Path) -> None:
     assert response.status_code == 401
     assert response.json()["ok"] is False
     assert response.headers["x-request-id"].startswith("req_")
+
+
+def test_service_config_rejects_production_default_token(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_SERVICE_ENV", "production")
+    monkeypatch.delenv("REDLINE_SERVICE_TOKEN", raising=False)
+
+    with pytest.raises(ValueError, match="production service requires"):
+        ServiceConfig.from_env()
+
+
+def test_service_config_rejects_wildcard_production_cors(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_SERVICE_ENV", "production")
+    monkeypatch.setenv("REDLINE_SERVICE_TOKEN", "x" * 32)
+    monkeypatch.setenv("REDLINE_SERVICE_CORS_ORIGINS", "*")
+
+    with pytest.raises(ValueError, match="CORS origins"):
+        ServiceConfig.from_env()
+
+
+def test_service_config_rejects_invalid_log_level(monkeypatch) -> None:
+    monkeypatch.setenv("REDLINE_SERVICE_LOG_LEVEL", "verbose")
+
+    with pytest.raises(ValueError, match="LOG_LEVEL"):
+        ServiceConfig.from_env()
+
+
+def test_service_cors_origin_is_configurable(tmp_path: Path) -> None:
+    app = create_app(ServiceConfig(root=tmp_path / "service", token="test-token", cors_origins=("http://localhost:3000",)))
+    client = TestClient(app)
+
+    response = client.options(
+        "/v1/runs",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-redline-token",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_service_uses_swappable_storage_adapters(tmp_path: Path) -> None:
+    config = ServiceConfig(root=tmp_path / "service", token="test-token")
+
+    metadata_store = create_metadata_store(config)
+    artifact_store = create_artifact_store(config)
+
+    assert isinstance(metadata_store, ServiceStore)
+    assert isinstance(artifact_store, LocalArtifactStore)
+    assert artifact_store.run_dir("run_abc") == config.runs_dir / "run_abc"
 
 
 def test_service_import_run_and_download_artifacts(tmp_path: Path) -> None:

@@ -6556,6 +6556,7 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "actions/checkout@v6" in workflow
     assert "astral-sh/setup-uv@v8.2.0" in workflow
     assert "uv run python scripts/verify-sponsor-fixture.py" in workflow
+    assert "bash scripts/deployment-smoke.sh" in workflow
     assert "git diff --exit-code -- schemas artifacts/demo artifacts/sponsor" in workflow
     assert 'test "$code" -eq 10' in workflow
     assert 'test "$code" -eq 0 -o "$code" -eq 10' not in workflow

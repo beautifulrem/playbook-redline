@@ -12,6 +12,19 @@ REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
 
 Default local URL: `http://127.0.0.1:8080`.
 
+Production/container runtime uses:
+
+```bash
+REDLINE_SERVICE_ENV=production
+REDLINE_SERVICE_TOKEN=<32+ character secret>
+REDLINE_SERVICE_ROOT=/data/redline-service
+REDLINE_SERVICE_CORS_ORIGINS=http://localhost:3000
+```
+
+Production rejects default demo tokens and wildcard CORS origins. Unknown server
+errors are redacted from HTTP responses; correlate logs with the returned
+`x-request-id`.
+
 All `/v1/*` endpoints require either:
 
 ```http
@@ -36,6 +49,15 @@ contract discovery.
 5. Download `receipt`, `report`, `envelope`, ledger checkpoint, or proof files.
 6. Optionally call sponsor preflight/live readback. Live mode never returns a
    pseudo-success when credentials or proof bindings are missing.
+
+The repository includes a frontend-facing smoke client for this exact flow:
+
+```bash
+REDLINE_SERVICE_TOKEN=redline-demo uv run python scripts/frontend-demo-flow.py \
+  --base-url http://127.0.0.1:8080 \
+  --token redline-demo \
+  --allow-demo-baseline-genesis
+```
 
 ## Endpoints
 
@@ -134,3 +156,19 @@ All handled errors use:
 ```
 
 The same `request_id` is returned in the `x-request-id` response header.
+
+## Deployment Smoke
+
+```bash
+make deployment-smoke
+```
+
+CI runs this against the Docker image. Development machines without Docker can
+use:
+
+```bash
+REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
+```
+
+The smoke test verifies the HTTP flow, artifact manifest hashes, replayed
+receipt result, and sponsor preflight.
