@@ -16,12 +16,12 @@ BODY="$(perl -0777 -pe 's/:root\s*\{.*?\}//s' "$CSS")"
 
 # A) canonical brand tokens must be present with EXACT values (true on-brand pin)
 req() { printf '%s' "$ROOT" | grep -qiE -- "$1:[[:space:]]*$2([^0-9A-Fa-f]|$)" || note "token $1 missing or != $2"; }
-req '--rl-bg'      '#0B0B0C'
-req '--rl-surface' '#121214'
+req '--rl-bg'      '#0C0D0F'
+req '--rl-surface' '#15161A'
 req '--rl-fg'      '#EAEAEA'
 req '--rl-muted'   '#8A8A92'
-req '--rl-hazard'  '#FF2A2A'
-req '--rl-pass'    '#4AF626'
+req '--rl-hazard'  '#EC5054'
+req '--rl-pass'    '#4FC97A'
 printf '%s' "$ROOT" | grep -qiE -- '--rl-radius:[[:space:]]*0([^0-9]|;|$)' || note "--rl-radius must be 0"
 
 # B) no non-zero radius anywhere (any *radius property whose value contains a non-zero digit)

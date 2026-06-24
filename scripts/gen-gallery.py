@@ -9,8 +9,11 @@ Usage: gen-gallery.py [out.html]   (default: /tmp/redline-gallery.html)
 """
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
+
+from redline.render import randomart_svg  # single source for the SSH-randomart seal
 
 CSS = Path("src/redline/static/redline.css").read_text(encoding="utf-8")
 
@@ -121,6 +124,8 @@ BODY = """
   <h2 class="rl-sec">Warning stripe</h2>
   <div class="rl-stripe"><span class="rl-stripe__msg">⚠ execution freeze active · demo execution disabled</span></div>
 
+  <!--MOTION-->
+
   <hr>
   <p class="rl-muted">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布。 <span class="rl-faint">REV 2.6 · UNIT RL-01</span></p>
 </main>
@@ -135,9 +140,87 @@ DOC = (
 )
 
 
+def fingerprint_svg(seed: str, size: int = 42, cells: int = 5) -> str:
+    """A deterministic identicon-style glyph rendered from a hash — a unique 'image' per hash.
+    Inline SVG (no xmlns → valid HTML5), fill=currentColor so it inherits the wrapper's brand color."""
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    pad = 3.0
+    cell = (size - 2 * pad) / cells
+    half = (cells + 1) // 2
+    rects = []
+    for row in range(cells):
+        for col in range(half):
+            if digest[(row * half + col) % len(digest)] & 1:
+                for mirrored in {col, cells - 1 - col}:  # horizontal mirror → glyph-like
+                    x = pad + mirrored * cell
+                    y = pad + row * cell
+                    rects.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}"/>')
+    return (
+        f'<svg viewBox="0 0 {size} {size}" fill="currentColor" role="img" aria-label="hash fingerprint">'
+        + "".join(rects)
+        + "</svg>"
+    )
+
+
+def _motion_section() -> str:
+    h_pass = "sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6"
+    h_resp = "sha256:9d7da0b24514ee1724d80ba8383514781265f59678bcfacea63e1030e46e8d5c"
+    h_bad = "sha256:deadbeefcafe1234deadbeefcafe1234deadbeefcafe1234deadbeefcafe1234"
+    nodes = "".join(
+        f'<div class="rl-chain__node"><span class="rl-chain__label">{lbl}</span>'
+        f'<span class="rl-chain__hash">{hsh}</span><span class="rl-chain__st--ok">✔ {st}</span></div>'
+        for lbl, hsh, st in [
+            ("edit", "sha256:0a91…7e2c", "provenance"),
+            ("verdict", "sha256:4263…645d6", "replayed"),
+            ("approval", "sha256:b8e1…09af", "digest burn"),
+            ("execution", "1453***8417", "bitget"),
+            ("attestation", "merkle 9d7d…8d5c", "ed25519"),
+        ]
+    )
+    return f"""
+  <h2 class="rl-sec">Motion &amp; imagery</h2>
+
+  <p class="rl-label">动效 · 在浏览器里看（prefers-reduced-motion 下自动静止）</p>
+  <div class="rl-crt rl-box">
+    <div class="rl-band rl-band--pass">
+      <span class="rl-band__verdict rl-scanin">PASS</span>
+      <span class="rl-band__meta rl-scanin rl-scanin--2 rl-caret">VERIFYING · REPLAYED · CHAINED · SIGNED</span>
+    </div>
+  </div>
+
+  <h2 class="rl-sec">Chain light-up · 链路逐节点点亮</h2>
+  <div class="rl-chain rl-chain--live">{nodes}</div>
+
+  <h2 class="rl-sec">Redline seal · SSH randomart 印章（hash→可视指纹，篡改即变形）</h2>
+  <div class="rl-seals">
+    <div class="rl-seal rl-seal--pass"><span class="rl-seal__art">{randomart_svg(h_pass)}</span><span class="rl-seal__body"><span class="rl-seal__stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart · receipt</span><span class="rl-seal__hash">{h_pass[:24]}…</span></span></div>
+    <div class="rl-seal"><span class="rl-seal__art">{randomart_svg(h_resp)}</span><span class="rl-seal__body"><span class="rl-seal__stamp">RESPONSE</span><span class="rl-seal__algo">SSH randomart · response</span><span class="rl-seal__hash">{h_resp[:24]}…</span></span></div>
+    <div class="rl-seal rl-seal--void"><span class="rl-seal__art">{randomart_svg(h_bad)}</span><span class="rl-seal__body"><span class="rl-seal__stamp">VOID</span><span class="rl-seal__algo">SSH randomart · tampered</span><span class="rl-seal__hash">{h_bad[:24]}…</span></span></div>
+  </div>
+
+  <h2 class="rl-sec">Verification checklist · 替代单调 summary</h2>
+  <div class="rl-box"><ul class="rl-check">
+    <li>max_drawdown ≤ 0.08000000 · observed 0.00498134</li>
+    <li>no_entry_when ≤ 0 · observed 0</li>
+    <li>replay_wellformed == 24 · observed 24</li>
+    <li>trade_budget ≤ 20.00000000 · observed 1.00000000</li>
+    <li class="rl-check--no">new_block_breach · observed TRUE → WITHHELD</li>
+  </ul></div>
+
+  <h2 class="rl-sec">Metric bars · observed vs threshold（载入充能）</h2>
+  <div class="rl-box">
+    <div class="rl-meter"><span class="rl-meter__k">max_drawdown</span><span class="rl-bar"><i style="width:6%"></i></span><span class="rl-meter__v">.005 / .08</span></div>
+    <div class="rl-meter"><span class="rl-meter__k">trade_budget</span><span class="rl-bar"><i style="width:5%"></i></span><span class="rl-meter__v">1.0 / 20</span></div>
+    <div class="rl-meter"><span class="rl-meter__k">replay_wellformed</span><span class="rl-bar"><i style="width:100%"></i></span><span class="rl-meter__v">24 / 24</span></div>
+    <div class="rl-meter"><span class="rl-meter__k">new_block_breach</span><span class="rl-bar rl-bar--over"><i style="width:100%"></i></span><span class="rl-meter__v">BREACH</span></div>
+  </div>
+"""
+
+
 def main() -> int:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/redline-gallery.html")
-    out.write_text(DOC.format(css=CSS, body=BODY), encoding="utf-8")
+    body = BODY.replace("<!--MOTION-->", _motion_section())
+    out.write_text(DOC.format(css=CSS, body=body), encoding="utf-8")
     print(out)
     return 0
 

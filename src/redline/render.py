@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -272,6 +273,7 @@ def _render_panel(panel: EvidencePanel, *, with_title: bool = False) -> str:
           <span class="rl-band__verdict">{_esc(panel.verdict)}</span>
           <span class="rl-band__meta">{_esc(_band_meta(panel))}</span>
         </div>
+{_render_seal(panel)}
 {_render_redline(panel)}
 {_render_execution(panel)}
 {_render_block(panel)}
@@ -326,6 +328,58 @@ def _render_summary(summary: str | None) -> str:
         return _esc("not provided")
     parts = [part.strip() for part in summary.split(";") if part.strip()]
     return "<br>".join(_esc(part) for part in parts) if parts else _esc(summary)
+
+
+def randomart_svg(seed: str, cell: int = 9) -> str:
+    """SSH 'Drunken Bishop' randomart (OpenSSH VisualHostKey) as inline SVG — a named
+    cryptographic fingerprint so near-identical hashes look obviously different to a human.
+    Deterministic, fill=currentColor, no external refs (safe for the offline evidence page)."""
+    hx = "".join(c for c in seed if c in "0123456789abcdefABCDEF")
+    if len(hx) % 2:
+        hx = hx[:-1]
+    data = bytes.fromhex(hx) if hx else hashlib.sha256(seed.encode("utf-8")).digest()
+    cols, rows = 17, 9
+    grid = [[0] * cols for _ in range(rows)]
+    x, y = cols // 2, rows // 2
+    for byte in data:
+        b = byte
+        for _ in range(4):
+            x = min(cols - 1, max(0, x + (1 if b & 1 else -1)))
+            y = min(rows - 1, max(0, y + (1 if b & 2 else -1)))
+            grid[y][x] += 1
+            b >>= 2
+    peak = max((max(row) for row in grid), default=1) or 1
+    fills = "".join(
+        f'<rect x="{i*cell}" y="{j*cell}" width="{cell}" height="{cell}" fill-opacity="{0.16 + 0.84 * (grid[j][i] / peak):.2f}"/>'
+        for j in range(rows)
+        for i in range(cols)
+        if grid[j][i]
+    )
+    sx, sy = cols // 2, rows // 2
+    marks = (
+        f'<rect x="{sx*cell}" y="{sy*cell}" width="{cell}" height="{cell}" fill="none" stroke="currentColor" stroke-opacity=".85"/>'
+        f'<rect x="{x*cell}" y="{y*cell}" width="{cell}" height="{cell}" fill="none" stroke="currentColor" stroke-opacity=".85"/>'
+    )
+    return (
+        f'<svg viewBox="0 0 {cols*cell} {rows*cell}" fill="currentColor" role="img" aria-label="randomart hash fingerprint of the receipt">'
+        + fills + marks + "</svg>"
+    )
+
+
+def _render_seal(panel: EvidencePanel) -> str:
+    seed = panel.receipt_hash or (panel.evidence.response_hash if panel.evidence else None)
+    if not seed:
+        return ""
+    passed = panel.evidence is not None and panel.invalid_reason_code is None
+    mod = "rl-seal--pass" if passed else "rl-seal--void"
+    stamp = "VERIFIED" if passed else "VOID"
+    short = seed if len(seed) <= 26 else seed[:26] + "…"
+    return (
+        f'        <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
+        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_esc(stamp)}</span>'
+        f'<span class="rl-seal__algo">SSH randomart · receipt fingerprint</span>'
+        f'<span class="rl-seal__hash">{_esc(short)}</span></span></div>'
+    )
 
 
 def _band_meta(panel: EvidencePanel) -> str:
