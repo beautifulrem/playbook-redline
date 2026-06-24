@@ -2855,7 +2855,7 @@ def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
         proof_fingerprints.add(tuple(proof.artifact_hash for proof in artifacts.receipt.proofs))
         trace_fingerprints.add(tuple(trace.artifact_hash for trace in artifacts.traces))
 
-    assert receipt_hashes == {"sha256:f87f7109896a9bce9dda5528f6f72d7af85b167180fd6fd07c50bfc38e1fd052"}
+    assert receipt_hashes == {"sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6"}
     assert len(report_hashes) == 1
     assert len(proof_fingerprints) == 1
     assert len(trace_fingerprints) == 1
@@ -7440,3 +7440,15 @@ def test_verifier_rejects_duplicate_same_key_ledger_entry(tmp_path: Path) -> Non
 
     assert result.status == VerificationStatus.REJECTED
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
+
+
+def test_legacy_v32_receipt_hash_is_back_compatible():
+    """Cross-version back-compat: a real pre-v3.3 receipt (committed fixture, issued before
+    the v3.3 optional fields existed) must still hash to its stored value under the current
+    exclude-none canonical hashing — i.e. it reads as intact, not tampered. This is a frozen
+    real-artifact guard (not self-referential): it pins the exact hash a previous release
+    produced, so re-introducing the include-none regression fails here."""
+    fixture = Path(__file__).parent / "fixtures" / "legacy-receipt-v3.2.json"
+    receipt = Receipt.model_validate(json.loads(fixture.read_text(encoding="utf-8")))
+    assert receipt.version == "redline.receipt.v3.2"
+    assert compute_receipt_hash(receipt) == receipt.receipt_hash

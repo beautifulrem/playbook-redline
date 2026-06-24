@@ -1,0 +1,17 @@
+{
+  "schema_version": "redline.bitget.order_status.v1",
+  "run_id": "run_1094a295995fc4cdc7dde24b",
+  "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+  "client_oid": "rl-256dde4557790a58afc761369b4e2",
+  "bitget_order_id": "1453610876568502273",
+  "queried_at": "2026-06-24T09:36:01Z",
+  "symbol": "BTCUSDT",
+  "product_type": "USDT-FUTURES",
+  "order_mode": "demo",
+  "paptrading": "1",
+  "status": "filled",
+  "raw_status": "filled",
+  "response_hash": "sha256:7f1f34bd1828deb86a4a88f4d5cbe8c84cd7a46ea088d49d2fe4cbddb302bf96",
+  "status_code": 200,
+  "evidence_hash": "sha256:869f83bdc6400669e969513cc56b55fe549223d7a82af963aeee8efc854eb08b"
+}
