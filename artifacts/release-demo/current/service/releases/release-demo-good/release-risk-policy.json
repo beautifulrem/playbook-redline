@@ -7,7 +7,7 @@
     "ETHUSDT",
     "SOLUSDT"
   ],
-  "bound_at": "2026-06-24T06:57:55Z",
+  "bound_at": "2026-06-24T09:35:45Z",
   "expected_order_notional_usdt": "5",
   "mainnet_enabled": false,
   "max_order_notional_usdt": "20",

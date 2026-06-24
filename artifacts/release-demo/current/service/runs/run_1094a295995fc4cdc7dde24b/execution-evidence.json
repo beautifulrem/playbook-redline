@@ -1,0 +1,19 @@
+{
+  "version": "redline.execution.evidence.v1",
+  "run_id": "run_1094a295995fc4cdc7dde24b",
+  "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+  "issuance_ledger_entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
+  "issuance_checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+  "approval_hash": "sha256:080ab5b6715fd1032480d075594b36d048084411f7b7183625c9b37782312321",
+  "verdict": "pass",
+  "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+  "bitget_order_id": "1453610833413308417",
+  "response_hash": "sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2",
+  "placed_at": "2026-06-24T09:35:50Z",
+  "symbol": "BTCUSDT",
+  "product_type": "USDT-FUTURES",
+  "order_mode": "demo",
+  "paptrading": "1",
+  "execution_ledger_entry_hash": "sha256:2b565fa99cc3de37f2c53276d96c1c8e2bbe5b4aff6b48997b0f14c133fcf13b",
+  "artifact_hash": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c"
+}

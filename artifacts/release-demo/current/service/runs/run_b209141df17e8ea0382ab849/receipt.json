@@ -1,6 +1,6 @@
 {
   "version": "redline.receipt.v3.3",
-  "prev_receipt_hash": "sha256:genesis",
+  "prev_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
   "package": {
     "identity_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
     "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
@@ -12,21 +12,21 @@
   "edit_provenance": {
     "tool": "fixture",
     "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
-    "diff_hash": "sha256:f53240af72989c573be6117b64dc1db4bc0e0ddf89579927fd8e40d73a693f55",
+    "diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
     "locked_by": "author",
     "captured_at": "2026-06-10T00:00:00Z"
   },
   "baseline": {
     "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
-    "baseline_receipt_hash": null,
+    "baseline_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
     "baseline_version_id": "fixture:baseline",
     "package_name": "baseline",
-    "chain_status": "genesis"
+    "chain_status": "chained"
   },
   "candidate": {
-    "package_hash": "sha256:c175c24b00d705a0be6db12fd67b29db5795451de6baa73908e57fc7f784f670",
-    "candidate_version_id": "fixture:candidate_good",
-    "package_name": "candidate_good"
+    "package_hash": "sha256:793cc8e832181add479ac37e2ed99090b24823779a25f6a68e82a346e10c7e71",
+    "candidate_version_id": "fixture:candidate_bad",
+    "package_name": "candidate_bad"
   },
   "spec": {
     "spec_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
@@ -52,9 +52,28 @@
     "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
   },
   "result": {
-    "status": "pass",
-    "new_breaches": [],
-    "result_hash": "sha256:83e6f1f573095856bb31b74de81bb7309612e4acf712e7024546a0d02892c53b"
+    "status": "withheld",
+    "new_breaches": [
+      {
+        "metric": "max_drawdown",
+        "op": "<=",
+        "threshold": "0.08000000",
+        "observed": "0.17663366",
+        "scenario_id": "btc-crash-2024-03-05",
+        "bar": 3,
+        "holds": false
+      },
+      {
+        "metric": "no_entry_when",
+        "op": "<=",
+        "threshold": "0",
+        "observed": "2.00000000",
+        "scenario_id": "btc-crash-2024-03-05",
+        "bar": 2,
+        "holds": false
+      }
+    ],
+    "result_hash": "sha256:8b03b029470a625c23e41433bdfe3bf7acd1c2038ed4b39ed83e5bee0776f747"
   },
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",
@@ -88,39 +107,35 @@
     "missing": []
   },
   "decision": {
-    "reason_code": "BASELINE_GENESIS",
-    "verdict_tier": "ALLOW",
+    "reason_code": "NEW_BLOCK_BREACH",
+    "verdict_tier": "BLOCK",
     "adjusted_size_cap": null,
     "required_proof_ids_source": "REQUIRED_PROOFS[status]",
     "required_proof_ids": [
-      "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
-      "proof:candidate_absolute:5f1ad76159c62e782c528b48",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7d7847e39bdde47458bb1ca4",
-      "proof:package_canonical:7bc11572ef15a4a40cdf1856",
-      "proof:probe:0b22c22a0727d2c30c2de30e",
-      "proof:probe:10142a4c4d62b0f91a288df0",
-      "proof:probe:1ddc081ebb0b52ee1d938eb9",
+      "proof:decision:f7c512a6a5eaf14ddd7d6f39",
+      "proof:package_canonical:41ab0f368e7162f567a761e8",
+      "proof:probe:76fbdbbb653d83b4540c6f8b",
       "proof:probe:a13bf024e0d494f47d38b48f",
       "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
       "proof:probe:c3ad8af9ce3ea6a163703aee",
-      "proof:replay:bbfdbde5518b151be3dd273e",
+      "proof:probe:f8de6126e1f9d5bd19708bde",
+      "proof:replay:520325867db0d4c21d877292",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
       "proof:spec_compile:8079e8531c379ae14c25e313"
     ],
     "satisfied_proof_ids": [
-      "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
-      "proof:candidate_absolute:5f1ad76159c62e782c528b48",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7d7847e39bdde47458bb1ca4",
-      "proof:package_canonical:7bc11572ef15a4a40cdf1856",
-      "proof:probe:0b22c22a0727d2c30c2de30e",
-      "proof:probe:10142a4c4d62b0f91a288df0",
-      "proof:probe:1ddc081ebb0b52ee1d938eb9",
+      "proof:decision:f7c512a6a5eaf14ddd7d6f39",
+      "proof:package_canonical:41ab0f368e7162f567a761e8",
+      "proof:probe:76fbdbbb653d83b4540c6f8b",
       "proof:probe:a13bf024e0d494f47d38b48f",
       "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:b5785a8f2f863c305e84df47",
       "proof:probe:c3ad8af9ce3ea6a163703aee",
-      "proof:replay:bbfdbde5518b151be3dd273e",
+      "proof:probe:f8de6126e1f9d5bd19708bde",
+      "proof:replay:520325867db0d4c21d877292",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
       "proof:spec_compile:8079e8531c379ae14c25e313"
     ],
@@ -129,33 +144,33 @@
   },
   "proofs": [
     {
-      "proof_id": "proof:package_canonical:7bc11572ef15a4a40cdf1856",
+      "proof_id": "proof:package_canonical:41ab0f368e7162f567a761e8",
       "phase": "import",
       "kind": "package_canonical",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:92dd7dbdc1876eb27a3f83f03f31a6a78e37c51d84c92ae4e5b2660d363c1fbf",
-      "artifact_hash": "sha256:7bc11572ef15a4a40cdf185639a3c244b225653f56d1d3233b3670042cfd9c1f",
+      "inputs_hash": "sha256:fd857c79df5dac9e88e8f8982602841a57526d6a3d04c704ffa9d049ceb61209",
+      "artifact_hash": "sha256:41ab0f368e7162f567a761e869680fc3d9a09a063baceac2b94fe07a5f3acdc2",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:41ab0f368e7162f567a761e8 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {}
     },
     {
-      "proof_id": "proof:edit_provenance:39c8b96527a92f5c79df6d37",
+      "proof_id": "proof:edit_provenance:c2202c44cdf225234b155589",
       "phase": "capture-edit",
       "kind": "edit_provenance",
       "verdict_bearing": false,
-      "inputs_hash": "sha256:b95ce165fd002a1a08acaf02b04ec419e7ab89022ef6f581ef353cf7c51c403a",
-      "artifact_hash": "sha256:39c8b96527a92f5c79df6d372737d5a9a19e86a1fe762ac43384111e23588471",
+      "inputs_hash": "sha256:fca5f2ef25903dc91f7851483cf50e3451db612eff68325e60e6953f2f10244e",
+      "artifact_hash": "sha256:c2202c44cdf225234b1555897e372567ca91dc2d389cee9da8e31b0420969daa",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:39c8b96527a92f5c79df6d37 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:c2202c44cdf225234b155589 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {
-        "expected_diff_hash": "sha256:f53240af72989c573be6117b64dc1db4bc0e0ddf89579927fd8e40d73a693f55",
+        "expected_diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
         "binding": "package_pair"
       }
     },
@@ -167,7 +182,7 @@
       "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
       "artifact_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -180,14 +195,14 @@
       }
     },
     {
-      "proof_id": "proof:replay:bbfdbde5518b151be3dd273e",
+      "proof_id": "proof:replay:520325867db0d4c21d877292",
       "phase": "run",
       "kind": "replay",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:174631ac69ba417be9e19a30fff5f9ae4eb32a929c6e47bf7d013c9bd8705142",
-      "artifact_hash": "sha256:bbfdbde5518b151be3dd273e6005076eefc09aff92e2bfa98dbe90d4b9bc4883",
+      "inputs_hash": "sha256:c18ded2d2ef19549a60e88e86639037ffa29d8b816a31cb594d4c15e46e31ec6",
+      "artifact_hash": "sha256:520325867db0d4c21d877292cf5dc424a3614820c7d5819fa8cdc15a86aabb31",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:bbfdbde5518b151be3dd273e --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:520325867db0d4c21d877292 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": "next_bar_open",
       "lookahead_guard": "structural_next_bar",
       "fees_modeled": true,
@@ -198,7 +213,7 @@
       "phase": "run",
       "kind": "replay_wellformed",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:becd6a481eaafa9ee9610defa7126d8ae1c8d306712ac4bc233f07d88bd90901",
+      "inputs_hash": "sha256:774cfd62d08cbd3788a8d59883980eeaf6a9849d61d441fcc4c93d40a52c48bb",
       "artifact_hash": "sha256:6c1df9b834122230a053526fe6cc45179a7cab042a3f953a1f3ca6b31d6d7cd7",
       "assertions": [
         {
@@ -238,31 +253,31 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {}
     },
     {
-      "proof_id": "proof:probe:0b22c22a0727d2c30c2de30e",
+      "proof_id": "proof:probe:b5785a8f2f863c305e84df47",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
-      "artifact_hash": "sha256:0b22c22a0727d2c30c2de30ee1d17e304d912f57873c2f9031e2a5568ceeeee7",
+      "artifact_hash": "sha256:b5785a8f2f863c305e84df47806fb56f5916db50c287f3e3100a5748e53236ac",
       "assertions": [
         {
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0",
+          "observed": "0.17663366",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 0,
-          "holds": true
+          "bar": 3,
+          "holds": false
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:0b22c22a0727d2c30c2de30e --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b5785a8f2f863c305e84df47 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -272,24 +287,24 @@
       }
     },
     {
-      "proof_id": "proof:probe:10142a4c4d62b0f91a288df0",
+      "proof_id": "proof:probe:f8de6126e1f9d5bd19708bde",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
-      "artifact_hash": "sha256:10142a4c4d62b0f91a288df035673ef369716943a1bdbdd836f1c322f8d57bb9",
+      "artifact_hash": "sha256:f8de6126e1f9d5bd19708bde93b0a2ff56d02dd2f9162a51e2952c76bf629e8d",
       "assertions": [
         {
           "metric": "no_entry_when",
           "op": "<=",
           "threshold": "0",
-          "observed": "0",
+          "observed": "2.00000000",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 0,
-          "holds": true
+          "bar": 2,
+          "holds": false
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:10142a4c4d62b0f91a288df0 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:f8de6126e1f9d5bd19708bde --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -316,7 +331,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -326,24 +341,24 @@
       }
     },
     {
-      "proof_id": "proof:probe:1ddc081ebb0b52ee1d938eb9",
+      "proof_id": "proof:probe:76fbdbbb653d83b4540c6f8b",
       "phase": "probe",
       "kind": "probe",
       "verdict_bearing": true,
       "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
-      "artifact_hash": "sha256:1ddc081ebb0b52ee1d938eb99fac84d56ff7cb8b54f5d66fb85387c659433a72",
+      "artifact_hash": "sha256:76fbdbbb653d83b4540c6f8b712fc2c5bc3338ed0e33e302018a036b25931917",
       "assertions": [
         {
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0.00498134",
+          "observed": "0.02029149",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 13,
+          "bar": 21,
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ddc081ebb0b52ee1d938eb9 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:76fbdbbb653d83b4540c6f8b --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -370,7 +385,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -397,7 +412,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -414,7 +429,7 @@
       "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
       "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -483,28 +498,28 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {}
     },
     {
-      "proof_id": "proof:candidate_absolute:5f1ad76159c62e782c528b48",
+      "proof_id": "proof:candidate_absolute:8670b636e72e32d864f7e227",
       "phase": "probe",
       "kind": "candidate_absolute",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:8a92190a9857e597f86e80d56a7529ef51fbb41ece5fcc391f38191dad72d32a",
-      "artifact_hash": "sha256:5f1ad76159c62e782c528b483a99c8d2d8c6af67194b0437cb1e99fc3874bd82",
+      "inputs_hash": "sha256:06d5ec40d25d7d4293d9eb75a7ae32e77b0aaa0472d04cab55e0eac9b8fd7ed1",
+      "artifact_hash": "sha256:8670b636e72e32d864f7e227a102f89cc479c21d70fcd4d2a823aebfd186c825",
       "assertions": [
         {
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0",
+          "observed": "0.17663366",
           "scenario_id": "btc-crash-2024-03-05",
-          "bar": 0,
-          "holds": true
+          "bar": 3,
+          "holds": false
         },
         {
           "metric": "trade_budget",
@@ -519,9 +534,9 @@
           "metric": "max_drawdown",
           "op": "<=",
           "threshold": "0.08000000",
-          "observed": "0.00498134",
+          "observed": "0.02029149",
           "scenario_id": "btc-chop-2024-08",
-          "bar": 13,
+          "bar": 21,
           "holds": true
         },
         {
@@ -534,21 +549,21 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:5f1ad76159c62e782c528b48 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:8670b636e72e32d864f7e227 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {}
     },
     {
-      "proof_id": "proof:decision:7d7847e39bdde47458bb1ca4",
+      "proof_id": "proof:decision:f7c512a6a5eaf14ddd7d6f39",
       "phase": "decide",
       "kind": "decision",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:2eb4c7d99d9a761c93721813b59309f7c361c6acadd6cb44c944f5668a3b8a8c",
-      "artifact_hash": "sha256:9b36c3e2e9ac274fa2e1dd6273fbd5f8526e2a6923054ce9993bb46ea2e3e9ca",
+      "inputs_hash": "sha256:570cc8a0549fb2b09778060b6598544fabb774a16e02bae55371f2d6153b0b5a",
+      "artifact_hash": "sha256:e9d4193646be64ae34463e2d796c33a8793bb1fb72f6014a3d0ff5760320c6ce",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:7d7847e39bdde47458bb1ca4 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:f7c512a6a5eaf14ddd7d6f39 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -574,9 +589,9 @@
     },
     "llm_in_verdict": false
   },
-  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
+  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:1a0101eed3f6933575ff23387f011dadb09bf5df605be6d384bf9a78d9b2e6d9",
+    "report_hash": "sha256:45c57e47d5b35200324e3b0529ad2988b127dbaacc21dffbb08d1560a63407b6",
     "attribution_report_hash": null
   },
   "publish": {
@@ -589,5 +604,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6"
+  "receipt_hash": "sha256:289405d2f8dd0460bc2778d5ed5a7d941ea1c1f4d8e166b14dd17fb821bd7dcf"
 }

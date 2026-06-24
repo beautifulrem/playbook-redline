@@ -1,0 +1,51 @@
+{
+  "schema_version": "redline.bitget.exchange_preflight.v1",
+  "run_id": "run_1094a295995fc4cdc7dde24b",
+  "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+  "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+  "checked_at": "2026-06-24T09:35:48Z",
+  "symbol": "BTCUSDT",
+  "product_type": "USDT-FUTURES",
+  "margin_coin": "USDT",
+  "order_mode": "demo",
+  "paptrading": "1",
+  "ok": true,
+  "checks": [
+    {
+      "name": "symbol_exists",
+      "ok": true
+    },
+    {
+      "name": "account_readable",
+      "ok": true
+    },
+    {
+      "name": "symbol_status",
+      "ok": true,
+      "value": "normal"
+    },
+    {
+      "name": "margin_coin_supported",
+      "ok": true
+    },
+    {
+      "name": "min_trade_num",
+      "ok": true,
+      "value": "0.0001"
+    },
+    {
+      "name": "size_precision",
+      "ok": true,
+      "value": "4"
+    }
+  ],
+  "contract_response_hash": "sha256:9168258361fcc582f6ec032b682ff148eb97097492d89293c3bb3b0e01a83c07",
+  "account_response_hash": "sha256:34f085181b98dcfa358cc2152317157a33e637031eae5fd6be7ddf38829e4d46",
+  "symbol_status": "normal",
+  "min_trade_num": "0.0001",
+  "min_trade_usdt": "5",
+  "price_place": "1",
+  "volume_place": "4",
+  "available": "9977.93699852",
+  "preflight_hash": "sha256:7e438d4ba4dcf389db9d398b3b3ee21adb74f99d1fe8b998e4b14150fe01591a"
+}

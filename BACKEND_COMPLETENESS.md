@@ -126,17 +126,18 @@ Documented limitations confirmed by an independent verdict-path / security
 review of the v2 backend (the review the implementing agent could not perform
 on itself):
 
-- **Receipt schema v3.3 is a breaking revision (v3.2 → v3.3).** v3.3 binds new
-  fields (`prev_receipt_hash`; decision `verdict_tier` / `adjusted_size_cap`;
-  leak-free replay fields; checkpoint `merkle_root`) into the canonical receipt
-  hash. The `Receipt` model still *reads* v3.2 (model-level back-compat), but a
-  pre-v3.3 receipt does **not** re-verify under the v3.3 verifier and must be
-  re-issued. This is intentional and fail-closed: the v3.3 verifier does not
-  vouch for receipts that lack v3.3 guarantees. Every shipped `artifacts/**`
-  receipt is v3.3 and verifies zero-secret. Restoring cross-version
-  verification would require switching the receipt hash to exclude-none
-  semantics and regenerating every artifact (release-demo regeneration needs
-  Bitget demo credentials) — deferred by decision.
+- **Receipt schema v3.3 — cross-version verify with v3.2 is RESTORED.** v3.3 adds
+  optional fields, but `compute_receipt_hash` now drops None (absent) fields
+  (`exclude_none=True`), so a pre-v3.3 receipt that never carried those fields
+  still hashes to its stored value and verifies (it reads as intact, not
+  tampered). All committed `artifacts/**` were regenerated under this hashing
+  (offline `make-demo` + `release-demo.sh` paptrading); a frozen real v3.2
+  receipt fixture (`tests/fixtures/legacy-receipt-v3.2.json` + test
+  `test_legacy_v32_receipt_hash_is_back_compatible`) guards it. Independently
+  re-reviewed: determinism preserved (200 runs → 1 hash), issue/verify symmetric,
+  tamper-evidence intact (null-drop forgery rejected at schema validation).
+  Note: `compute_ledger_checkpoint_hash` does not yet share the exclude-none rule
+  — inert today (checkpoints carry no None fields); a follow-up could align it.
 - **Offline bundle / attestation verification is integrity-only unless a signer
   is pinned.** By default `verify-chain` / `verify-release-attestation` prove
   internal consistency and that the embedded Ed25519 signature matches the
