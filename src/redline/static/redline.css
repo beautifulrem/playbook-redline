@@ -137,6 +137,14 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-table th { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-weight: 600; font-size: 11px; }
 .rl-table tbody tr:hover { background: var(--rl-surface); }
 
+/* copy-to-clipboard affordance for identifiers / hashes (console surfaces) */
+.rl-idcopy { display: inline-flex; align-items: baseline; gap: var(--rl-2); min-width: 0; }
+.rl-copy { font-family: var(--rl-mono); font-size: 10px; text-transform: uppercase; letter-spacing: var(--rl-track); color: var(--rl-muted); background: var(--rl-surface-2); border: var(--rl-border); padding: 1px 5px; cursor: pointer; flex: 0 0 auto; }
+.rl-copy:hover { color: var(--rl-fg); border-color: var(--rl-fg); }
+.rl-copy:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 1px; }
+/* mono log block (job events, audit ledger) */
+.rl-pre { margin: 0; padding: var(--rl-3); border: var(--rl-border); background: var(--rl-bg); font-family: var(--rl-mono); font-size: 11px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 /* narrow viewports: stack the band so the verdict meta never clips off-screen */
 @media (max-width: 560px) { .rl-band { flex-direction: column; align-items: flex-start; gap: var(--rl-2); } }
 

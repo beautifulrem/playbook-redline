@@ -4,13 +4,22 @@ import html
 import json
 from typing import Any
 
+from redline.render import _inline_css, randomart_svg
+
+REPO_URL = "https://github.com/beautifulrem/playbook-redline"
+BITGET_DOCS_URL = "https://www.bitget.com/api-doc/contract/intro"
+DEMO_STAMP = "DEMO / paptrading:1 / non-mainnet"
+
+_OK = {"ok", "pass", "passed", "succeeded", "job_succeeded", "release_ready", "attested", "verified"}
+_BAD = {"failed", "invalid", "missing", "blocked", "blocked_withheld", "withheld", "void", "cancelled", "true"}
+
 
 def render_judge_console_html(*, principal: str, safety: dict[str, Any], releases: list[dict[str, Any]]) -> str:
     rows = "\n".join(
         "<tr>"
-        f"<td><a href=\"/v1/judge/releases/{_e(item['release_id'])}\">{_e(item['release_id'])}</a></td>"
+        f'<td><a href="/v1/judge/releases/{_e(item["release_id"])}">{_e(item["release_id"])}</a></td>'
         f"<td>{_badge(item['state'])}</td>"
-        f"<td>{_e(item.get('canonical_order_id') or 'none')}</td>"
+        f"<td>{_id(item.get('canonical_order_id'))}</td>"
         f"<td>{_e(item.get('showcase_count', 0))}</td>"
         f"<td>{_badge(item.get('attestation_status') or 'missing')}</td>"
         f"<td>{_badge(item.get('latest_job_status') or 'none')}</td>"
@@ -18,31 +27,26 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
         for item in releases
     )
     if not rows:
-        rows = "<tr><td colspan=\"6\">No release candidates</td></tr>"
-    return _document(
-        title="Redline Judge Console",
-        body=f"""
-<header>
-  <div>
-    <p class="stamp">DEMO / paptrading:1 / non-mainnet</p>
-    <h1>Redline Judge Console</h1>
-  </div>
-  <div class="principal">{_e(principal)}</div>
-</header>
-<section class="grid three">
-  {_metric("release freeze", _flag(safety.get("release_freeze")))}
-  {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
-  {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
-</section>
-<section>
-  <h2>Release Candidates</h2>
-  <table>
-    <thead><tr><th>release</th><th>state</th><th>canonical order</th><th>showcase</th><th>attestation</th><th>latest job</th></tr></thead>
-    <tbody>{rows}</tbody>
-  </table>
-</section>
-""",
-    )
+        rows = '<tr><td colspan="6">No release candidates</td></tr>'
+    body = f"""
+    <h1 class="rl-macro">Judge Console</h1>
+    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
+    <hr>
+    <h2 class="rl-sec">Safety</h2>
+    <div class="rl-grid rl-grid--3">
+      {_metric("release freeze", _flag(safety.get("release_freeze")))}
+      {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
+      {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
+    </div>
+    <h2 class="rl-sec">Release candidates</h2>
+    <div class="rl-scroll-x"><table class="rl-table">
+      <thead><tr><th scope="col">release</th><th scope="col">state</th><th scope="col">canonical order</th><th scope="col">showcase</th><th scope="col">attestation</th><th scope="col">latest job</th></tr></thead>
+      <tbody>{rows}</tbody>
+    </table></div>
+    {_chrome()}
+    {_script()}
+"""
+    return _document(title="Redline Judge Console", body=body)
 
 
 def render_judge_release_html(
@@ -58,96 +62,100 @@ def render_judge_release_html(
     attestation_status: dict[str, Any],
 ) -> str:
     release_id = str(release["release_id"])
+    execution = release.get("execution_evidence") or {}
+    state = str(release.get("state") or "")
+    band_mod = "rl-band--pass" if _is_ok(state) else ""
     showcase_rows = "\n".join(
         "<tr>"
         f"<td>{_e(item.get('attempt_id'))}</td>"
         f"<td>{_badge('ok' if item.get('ok') else item.get('reason_code') or 'invalid')}</td>"
-        f"<td>{_e(item.get('bitget_order_id') or '')}</td>"
-        f"<td>{_e(item.get('client_oid') or '')}</td>"
-        f"<td><a href=\"{_e(item.get('evidence_html_url') or '#')}\">evidence</a></td>"
+        f"<td>{_id(item.get('bitget_order_id'))}</td>"
+        f"<td>{_id(item.get('client_oid'))}</td>"
+        f'<td><a href="{_e(item.get("evidence_html_url") or "#")}">evidence</a></td>'
         "</tr>"
         for item in showcase_orders
     )
     if not showcase_rows:
-        showcase_rows = "<tr><td colspan=\"5\">No showcase orders</td></tr>"
+        showcase_rows = '<tr><td colspan="5">No showcase orders</td></tr>'
     job_rows = "\n".join(
         "<tr>"
         f"<td>{_e(item.get('job_id'))}</td>"
         f"<td>{_badge(item.get('status') or 'unknown')}</td>"
         f"<td>{_e(item.get('job_type'))}</td>"
         f"<td>{_e(item.get('requested_by'))}</td>"
-        f"<td><a href=\"/v1/release-candidates/{_e(release_id)}/jobs/{_e(item.get('job_id'))}/events.ndjson\">events</a></td>"
+        f'<td><a href="/v1/release-candidates/{_e(release_id)}/jobs/{_e(item.get("job_id"))}/events.ndjson">events</a></td>'
         "</tr>"
         for item in jobs
     )
     if not job_rows:
-        job_rows = "<tr><td colspan=\"5\">No jobs</td></tr>"
+        job_rows = '<tr><td colspan="5">No jobs</td></tr>'
     event_lines = "\n".join(_e(_event_line(item)) for item in latest_events) or "No job events"
     audit_lines = "\n".join(_e(_audit_line(item)) for item in audit_entries[-12:]) or "No audit entries"
-    return _document(
-        title=f"Release {release_id}",
-        body=f"""
-<header>
-  <div>
-    <p class="stamp">DEMO / paptrading:1 / non-mainnet</p>
-    <h1>Release {_e(release_id)}</h1>
-  </div>
-  <div class="principal">{_e(principal)}</div>
-</header>
-<nav><a href="/v1/judge/console">Judge Console</a></nav>
-<section class="grid three">
-  {_metric("state", _badge(release.get("state")))}
-  {_metric("verdict", _e(release.get("redline_reason_code") or "missing"))}
-  {_metric("canonical order", _e((release.get("execution_evidence") or {}).get("bitget_order_id") or "missing"))}
-</section>
-<section class="grid three">
-  {_metric("simulation hash", _short(release.get("simulation_evidence_hash")))}
-  {_metric("risk hash", _short(release.get("risk_policy_hash")))}
-  {_metric("approval", _e((release.get("approval") or {}).get("reviewer_id") or "missing"))}
-</section>
-<section class="grid three">
-  {_metric("release freeze", _flag(safety.get("release_freeze")))}
-  {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
-  {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
-</section>
-<section class="actions">
-  <input id="redline-token" type="password" autocomplete="off" placeholder="Redline token" />
-  <button type="button" data-action="save-token">Save token</button>
-  <button type="button" data-action="run-showcase" data-release-id="{_e(release_id)}">Run live Bitget demo showcase order</button>
-  <button type="button" data-action="attest" data-release-id="{_e(release_id)}">Attest bundle</button>
-  <a class="button" href="/v1/release-candidates/{_e(release_id)}/evidence">Download bundle</a>
-  <a class="button" href="/v1/release-candidates/{_e(release_id)}/evidence.html">Open evidence.html</a>
-  <a class="button" href="/v1/release-candidates/{_e(release_id)}/attestation.html">Open attestation.html</a>
-</section>
-<section class="grid two">
-  {_metric("bundle verify", _status_block(bundle_status))}
-  {_metric("attestation", _status_block(attestation_status))}
-</section>
-<section>
-  <h2>Showcase Orders</h2>
-  <table>
-    <thead><tr><th>attempt</th><th>status</th><th>order id</th><th>client oid</th><th>evidence</th></tr></thead>
-    <tbody>{showcase_rows}</tbody>
-  </table>
-</section>
-<section>
-  <h2>Jobs</h2>
-  <table>
-    <thead><tr><th>job</th><th>status</th><th>type</th><th>requested by</th><th>events</th></tr></thead>
-    <tbody>{job_rows}</tbody>
-  </table>
-</section>
-<section>
-  <h2>Latest Job Events</h2>
-  <pre id="job-events">{event_lines}</pre>
-</section>
-<section>
-  <h2>Audit Ledger</h2>
-  <pre>{audit_lines}</pre>
-</section>
-{_script()}
-""",
-    )
+    body = f"""
+    <p class="rl-label"><a href="/v1/judge/console">&larr; Judge Console</a></p>
+    <h1 class="rl-macro">Release</h1>
+    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; <span class="rl-mono">{_e(release_id)}</span> &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
+    <div class="rl-band {band_mod}">
+      <span class="rl-band__verdict">{_e((state or "unknown").upper().replace("_", " "))}</span>
+      <span class="rl-band__meta">verdict {_e(release.get("redline_reason_code") or "missing")}</span>
+    </div>
+    {_release_seal(release, state)}
+    <h2 class="rl-sec">Verifiable chain</h2>
+    {_proofbar(release, showcase_orders)}
+    {_chain_walk(release, bundle_status, attestation_status)}
+    <h2 class="rl-sec">Assurance tier</h2>
+    {_tier_meter(release)}
+    <h2 class="rl-sec">Release</h2>
+    <div class="rl-grid rl-grid--3">
+      {_metric("state", _badge(release.get("state")))}
+      {_metric("verdict", _e(release.get("redline_reason_code") or "missing"))}
+      {_metric("canonical order", _id(execution.get("bitget_order_id")))}
+    </div>
+    <div class="rl-grid rl-grid--3">
+      {_metric("symbol", _symbol_link(execution.get("symbol")))}
+      {_metric("simulation hash", _id(release.get("simulation_evidence_hash")))}
+      {_metric("approval", _e((release.get("approval") or {}).get("reviewer_id") or "missing"))}
+    </div>
+    <div class="rl-grid rl-grid--3">
+      {_metric("release freeze", _flag(safety.get("release_freeze")))}
+      {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
+      {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
+    </div>
+    <h2 class="rl-sec">Actions</h2>
+    <div class="rl-box">
+      <div class="rl-tamper__row">
+        <input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="Redline token" />
+        <button type="button" class="rl-btn" data-action="save-token">Save token</button>
+        <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">Run live Bitget demo showcase order</button>
+        <button type="button" class="rl-btn" data-action="attest" data-release-id="{_e(release_id)}">Attest bundle</button>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence">Download bundle</a>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence.html">Open evidence.html</a>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/attestation.html">Open attestation.html</a>
+      </div>
+    </div>
+    <h2 class="rl-sec">Verification</h2>
+    <div class="rl-cols-2">
+      {_metric("bundle verify", _status_block(bundle_status))}
+      {_metric("attestation", _status_block(attestation_status))}
+    </div>
+    <h2 class="rl-sec">Showcase orders</h2>
+    <div class="rl-scroll-x"><table class="rl-table">
+      <thead><tr><th scope="col">attempt</th><th scope="col">status</th><th scope="col">order id</th><th scope="col">client oid</th><th scope="col">evidence</th></tr></thead>
+      <tbody>{showcase_rows}</tbody>
+    </table></div>
+    <h2 class="rl-sec">Jobs</h2>
+    <div class="rl-scroll-x"><table class="rl-table">
+      <thead><tr><th scope="col">job</th><th scope="col">status</th><th scope="col">type</th><th scope="col">requested by</th><th scope="col">events</th></tr></thead>
+      <tbody>{job_rows}</tbody>
+    </table></div>
+    <h2 class="rl-sec">Latest job events</h2>
+    <pre class="rl-pre" id="job-events">{event_lines}</pre>
+    <h2 class="rl-sec">Audit ledger</h2>
+    <pre class="rl-pre">{audit_lines}</pre>
+    {_chrome()}
+    {_script()}
+"""
+    return _document(title=f"Release {release_id}", body=body)
 
 
 def _document(*, title: str, body: str) -> str:
@@ -157,39 +165,118 @@ def _document(*, title: str, body: str) -> str:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{_e(title)}</title>
-  <style>
-    :root {{ color-scheme: light; --fg: #1f2328; --muted: #57606a; --line: #d8dee4; --ok: #1a7f37; --bad: #cf222e; --warn: #9a6700; --bg: #f6f8fa; }}
-    body {{ margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--fg); background: white; }}
-    header {{ display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 24px 28px 12px; border-bottom: 1px solid var(--line); }}
-    h1 {{ margin: 4px 0 0; font-size: 24px; }}
-    h2 {{ margin: 0 0 12px; font-size: 16px; }}
-    nav, section {{ margin: 18px 28px; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-    th, td {{ padding: 9px 8px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; word-break: break-word; }}
-    th {{ color: var(--muted); font-weight: 600; }}
-    pre {{ margin: 0; padding: 12px; overflow: auto; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; font-size: 12px; line-height: 1.5; }}
-    input {{ min-width: 220px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }}
-    button, .button {{ display: inline-block; margin: 4px 8px 4px 0; padding: 8px 10px; border: 1px solid #1f6feb; border-radius: 6px; background: #0969da; color: white; font: inherit; text-decoration: none; cursor: pointer; }}
-    a {{ color: #0969da; }}
-    .grid {{ display: grid; gap: 12px; }}
-    .grid.two {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    .grid.three {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-    .metric {{ padding: 12px; border: 1px solid var(--line); border-radius: 8px; }}
-    .metric .label {{ display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }}
-    .badge {{ display: inline-block; padding: 2px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }}
-    .badge.ok, .badge.pass, .badge.succeeded, .badge.release_ready, .badge.ATTESTED {{ color: var(--ok); border-color: var(--ok); }}
-    .badge.failed, .badge.invalid, .badge.missing, .badge.true {{ color: var(--bad); border-color: var(--bad); }}
-    .badge.running, .badge.queued {{ color: var(--warn); border-color: var(--warn); }}
-    .stamp, .principal {{ color: var(--muted); font-size: 13px; margin: 0; }}
-    .actions {{ padding: 12px; border: 1px solid var(--line); border-radius: 8px; }}
-    @media (max-width: 760px) {{ .grid.two, .grid.three {{ grid-template-columns: 1fr; }} header {{ align-items: start; flex-direction: column; }} }}
-  </style>
+  <style>{_inline_css()}</style>
 </head>
 <body>
+  <main class="rl-main">
 {body}
+  </main>
 </body>
 </html>
 """
+
+
+def _chrome() -> str:
+    return (
+        f'    <hr>\n    <p class="rl-muted">Playbook Redline &nbsp;&middot;&nbsp; '
+        f'<a href="{REPO_URL}" target="_blank" rel="noopener">source &nearr;</a> &nbsp;&middot;&nbsp; '
+        f'<a href="{BITGET_DOCS_URL}" target="_blank" rel="noopener">Bitget API &nearr;</a></p>'
+    )
+
+
+def _release_seal(release: dict[str, Any], state: str) -> str:
+    seed = (
+        release.get("simulation_evidence_hash")
+        or release.get("risk_policy_hash")
+        or (release.get("execution_evidence") or {}).get("response_hash")
+    )
+    if not seed:
+        return ""
+    seed = str(seed)
+    passed = _is_ok(state)
+    mod = "rl-seal--pass" if passed else "rl-seal--void"
+    stamp = "VERIFIED" if passed else "REVIEW"
+    short = seed if len(seed) <= 26 else seed[:26] + "…"
+    return (
+        f'    <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
+        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_e(stamp)}</span>'
+        f'<span class="rl-seal__algo">SSH randomart &middot; release fingerprint</span>'
+        f'<span class="rl-seal__hash">{_e(short)}</span></span></div>'
+    )
+
+
+def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestation_status: dict[str, Any]) -> str:
+    execution = release.get("execution_evidence") or {}
+    approval = release.get("approval") or {}
+    steps = [
+        ("receipt", str(release.get("redline_reason_code") or "verdict"), bool(release.get("redline_reason_code"))),
+        ("approval", str(approval.get("reviewer_id") or "—"), bool(approval.get("reviewer_id"))),
+        ("execution", _short_id(execution.get("bitget_order_id")), bool(execution.get("bitget_order_id"))),
+        ("attestation", "ed25519" if attestation_status.get("ok") else "—", bool(attestation_status.get("ok"))),
+        ("merkle", "root" if bundle_status.get("ok") else "—", bool(bundle_status.get("ok"))),
+    ]
+    nodes = []
+    failed = False
+    for label, detail, ok in steps:
+        if failed:
+            status = '<span class="rl-chain__st--skip">not reached</span>'
+            node_cls = ""
+            detail = "—"
+        elif ok:
+            status = '<span class="rl-chain__st--ok">&#10004; verified</span>'
+            node_cls = ""
+        else:
+            status = '<span class="rl-chain__st--bad">&#10008; failed</span><span class="rl-chain__flag">first failed</span>'
+            node_cls = " rl-chain__node--fail"
+            failed = True
+        nodes.append(
+            f'<div class="rl-chain__node{node_cls}"><span class="rl-chain__label">{_e(label)}</span>'
+            f'<span class="rl-chain__hash">{_e(detail)}</span>{status}</div>'
+        )
+    return f'    <div class="rl-chain">{"".join(nodes)}</div>'
+
+
+def _proofbar(release: dict[str, Any], showcase_orders: list[dict[str, Any]]) -> str:
+    execution = release.get("execution_evidence") or {}
+    verified = sum(1 for order in showcase_orders if order.get("ok"))
+    tier = "L1" if execution.get("bitget_order_id") else "L0"
+    items = [
+        (str(verified).zfill(2), "verified orders", False),
+        ("00", "live funds at risk", True),
+        (tier, "assurance tier", False),
+        ("256", "bit hash-chained", False),
+    ]
+    cells = "".join(
+        f'<div><span class="rl-proof__num{" rl-proof__num--ok" if ok else ""}">{_e(num)}</span>'
+        f'<span class="rl-proof__label">{_e(label)}</span></div>'
+        for num, label, ok in items
+    )
+    return f'    <div class="rl-proofbar">{cells}</div>'
+
+
+def _tier_meter(release: dict[str, Any]) -> str:
+    executed = bool((release.get("execution_evidence") or {}).get("bitget_order_id"))
+    segments = [
+        ("L0", "sim-only", "rl-tier__seg--reached"),
+        ("L1", "demo-executed", "rl-tier__seg--on" if executed else ""),
+        ("L2", "live-gated", ""),
+    ]
+    segs = "".join(
+        f'<div class="rl-tier__seg {cls}"><b>{_e(code)}</b>{_e(label)}</div>' for code, label, cls in segments
+    )
+    return f'    <div class="rl-tier">{segs}</div>'
+
+
+def _short_id(value: object) -> str:
+    raw = str(value or "")
+    return raw if len(raw) <= 14 else raw[:6] + "…" + raw[-4:]
+
+
+def _symbol_link(symbol: object) -> str:
+    raw = str(symbol or "").strip()
+    if not raw:
+        return _e("missing")
+    return f'<a href="https://www.bitget.com/futures/usdt/{_e(raw)}" target="_blank" rel="noopener">{_e(raw)} &nearr;</a>'
 
 
 def _script() -> str:
@@ -226,6 +313,16 @@ def _script() -> str:
     return null;
   }
   document.addEventListener("click", async (event) => {
+    const copyBtn = event.target.closest("[data-copy]");
+    if (copyBtn) {
+      try {
+        await navigator.clipboard.writeText(copyBtn.dataset.copy);
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = "copied";
+        setTimeout(() => { copyBtn.textContent = prev; }, 1200);
+      } catch (err) { /* clipboard unavailable */ }
+      return;
+    }
     const button = event.target.closest("[data-action]");
     if (!button) return;
     const action = button.dataset.action;
@@ -259,19 +356,30 @@ def _script() -> str:
 
 
 def _metric(label: str, value: object) -> str:
-    return f"<div class=\"metric\"><span class=\"label\">{_e(label)}</span><strong>{value}</strong></div>"
+    return f'<div class="rl-box"><span class="rl-box__label">{_e(label)}</span><strong>{value}</strong></div>'
 
 
 def _badge(value: object) -> str:
     raw = str(value or "missing")
-    cls = raw.replace(" ", "_").replace("/", "_")
-    return f"<span class=\"badge {_e(cls)}\">{_e(raw)}</span>"
+    key = raw.lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+    mod = " rl-badge--ok" if key in _OK else " rl-badge--fail" if key in _BAD else ""
+    return f'<span class="rl-badge{mod}">{_e(raw)}</span>'
+
+
+def _id(value: object) -> str:
+    raw = str(value or "")
+    if not raw or raw in {"none", "missing"}:
+        return _e(raw or "none")
+    return (
+        f'<span class="rl-idcopy"><span class="rl-mono">{_e(raw)}</span>'
+        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy {_e(raw)}">copy</button></span>'
+    )
 
 
 def _status_block(status: dict[str, Any]) -> str:
     label = status.get("status") or ("ok" if status.get("ok") else "missing")
     detail = status.get("detail") or status.get("hash") or ""
-    return f"{_badge(label)}<br><small>{_e(detail)}</small>"
+    return f'{_badge(label)}<br><small class="rl-mono rl-faint">{_e(detail)}</small>'
 
 
 def _event_line(item: dict[str, Any]) -> str:
@@ -284,11 +392,8 @@ def _audit_line(item: dict[str, Any]) -> str:
     return f"{item.get('created_at', '')} {item.get('event_type', '')} {json.dumps(payload, sort_keys=True)}"
 
 
-def _short(value: object) -> str:
-    raw = str(value or "missing")
-    if len(raw) <= 24:
-        return _e(raw)
-    return _e(raw[:18] + "..." + raw[-8:])
+def _is_ok(state: object) -> bool:
+    return str(state or "").lower().replace("-", "_") in _OK
 
 
 def _flag(value: object) -> str:
