@@ -1,35 +1,37 @@
 {
   "envelope_version": "redline.decision.v1",
   "status": "withheld",
+  "verdict_tier": "BLOCK",
+  "adjusted_size_cap": null,
   "reason_code": "NEW_BLOCK_BREACH",
   "chain_status": "genesis",
   "required_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:7747239903038908783dfc3b",
+    "proof:decision:f7c512a6a5eaf14ddd7d6f39",
     "proof:package_canonical:41ab0f368e7162f567a761e8",
-    "proof:probe:1ea0185c616b3d37f783091d",
-    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:76fbdbbb653d83b4540c6f8b",
     "proof:probe:a13bf024e0d494f47d38b48f",
     "proof:probe:b3e8d95ec8b37d9651c0dde7",
     "proof:probe:b5785a8f2f863c305e84df47",
     "proof:probe:c3ad8af9ce3ea6a163703aee",
-    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:probe:f8de6126e1f9d5bd19708bde",
+    "proof:replay:520325867db0d4c21d877292",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
-    "proof:spec_compile:793a7818c323072d18bcf8d8"
+    "proof:spec_compile:8079e8531c379ae14c25e313"
   ],
   "satisfied_proof_ids": [
     "proof:coverage:07629775749a0c50afc55033",
-    "proof:decision:7747239903038908783dfc3b",
+    "proof:decision:f7c512a6a5eaf14ddd7d6f39",
     "proof:package_canonical:41ab0f368e7162f567a761e8",
-    "proof:probe:1ea0185c616b3d37f783091d",
-    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:76fbdbbb653d83b4540c6f8b",
     "proof:probe:a13bf024e0d494f47d38b48f",
     "proof:probe:b3e8d95ec8b37d9651c0dde7",
     "proof:probe:b5785a8f2f863c305e84df47",
     "proof:probe:c3ad8af9ce3ea6a163703aee",
-    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:probe:f8de6126e1f9d5bd19708bde",
+    "proof:replay:520325867db0d4c21d877292",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
-    "proof:spec_compile:793a7818c323072d18bcf8d8"
+    "proof:spec_compile:8079e8531c379ae14c25e313"
   ],
   "coverage": {
     "manifest": "suite.scenarios×spec.block_probes",
