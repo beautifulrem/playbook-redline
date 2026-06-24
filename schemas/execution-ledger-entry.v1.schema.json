@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "Status": {
+      "enum": [
+        "pass",
+        "withheld",
+        "reduce_size",
+        "reject",
+        "unverified_no_verdict"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_hash": {
+      "default": "sha256:unapproved",
+      "title": "Approval Hash",
+      "type": "string"
+    },
+    "bitget_order_id": {
+      "title": "Bitget Order Id",
+      "type": "string"
+    },
+    "client_oid": {
+      "title": "Client Oid",
+      "type": "string"
+    },
+    "entry_hash": {
+      "title": "Entry Hash",
+      "type": "string"
+    },
+    "issuance_checkpoint_hash": {
+      "default": "sha256:genesis",
+      "title": "Issuance Checkpoint Hash",
+      "type": "string"
+    },
+    "issuance_ledger_entry_hash": {
+      "default": "sha256:genesis",
+      "title": "Issuance Ledger Entry Hash",
+      "type": "string"
+    },
+    "placed_at": {
+      "title": "Placed At",
+      "type": "string"
+    },
+    "previous_entry_hash": {
+      "title": "Previous Entry Hash",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "response_hash": {
+      "title": "Response Hash",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Status"
+    },
+    "version": {
+      "const": "redline.execution.ledger_entry.v1",
+      "default": "redline.execution.ledger_entry.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "receipt_hash",
+    "verdict",
+    "client_oid",
+    "bitget_order_id",
+    "response_hash",
+    "placed_at",
+    "previous_entry_hash",
+    "entry_hash"
+  ],
+  "title": "ExecutionLedgerEntry",
+  "type": "object"
+}

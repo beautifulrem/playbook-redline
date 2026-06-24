@@ -1,0 +1,27 @@
+{
+  "proof_id": "proof:probe:b3e8d95ec8b37d9651c0dde7",
+  "phase": "probe",
+  "kind": "probe",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:cbb0ac11c03eb69951c8a01f550a31939b2fbb8d4678ebe8025be0a0fe5b2982",
+  "artifact_hash": "sha256:b3e8d95ec8b37d9651c0dde76a346dbb84fb8d254d027d1b8e8a2f810ed3fe25",
+  "assertions": [
+    {
+      "metric": "trade_budget",
+      "op": "<=",
+      "threshold": "20.00000000",
+      "observed": "1.00000000",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 23,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
+  "meta": {
+    "scenario_id": "btc-crash-2024-03-05",
+    "probe_id": "trade_budget"
+  }
+}

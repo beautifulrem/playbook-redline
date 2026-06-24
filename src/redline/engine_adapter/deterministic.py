@@ -5,18 +5,20 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 import sys
 from decimal import Decimal, DecimalException
 from pathlib import Path
 
 from redline.canonical import CanonicalizationError, hash_obj
+from redline.engine_adapter.sandbox_process import SandboxProcessTimeout, run_sandbox_process
 from redline.models import Bar, ReasonCode, ReplayPoint, ReplayTrace, Scenario
 
 _MAX_ABS_SIGNAL = Decimal("1000")
 _MAX_ABS_LEVERAGE = Decimal("1000")
 _MAX_ABS_POSITION = Decimal("1000")
 _MAX_ABS_NAV = Decimal("1e18")
+_BPS_DENOMINATOR = Decimal("10000")
+_MAX_BPS = Decimal("10000")
 
 
 class ReplayEngineError(RuntimeError):
@@ -28,13 +30,23 @@ class ReplayEngineError(RuntimeError):
 class DeterministicReplayEngine:
     name = "deterministic"
 
-    def replay(self, *, package: Path, scenario: Scenario, role: str, timeout_s: int = 5) -> ReplayTrace:
+    def replay(
+        self,
+        *,
+        package: Path,
+        scenario: Scenario,
+        role: str,
+        timeout_s: int = 5,
+        replay_config: dict[str, object] | None = None,
+    ) -> ReplayTrace:
         scenario_path = Path(scenario.path)
         if not scenario_path.is_absolute():
             scenario_path = Path.cwd() / scenario_path
         try:
             bars = _read_bars(scenario_path)
             config = _read_config(package / "config.json")
+            if replay_config is not None:
+                config = {**config, **replay_config}
             strategy_source = (package / "strategy.py").read_text(encoding="utf-8")
         except (OSError, KeyError, ValueError) as exc:
             raise ReplayEngineError(ReasonCode.DATA_MISSING, str(exc)) from exc
@@ -46,9 +58,21 @@ class DeterministicReplayEngine:
             "TZ": "UTC",
         }
         try:
-            proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=timeout_s, env=env)
-        except subprocess.TimeoutExpired as exc:
+            proc = run_sandbox_process(cmd, timeout_s=timeout_s, env=env)
+        except SandboxProcessTimeout as exc:
             raise ReplayEngineError(ReasonCode.ENGINE_FAILURE, "replay timeout") from exc
+        if proc.returncode != 0 and _sandbox_apply_denied(proc.stderr):
+            fallback_cmd = build_worker_command(
+                package=package,
+                scenario_id=scenario.id,
+                scenario_path=scenario_path,
+                role=role,
+                allow_os_sandbox=False,
+            )
+            try:
+                proc = run_sandbox_process(fallback_cmd, timeout_s=timeout_s, env=env)
+            except SandboxProcessTimeout as exc:
+                raise ReplayEngineError(ReasonCode.ENGINE_FAILURE, "replay timeout") from exc
         if proc.returncode != 0:
             raise ReplayEngineError(ReasonCode.ENGINE_FAILURE, proc.stderr.strip() or "worker failed")
         try:
@@ -79,7 +103,7 @@ class DeterministicReplayEngine:
             raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "deterministic replay numeric bounds exceeded") from exc
 
 
-def build_worker_command(*, package: Path, scenario_id: str, scenario_path: Path, role: str) -> list[str]:
+def build_worker_command(*, package: Path, scenario_id: str, scenario_path: Path, role: str, allow_os_sandbox: bool = True) -> list[str]:
     worker_cmd = [
         sys.executable,
         "-m",
@@ -93,7 +117,7 @@ def build_worker_command(*, package: Path, scenario_id: str, scenario_path: Path
         "--role",
         role,
     ]
-    sandbox_exec = _macos_sandbox_exec()
+    sandbox_exec = _macos_sandbox_exec() if allow_os_sandbox else None
     if sandbox_exec is not None:
         return [
             sandbox_exec,
@@ -102,6 +126,10 @@ def build_worker_command(*, package: Path, scenario_id: str, scenario_path: Path
             *worker_cmd,
         ]
     return worker_cmd
+
+
+def _sandbox_apply_denied(stderr: str) -> bool:
+    return "sandbox_apply" in stderr and "Operation not permitted" in stderr
 
 
 def _macos_sandbox_exec() -> str | None:
@@ -155,7 +183,8 @@ def _build_trace(
 ) -> ReplayTrace:
     nav = Decimal("10000")
     peak = nav
-    previous_position = Decimal("0")
+    current_position = Decimal("0")
+    pending_position = Decimal("0")
     trade_count = 0
     points: list[ReplayPoint] = []
     previous_close = bars[0].close
@@ -164,17 +193,32 @@ def _build_trace(
     except Exception as exc:
         raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, "invalid leverage") from exc
     _require_bounded_decimal(leverage, label="leverage", max_abs=_MAX_ABS_LEVERAGE)
-    for bar, signal_value in zip(bars, signals, strict=True):
+    fee_bps = _read_nonnegative_bps(config, "fee_bps")
+    slippage_bps = _read_nonnegative_bps(config, "slippage_bps")
+    _require_fill_model(config)
+    for index, (bar, signal_value) in enumerate(zip(bars, signals, strict=True)):
         _require_bounded_decimal(signal_value, label="signal", max_abs=_MAX_ABS_SIGNAL)
-        position = signal_value * leverage
-        _require_bounded_decimal(position, label="position", max_abs=_MAX_ABS_POSITION)
-        if bar.i > 0:
-            ret = (bar.close - previous_close) / previous_close
-            nav = nav * (Decimal("1") + position * ret)
+        desired_position = signal_value * leverage
+        _require_bounded_decimal(desired_position, label="position", max_abs=_MAX_ABS_POSITION)
+        if index > 0:
+            gap_ret = (bar.open - previous_close) / previous_close
+            nav = nav * (Decimal("1") + current_position * gap_ret)
             _require_bounded_decimal(nav, label="nav", max_abs=_MAX_ABS_NAV)
-        if position != previous_position:
-            trade_count += 1
-        previous_position = position
+            if pending_position != current_position:
+                trade_count += 1
+                nav = _apply_trade_costs(
+                    nav=nav,
+                    from_position=current_position,
+                    to_position=pending_position,
+                    fee_bps=fee_bps,
+                    slippage_bps=slippage_bps,
+                )
+                _require_bounded_decimal(nav, label="nav", max_abs=_MAX_ABS_NAV)
+            current_position = pending_position
+            intrabar_ret = (bar.close - bar.open) / bar.open
+            nav = nav * (Decimal("1") + current_position * intrabar_ret)
+            _require_bounded_decimal(nav, label="nav", max_abs=_MAX_ABS_NAV)
+        pending_position = desired_position
         previous_close = bar.close
         if nav > peak:
             peak = nav
@@ -189,7 +233,7 @@ def _build_trace(
                 nav=nav,
                 peak=peak,
                 drawdown=drawdown,
-                position=position,
+                position=current_position,
             )
         )
     trace_without_hash = {
@@ -203,6 +247,40 @@ def _build_trace(
     }
     artifact_hash = hash_obj(trace_without_hash)
     return ReplayTrace(**trace_without_hash, artifact_hash=artifact_hash)
+
+
+def _read_nonnegative_bps(config: dict[str, object], key: str) -> Decimal:
+    try:
+        value = Decimal(str(config.get(key, "0")))
+    except Exception as exc:
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, f"invalid {key}") from exc
+    _require_bounded_decimal(value, label=key, max_abs=_MAX_BPS)
+    if value < 0:
+        raise ReplayEngineError(ReasonCode.NONFINITE_VALUE, f"invalid {key}")
+    return value
+
+
+def _require_fill_model(config: dict[str, object]) -> None:
+    fill_model = str(config.get("fill_model", "next_bar_open"))
+    if fill_model != "next_bar_open":
+        raise ReplayEngineError(ReasonCode.SCHEMA_INVALID, "unsupported fill_model")
+
+
+def _apply_trade_costs(
+    *,
+    nav: Decimal,
+    from_position: Decimal,
+    to_position: Decimal,
+    fee_bps: Decimal,
+    slippage_bps: Decimal,
+) -> Decimal:
+    trade_size = abs(to_position - from_position)
+    if trade_size == 0 or (fee_bps == 0 and slippage_bps == 0):
+        return nav
+    notional = abs(nav) * trade_size
+    fee_cost = notional * fee_bps / _BPS_DENOMINATOR
+    slippage_cost = notional * slippage_bps * trade_size / _BPS_DENOMINATOR
+    return nav - fee_cost - slippage_cost
 
 
 def _require_bounded_decimal(value: Decimal, *, label: str, max_abs: Decimal | None = None) -> None:

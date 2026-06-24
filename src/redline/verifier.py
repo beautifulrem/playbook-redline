@@ -24,12 +24,13 @@ from redline.models import (
 )
 from redline.package_identity import load_identity_lock
 from redline.proof_kernel import REQUIRED_PROOFS, decision_envelope_from_receipt, decision_proof_id
-from redline.receipt import compute_receipt_hash
+from redline.merkle import merkle_root
+from redline.receipt import compute_ledger_checkpoint_hash, compute_receipt_hash
 from redline.report import render_strength_summary, to_report
 from redline.trust import verify_checkpoint_attestation
 
-BAD_INPUT = {ReasonCode.FILE_NOT_FOUND, ReasonCode.PARSE_ERROR, ReasonCode.SCHEMA_INVALID, ReasonCode.VERSION_UNSUPPORTED}
-SINGLETON_PROOF_KINDS = {
+BAD_INPUT = (ReasonCode.FILE_NOT_FOUND, ReasonCode.PARSE_ERROR, ReasonCode.SCHEMA_INVALID, ReasonCode.VERSION_UNSUPPORTED)
+SINGLETON_PROOF_KINDS = (
     ProofKind.PACKAGE_CANONICAL,
     ProofKind.SPEC_COMPILE,
     ProofKind.REPLAY,
@@ -38,8 +39,8 @@ SINGLETON_PROOF_KINDS = {
     ProofKind.BASELINE_CALIBRATION,
     ProofKind.CANDIDATE_ABSOLUTE,
     ProofKind.DECISION,
-}
-NON_VERDICT_PROOF_KINDS = {ProofKind.EDIT_PROVENANCE, ProofKind.SPONSOR_READBACK}
+)
+NON_VERDICT_PROOF_KINDS = (ProofKind.EDIT_PROVENANCE, ProofKind.SPONSOR_READBACK)
 
 
 def load_receipt(path: Path) -> Receipt:
@@ -68,7 +69,7 @@ def verify(
             return _bad(ReasonCode.FILE_NOT_FOUND, level)
         with receipt_path.open(encoding="utf-8") as fh:
             payload = json.load(fh)
-        if payload.get("version") != "redline.receipt.v3.2":
+        if payload.get("version") not in ("redline.receipt.v3.2", "redline.receipt.v3.3"):
             return _bad(ReasonCode.VERSION_UNSUPPORTED, level)
         receipt = Receipt.model_validate(payload)
     except (json.JSONDecodeError, OSError):
@@ -230,9 +231,12 @@ def verify_proof(
     try:
         external = Proof.model_validate(json.loads(proof_path.read_text(encoding="utf-8")))
     except Exception:
-        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.PROOF_HASH_MISMATCH)
     if external != receipt_proof:
-        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.PROOF_HASH_MISMATCH)
+    leak_free_error = _leak_free_proof_error(receipt_proof)
+    if leak_free_error is not None:
+        return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=leak_free_error)
     if package is None:
         return ProofVerification(status="proof_unreplayable", proof_id=proof_id, artifact_hash=receipt_proof.artifact_hash, reason_code=ReasonCode.DATA_MISSING)
     if package is not None:
@@ -259,8 +263,20 @@ def verify_proof(
         rerun_proofs = rerun.receipt.proofs if rerun.receipt is not None else rerun.proofs
         rerun_proof = next((proof for proof in rerun_proofs if proof.proof_id == proof_id), None)
         if rerun_proof != receipt_proof:
-            return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
+            return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.PROOF_HASH_MISMATCH)
     return ProofVerification(status="proof_verified", proof_id=proof_id, artifact_hash=receipt_proof.artifact_hash)
+
+
+def _leak_free_proof_error(proof: Proof) -> ReasonCode | None:
+    if proof.kind != ProofKind.REPLAY:
+        return None
+    if proof.fill_model != "next_bar_open":
+        return ReasonCode.PROOF_HASH_MISMATCH
+    if proof.lookahead_guard != "structural_next_bar":
+        return ReasonCode.PROOF_HASH_MISMATCH
+    if proof.fees_modeled is not True:
+        return ReasonCode.PROOF_HASH_MISMATCH
+    return None
 
 
 def verify_decision_proof_bundle(
@@ -299,6 +315,8 @@ def verify_decision_proof_bundle(
         reason_code=envelope.reason_code,
         proof_ids=non_decision_ids,
         coverage=envelope.coverage,
+        verdict_tier=envelope.verdict_tier,
+        adjusted_size_cap=envelope.adjusted_size_cap,
     )
     if sorted(envelope.required_proof_ids) != [expected_proof_id] or sorted(envelope.satisfied_proof_ids) != [expected_proof_id]:
         return ProofVerification(status="proof_mismatch", proof_id=proof_id, reason_code=ReasonCode.RECEIPT_MISMATCH)
@@ -329,16 +347,17 @@ def _missing_required_proof_ids(receipt: Receipt, status: Status) -> list[str]:
         if not ids:
             missing.append(kind.value)
         expected_ids.extend(ids)
-    if set(expected_ids) != set(receipt.decision.required_proof_ids):
-        missing.extend(sorted(set(receipt.decision.required_proof_ids).symmetric_difference(expected_ids)))
-    return sorted(set(missing))
+    required_ids = list(receipt.decision.required_proof_ids)
+    if not _same_members(expected_ids, required_ids):
+        missing.extend(_symmetric_difference_sorted(required_ids, expected_ids))
+    return _unique_sorted(missing)
 
 
 def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
     if receipt.package.manifest_hash != receipt.package.identity_hash:
         return ReasonCode.RECEIPT_MISMATCH
     proof_ids = [proof.proof_id for proof in receipt.proofs]
-    if len(set(proof_ids)) != len(proof_ids):
+    if _has_duplicates(proof_ids):
         return ReasonCode.RECEIPT_MISMATCH
     for proof in receipt.proofs:
         if proof.kind in NON_VERDICT_PROOF_KINDS and proof.verdict_bearing:
@@ -374,6 +393,8 @@ def _receipt_binding_error(receipt: Receipt) -> ReasonCode | None:
             reason_code=receipt.decision.reason_code,
             proof_ids=non_decision_ids,
             coverage=receipt.coverage,
+            verdict_tier=receipt.decision.verdict_tier,
+            adjusted_size_cap=receipt.decision.adjusted_size_cap,
         )
         if decision_proof.proof_id != expected_decision_id:
             return ReasonCode.RECEIPT_MISMATCH
@@ -437,7 +458,7 @@ def _replay_error(
         return ReasonCode.ENGINE_IDENTITY_MISMATCH
     if rerun.envelope.coverage != receipt.coverage:
         return ReasonCode.ENGINE_IDENTITY_MISMATCH
-    if set(rerun.envelope.required_proof_ids) != set(receipt.decision.required_proof_ids):
+    if not _same_members(rerun.envelope.required_proof_ids, receipt.decision.required_proof_ids):
         return ReasonCode.ENGINE_IDENTITY_MISMATCH
     if _proof_fingerprint(rerun.receipt.proofs) != _proof_fingerprint(receipt.proofs):
         return ReasonCode.ENGINE_IDENTITY_MISMATCH
@@ -547,8 +568,10 @@ def _ledger_checkpoint_error(
         checkpoint = LedgerCheckpoint.model_validate(json.loads(checkpoint_path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, ValidationError):
         return ReasonCode.RECEIPT_MISMATCH
-    expected_checkpoint_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
+    expected_checkpoint_hash = compute_ledger_checkpoint_hash(checkpoint)
     if checkpoint.checkpoint_hash != expected_checkpoint_hash:
+        return ReasonCode.RECEIPT_MISMATCH
+    if "merkle_root" in checkpoint.model_fields_set and checkpoint.merkle_root != merkle_root(checkpoint.subject_receipt_hashes):
         return ReasonCode.RECEIPT_MISMATCH
     if checkpoint.ledger_hash != hash_file(ledger_path):
         return ReasonCode.RECEIPT_MISMATCH
@@ -586,11 +609,11 @@ def _ledger_checkpoint_error(
 def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode | None:
     if not proofs_dir.exists():
         return ReasonCode.RECEIPT_MISMATCH
-    expected_files = {f"{proof.proof_id.replace(':', '_')}.json" for proof in receipt.proofs}
+    expected_files = [f"{proof.proof_id.replace(':', '_')}.json" for proof in receipt.proofs]
     if len(expected_files) != len(receipt.proofs):
         return ReasonCode.RECEIPT_MISMATCH
-    actual_files = {path.name for path in proofs_dir.glob("*.json")}
-    if actual_files != expected_files:
+    actual_files = sorted(path.name for path in proofs_dir.glob("*.json"))
+    if sorted(actual_files) != sorted(expected_files):
         return ReasonCode.RECEIPT_MISMATCH
     external_proof_ids: list[str] = []
     for proof in receipt.proofs:
@@ -605,9 +628,41 @@ def _external_proofs_error(*, receipt: Receipt, proofs_dir: Path) -> ReasonCode 
         external_proof_ids.append(external.proof_id)
         if external != proof:
             return ReasonCode.RECEIPT_MISMATCH
-    if len(set(external_proof_ids)) != len(external_proof_ids):
+    if _has_duplicates(external_proof_ids):
         return ReasonCode.RECEIPT_MISMATCH
     return None
+
+
+def _has_duplicates(items: list[str]) -> bool:
+    seen: list[str] = []
+    for item in items:
+        if item in seen:
+            return True
+        seen.append(item)
+    return False
+
+
+def _same_members(left: list[str], right: list[str]) -> bool:
+    return all(item in right for item in left) and all(item in left for item in right)
+
+
+def _unique_sorted(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return sorted(unique)
+
+
+def _symmetric_difference_sorted(left: list[str], right: list[str]) -> list[str]:
+    diff: list[str] = []
+    for item in left:
+        if item not in right and item not in diff:
+            diff.append(item)
+    for item in right:
+        if item not in left and item not in diff:
+            diff.append(item)
+    return sorted(diff)
 
 
 def _external_report_error(*, report_path: Path, expected_report: dict, receipt: Receipt) -> ReasonCode | None:

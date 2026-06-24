@@ -17,6 +17,9 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b5785a8f2f863c305e84df47 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {
     "scenario_id": "btc-crash-2024-03-05",
     "probe_id": "drawdown_limit"

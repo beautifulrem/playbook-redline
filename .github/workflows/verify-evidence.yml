@@ -1,0 +1,31 @@
+name: Verify Evidence Chain
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+      - name: Verdict path purity gate
+        run: uv run python scripts/check-verdict-path-imports.py
+      - name: Verdict path purity tests
+        run: uv run --extra dev pytest -q -k "verdict_path_import_gate or purity"
+      - name: Verify committed release evidence chain
+        run: uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json
+      - name: Verify tamper demo fails closed
+        run: |
+          set +e
+          scripts/tamper-demo.sh
+          code=$?
+          echo "tamper-demo exit code: $code"
+          test "$code" -ne 0

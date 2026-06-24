@@ -39,7 +39,7 @@
       "threshold": "0.08000000",
       "observed": "0.00498134",
       "scenario_id": "btc-chop-2024-08",
-      "bar": 13,
+      "bar": 17,
       "holds": true
     },
     {
@@ -62,5 +62,8 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {}
 }

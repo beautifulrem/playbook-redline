@@ -8,6 +8,7 @@
     "tool": "fixture"
   },
   "envelope": {
+    "adjusted_size_cap": null,
     "capabilities": {
       "engine": {
         "degraded": false,
@@ -63,57 +64,61 @@
     "reason_code": "NEW_BLOCK_BREACH",
     "required_proof_ids": [
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7747239903038908783dfc3b",
+      "proof:decision:f7c512a6a5eaf14ddd7d6f39",
       "proof:package_canonical:41ab0f368e7162f567a761e8",
-      "proof:probe:1ea0185c616b3d37f783091d",
-      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:76fbdbbb653d83b4540c6f8b",
       "proof:probe:a13bf024e0d494f47d38b48f",
       "proof:probe:b3e8d95ec8b37d9651c0dde7",
       "proof:probe:b5785a8f2f863c305e84df47",
       "proof:probe:c3ad8af9ce3ea6a163703aee",
-      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:probe:f8de6126e1f9d5bd19708bde",
+      "proof:replay:520325867db0d4c21d877292",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
-      "proof:spec_compile:793a7818c323072d18bcf8d8"
+      "proof:spec_compile:8079e8531c379ae14c25e313"
     ],
     "satisfied_proof_ids": [
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7747239903038908783dfc3b",
+      "proof:decision:f7c512a6a5eaf14ddd7d6f39",
       "proof:package_canonical:41ab0f368e7162f567a761e8",
-      "proof:probe:1ea0185c616b3d37f783091d",
-      "proof:probe:2b0b31d7e8e89665ae2fab01",
+      "proof:probe:76fbdbbb653d83b4540c6f8b",
       "proof:probe:a13bf024e0d494f47d38b48f",
       "proof:probe:b3e8d95ec8b37d9651c0dde7",
       "proof:probe:b5785a8f2f863c305e84df47",
       "proof:probe:c3ad8af9ce3ea6a163703aee",
-      "proof:replay:c149d9a88c7c8e1a3d333339",
+      "proof:probe:f8de6126e1f9d5bd19708bde",
+      "proof:replay:520325867db0d4c21d877292",
       "proof:replay_wellformed:6c1df9b834122230a053526f",
-      "proof:spec_compile:793a7818c323072d18bcf8d8"
+      "proof:spec_compile:8079e8531c379ae14c25e313"
     ],
-    "status": "withheld"
+    "status": "withheld",
+    "verdict_tier": "BLOCK"
   },
   "proof_ids": [
     "proof:package_canonical:41ab0f368e7162f567a761e8",
     "proof:edit_provenance:c2202c44cdf225234b155589",
-    "proof:spec_compile:793a7818c323072d18bcf8d8",
-    "proof:replay:c149d9a88c7c8e1a3d333339",
+    "proof:spec_compile:8079e8531c379ae14c25e313",
+    "proof:replay:520325867db0d4c21d877292",
     "proof:replay_wellformed:6c1df9b834122230a053526f",
     "proof:probe:b5785a8f2f863c305e84df47",
-    "proof:probe:2b0b31d7e8e89665ae2fab01",
+    "proof:probe:f8de6126e1f9d5bd19708bde",
     "proof:probe:b3e8d95ec8b37d9651c0dde7",
-    "proof:probe:1ea0185c616b3d37f783091d",
+    "proof:probe:76fbdbbb653d83b4540c6f8b",
     "proof:probe:a13bf024e0d494f47d38b48f",
     "proof:probe:c3ad8af9ce3ea6a163703aee",
     "proof:coverage:07629775749a0c50afc55033",
     "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
     "proof:candidate_absolute:8670b636e72e32d864f7e227",
-    "proof:decision:7747239903038908783dfc3b"
+    "proof:decision:f7c512a6a5eaf14ddd7d6f39"
   ],
   "proofs": [
     {
       "artifact_hash": "sha256:41ab0f368e7162f567a761e869680fc3d9a09a063baceac2b94fe07a5f3acdc2",
       "assertions": [],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:fd857c79df5dac9e88e8f8982602841a57526d6a3d04c704ffa9d049ceb61209",
       "kind": "package_canonical",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "import",
       "proof_id": "proof:package_canonical:41ab0f368e7162f567a761e8",
@@ -123,8 +128,11 @@
     {
       "artifact_hash": "sha256:c2202c44cdf225234b1555897e372567ca91dc2d389cee9da8e31b0420969daa",
       "assertions": [],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:fca5f2ef25903dc91f7851483cf50e3451db612eff68325e60e6953f2f10244e",
       "kind": "edit_provenance",
+      "lookahead_guard": null,
       "meta": {
         "binding": "package_pair",
         "expected_diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2"
@@ -135,10 +143,13 @@
       "verdict_bearing": false
     },
     {
-      "artifact_hash": "sha256:793a7818c323072d18bcf8d8f467d10e182a18b1eef0043a803e75ce7d9d56e3",
+      "artifact_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
       "assertions": [],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
       "kind": "spec_compile",
+      "lookahead_guard": null,
       "meta": {
         "compiler": "json",
         "degraded": "true",
@@ -147,19 +158,22 @@
         "tool_schema_hash": ""
       },
       "phase": "compile",
-      "proof_id": "proof:spec_compile:793a7818c323072d18bcf8d8",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:793a7818c323072d18bcf8d8 --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:spec_compile:8079e8531c379ae14c25e313",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:c149d9a88c7c8e1a3d333339f8012aaf47f78a1d87da7128a85cd6505553b40f",
+      "artifact_hash": "sha256:520325867db0d4c21d877292cf5dc424a3614820c7d5819fa8cdc15a86aabb31",
       "assertions": [],
+      "fees_modeled": true,
+      "fill_model": "next_bar_open",
       "inputs_hash": "sha256:c18ded2d2ef19549a60e88e86639037ffa29d8b816a31cb594d4c15e46e31ec6",
       "kind": "replay",
+      "lookahead_guard": "structural_next_bar",
       "meta": {},
       "phase": "run",
-      "proof_id": "proof:replay:c149d9a88c7c8e1a3d333339",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:c149d9a88c7c8e1a3d333339 --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:replay:520325867db0d4c21d877292",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:520325867db0d4c21d877292 --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     },
     {
@@ -202,8 +216,11 @@
           "threshold": "24"
         }
       ],
-      "inputs_hash": "sha256:23c3d55fe162c06c2a8492af17ec1c0bd5ef804f43caf74fb5ff1be8ba9f18fe",
+      "fees_modeled": null,
+      "fill_model": null,
+      "inputs_hash": "sha256:774cfd62d08cbd3788a8d59883980eeaf6a9849d61d441fcc4c93d40a52c48bb",
       "kind": "replay_wellformed",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "run",
       "proof_id": "proof:replay_wellformed:6c1df9b834122230a053526f",
@@ -223,8 +240,11 @@
           "threshold": "0.08000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "drawdown_limit",
         "scenario_id": "btc-crash-2024-03-05"
@@ -235,10 +255,10 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:2b0b31d7e8e89665ae2fab01a16fbe72311e839c048e6d929ac08f01a8cce469",
+      "artifact_hash": "sha256:f8de6126e1f9d5bd19708bde93b0a2ff56d02dd2f9162a51e2952c76bf629e8d",
       "assertions": [
         {
-          "bar": 1,
+          "bar": 2,
           "holds": false,
           "metric": "no_entry_when",
           "observed": "2.00000000",
@@ -247,15 +267,18 @@
           "threshold": "0"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "no_entry_when_crash",
         "scenario_id": "btc-crash-2024-03-05"
       },
       "phase": "probe",
-      "proof_id": "proof:probe:2b0b31d7e8e89665ae2fab01",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:2b0b31d7e8e89665ae2fab01 --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:probe:f8de6126e1f9d5bd19708bde",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:f8de6126e1f9d5bd19708bde --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     },
     {
@@ -271,8 +294,11 @@
           "threshold": "20.00000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:cbb0ac11c03eb69951c8a01f550a31939b2fbb8d4678ebe8025be0a0fe5b2982",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "trade_budget",
         "scenario_id": "btc-crash-2024-03-05"
@@ -283,7 +309,7 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:1ea0185c616b3d37f783091d68006833acaa0398af0563b14b0ab0cfd927e85a",
+      "artifact_hash": "sha256:76fbdbbb653d83b4540c6f8b712fc2c5bc3338ed0e33e302018a036b25931917",
       "assertions": [
         {
           "bar": 21,
@@ -295,15 +321,18 @@
           "threshold": "0.08000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "drawdown_limit",
         "scenario_id": "btc-chop-2024-08"
       },
       "phase": "probe",
-      "proof_id": "proof:probe:1ea0185c616b3d37f783091d",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ea0185c616b3d37f783091d --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:probe:76fbdbbb653d83b4540c6f8b",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:76fbdbbb653d83b4540c6f8b --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     },
     {
@@ -319,8 +348,11 @@
           "threshold": "0"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:f64b2947296784cd46902d3d0716d8e9e2b0505bc5b7e43ae113512958902a35",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "no_entry_when_crash",
         "scenario_id": "btc-chop-2024-08"
@@ -343,8 +375,11 @@
           "threshold": "20.00000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:c549f70424b2bdc144ae5416b387cb50d50e28651b19e571e6a72a6c34d3b89c",
       "kind": "probe",
+      "lookahead_guard": null,
       "meta": {
         "probe_id": "trade_budget",
         "scenario_id": "btc-chop-2024-08"
@@ -357,8 +392,11 @@
     {
       "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
       "assertions": [],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
       "kind": "coverage",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "decide",
       "proof_id": "proof:coverage:07629775749a0c50afc55033",
@@ -396,7 +434,7 @@
           "threshold": "20.00000000"
         },
         {
-          "bar": 13,
+          "bar": 17,
           "holds": true,
           "metric": "max_drawdown",
           "observed": "0.00498134",
@@ -423,8 +461,11 @@
           "threshold": "20.00000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:c1c2f85d90c548db38461d421e2bafe1ac4703b62b2aae088009c0ebc2b79033",
       "kind": "baseline_calibration",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "calibrate",
       "proof_id": "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
@@ -471,8 +512,11 @@
           "threshold": "20.00000000"
         }
       ],
+      "fees_modeled": null,
+      "fill_model": null,
       "inputs_hash": "sha256:06d5ec40d25d7d4293d9eb75a7ae32e77b0aaa0472d04cab55e0eac9b8fd7ed1",
       "kind": "candidate_absolute",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "probe",
       "proof_id": "proof:candidate_absolute:8670b636e72e32d864f7e227",
@@ -480,14 +524,17 @@
       "verdict_bearing": true
     },
     {
-      "artifact_hash": "sha256:0e09ed54e11b922318147df31ec4cb638139df7b29814d76f4c9e4ff5dccd3b9",
+      "artifact_hash": "sha256:041423902eb6e78b09d0c09861544e15b9dd89332c0d3a8b9052024d9dd36f94",
       "assertions": [],
-      "inputs_hash": "sha256:c3338047e2fda40d9c12904d7cb830adf54b767566d4e7fadf5cf77971b81599",
+      "fees_modeled": null,
+      "fill_model": null,
+      "inputs_hash": "sha256:804791c18e760eb8529ff59f374b82cf2debde00c483b2b7d4ebf9a4b9b8edf8",
       "kind": "decision",
+      "lookahead_guard": null,
       "meta": {},
       "phase": "decide",
-      "proof_id": "proof:decision:7747239903038908783dfc3b",
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:7747239903038908783dfc3b --package <package> --suite <suite> --spec <spec>",
+      "proof_id": "proof:decision:f7c512a6a5eaf14ddd7d6f39",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:f7c512a6a5eaf14ddd7d6f39 --package <package> --suite <suite> --spec <spec>",
       "verdict_bearing": true
     }
   ],
@@ -501,15 +548,15 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:072bcac2a477c3e4a2dfdbb90d24cc84531f7f09c4e90ac650cf1636d34e535c",
-  "report_hash": "sha256:8e4a2778321eaf27cb2ad92a79fb3defd39f9ec2ffa7d463acb6a473b142d38d",
+  "receipt_hash": "sha256:4dd4475834ca1b058ba4b9051efca05aa7bc4759db5b46fbf9a44cd314f48440",
+  "report_hash": "sha256:05f2c4098257a0972e2a2809aeee2fd2fbc9995eb6be3954f9905bcf0970eb22",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [
     {
-      "artifact_hash": "sha256:6bb9225c9a9df8fa74f192b1c40f3e6931ddba6ea1753f3f05f85d612d73d976",
+      "artifact_hash": "sha256:287f5de1bd0868c1f8e6cd2f223d6df3303abed603a3190a49f4ec3bce897923",
       "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:cff848bede7da2c59da555bb3807f98e141e38a6322bcc880fb667b2e9e1fa80",
+      "input_hash": "sha256:fcfce1ff3f80cc894bd4211c62d0bca22740285a0eae66ae6067c9fbb2d0c160",
       "points": [
         {
           "bar": 0,
@@ -587,17 +634,17 @@
           "bar": 8,
           "close": "97.00000000",
           "drawdown": "0",
-          "nav": "10052.08333333",
-          "peak": "10052.08333333",
-          "position": "0.50000000",
+          "nav": "10000.00000000",
+          "peak": "10000.00000000",
+          "position": "0",
           "timestamp": "2024-03-05T08:00:00Z"
         },
         {
           "bar": 9,
           "close": "98.00000000",
           "drawdown": "0",
-          "nav": "10103.89819588",
-          "peak": "10103.89819588",
+          "nav": "10051.54639175",
+          "peak": "10051.54639175",
           "position": "0.50000000",
           "timestamp": "2024-03-05T09:00:00Z"
         },
@@ -605,8 +652,8 @@
           "bar": 10,
           "close": "99.00000000",
           "drawdown": "0",
-          "nav": "10155.44869688",
-          "peak": "10155.44869688",
+          "nav": "10102.82979171",
+          "peak": "10102.82979171",
           "position": "0.50000000",
           "timestamp": "2024-03-05T10:00:00Z"
         },
@@ -614,8 +661,8 @@
           "bar": 11,
           "close": "100.00000000",
           "drawdown": "0",
-          "nav": "10206.73884181",
-          "peak": "10206.73884181",
+          "nav": "10153.85418460",
+          "peak": "10153.85418460",
           "position": "0.50000000",
           "timestamp": "2024-03-05T11:00:00Z"
         },
@@ -623,8 +670,8 @@
           "bar": 12,
           "close": "101.00000000",
           "drawdown": "0",
-          "nav": "10257.77253602",
-          "peak": "10257.77253602",
+          "nav": "10204.62345552",
+          "peak": "10204.62345552",
           "position": "0.50000000",
           "timestamp": "2024-03-05T12:00:00Z"
         },
@@ -632,8 +679,8 @@
           "bar": 13,
           "close": "102.00000000",
           "drawdown": "0",
-          "nav": "10308.55358818",
-          "peak": "10308.55358818",
+          "nav": "10255.14139342",
+          "peak": "10255.14139342",
           "position": "0.50000000",
           "timestamp": "2024-03-05T13:00:00Z"
         },
@@ -641,8 +688,8 @@
           "bar": 14,
           "close": "103.00000000",
           "drawdown": "0",
-          "nav": "10359.08571361",
-          "peak": "10359.08571361",
+          "nav": "10305.41169437",
+          "peak": "10305.41169437",
           "position": "0.50000000",
           "timestamp": "2024-03-05T14:00:00Z"
         },
@@ -650,8 +697,8 @@
           "bar": 15,
           "close": "104.00000000",
           "drawdown": "0",
-          "nav": "10409.37253746",
-          "peak": "10409.37253746",
+          "nav": "10355.43796473",
+          "peak": "10355.43796473",
           "position": "0.50000000",
           "timestamp": "2024-03-05T15:00:00Z"
         },
@@ -659,8 +706,8 @@
           "bar": 16,
           "close": "105.00000000",
           "drawdown": "0",
-          "nav": "10459.41759774",
-          "peak": "10459.41759774",
+          "nav": "10405.22372417",
+          "peak": "10405.22372417",
           "position": "0.50000000",
           "timestamp": "2024-03-05T16:00:00Z"
         },
@@ -668,8 +715,8 @@
           "bar": 17,
           "close": "106.00000000",
           "drawdown": "0",
-          "nav": "10509.22434820",
-          "peak": "10509.22434820",
+          "nav": "10454.77240858",
+          "peak": "10454.77240858",
           "position": "0.50000000",
           "timestamp": "2024-03-05T17:00:00Z"
         },
@@ -677,8 +724,8 @@
           "bar": 18,
           "close": "107.00000000",
           "drawdown": "0",
-          "nav": "10558.79616117",
-          "peak": "10558.79616117",
+          "nav": "10504.08737277",
+          "peak": "10504.08737277",
           "position": "0.50000000",
           "timestamp": "2024-03-05T18:00:00Z"
         },
@@ -686,8 +733,8 @@
           "bar": 19,
           "close": "108.00000000",
           "drawdown": "0",
-          "nav": "10608.13633014",
-          "peak": "10608.13633014",
+          "nav": "10553.17189320",
+          "peak": "10553.17189320",
           "position": "0.50000000",
           "timestamp": "2024-03-05T19:00:00Z"
         },
@@ -695,8 +742,8 @@
           "bar": 20,
           "close": "109.00000000",
           "drawdown": "0",
-          "nav": "10657.24807241",
-          "peak": "10657.24807241",
+          "nav": "10602.02917048",
+          "peak": "10602.02917048",
           "position": "0.50000000",
           "timestamp": "2024-03-05T20:00:00Z"
         },
@@ -704,8 +751,8 @@
           "bar": 21,
           "close": "110.00000000",
           "drawdown": "0",
-          "nav": "10706.13453146",
-          "peak": "10706.13453146",
+          "nav": "10650.66233182",
+          "peak": "10650.66233182",
           "position": "0.50000000",
           "timestamp": "2024-03-05T21:00:00Z"
         },
@@ -713,8 +760,8 @@
           "bar": 22,
           "close": "111.00000000",
           "drawdown": "0",
-          "nav": "10754.79877933",
-          "peak": "10754.79877933",
+          "nav": "10699.07443332",
+          "peak": "10699.07443332",
           "position": "0.50000000",
           "timestamp": "2024-03-05T22:00:00Z"
         },
@@ -722,8 +769,8 @@
           "bar": 23,
           "close": "112.00000000",
           "drawdown": "0",
-          "nav": "10803.24381888",
-          "peak": "10803.24381888",
+          "nav": "10747.26846230",
+          "peak": "10747.26846230",
           "position": "0.50000000",
           "timestamp": "2024-03-05T23:00:00Z"
         }
@@ -733,10 +780,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:d40084a618c36bd31c600596d51582a9e6df5a59e3f92702abec185017c19bc9",
+      "artifact_hash": "sha256:fba0e50646c498d5a730586c63e760ca5e8a1a58a636bd1f0994d04ed83ad9a4",
       "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:7e0b288cff436ebdc3a8d7e81227bb130d77c33f89f411ffe716b93fc33e3f10",
+      "input_hash": "sha256:0dc37e6ea30b270707558545d8b4cebd32fc58b1a9b20a0c330fb0543ae161f4",
       "points": [
         {
           "bar": 0,
@@ -751,17 +798,17 @@
           "bar": 1,
           "close": "101.00000000",
           "drawdown": "0",
-          "nav": "10200.00000000",
-          "peak": "10200.00000000",
-          "position": "2.00000000",
+          "nav": "10000.00000000",
+          "peak": "10000.00000000",
+          "position": "0",
           "timestamp": "2024-03-05T01:00:00Z"
         },
         {
           "bar": 2,
           "close": "100.00000000",
           "drawdown": "0.01980198",
-          "nav": "9998.01980198",
-          "peak": "10200.00000000",
+          "nav": "9801.98019802",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T02:00:00Z"
         },
@@ -769,8 +816,8 @@
           "bar": 3,
           "close": "92.00000000",
           "drawdown": "0.17663366",
-          "nav": "8398.33663366",
-          "peak": "10200.00000000",
+          "nav": "8233.66336634",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T03:00:00Z"
         },
@@ -778,8 +825,8 @@
           "bar": 4,
           "close": "93.00000000",
           "drawdown": "0.15873440",
-          "nav": "8580.90916918",
-          "peak": "10200.00000000",
+          "nav": "8412.65604821",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T04:00:00Z"
         },
@@ -787,8 +834,8 @@
           "bar": 5,
           "close": "94.00000000",
           "drawdown": "0.14064266",
-          "nav": "8765.44485024",
-          "peak": "10200.00000000",
+          "nav": "8593.57338258",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T05:00:00Z"
         },
@@ -796,8 +843,8 @@
           "bar": 6,
           "close": "95.00000000",
           "drawdown": "0.12235846",
-          "nav": "8951.94367684",
-          "peak": "10200.00000000",
+          "nav": "8776.41536945",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T06:00:00Z"
         },
@@ -805,8 +852,8 @@
           "bar": 7,
           "close": "96.00000000",
           "drawdown": "0.10388180",
-          "nav": "9140.40564898",
-          "peak": "10200.00000000",
+          "nav": "8961.18200880",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T07:00:00Z"
         },
@@ -814,8 +861,8 @@
           "bar": 8,
           "close": "97.00000000",
           "drawdown": "0.08521267",
-          "nav": "9330.83076667",
-          "peak": "10200.00000000",
+          "nav": "9147.87330065",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T08:00:00Z"
         },
@@ -823,8 +870,8 @@
           "bar": 9,
           "close": "98.00000000",
           "drawdown": "0.06635108",
-          "nav": "9523.21902990",
-          "peak": "10200.00000000",
+          "nav": "9336.48924500",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T09:00:00Z"
         },
@@ -832,8 +879,8 @@
           "bar": 10,
           "close": "99.00000000",
           "drawdown": "0.04729702",
-          "nav": "9717.57043867",
-          "peak": "10200.00000000",
+          "nav": "9527.02984183",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T10:00:00Z"
         },
@@ -841,8 +888,8 @@
           "bar": 11,
           "close": "100.00000000",
           "drawdown": "0.02805049",
-          "nav": "9913.88499299",
-          "peak": "10200.00000000",
+          "nav": "9719.49509116",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T11:00:00Z"
         },
@@ -850,8 +897,8 @@
           "bar": 12,
           "close": "101.00000000",
           "drawdown": "0.00861150",
-          "nav": "10112.16269285",
-          "peak": "10200.00000000",
+          "nav": "9913.88499299",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-03-05T12:00:00Z"
         },
@@ -859,8 +906,8 @@
           "bar": 13,
           "close": "102.00000000",
           "drawdown": "0",
-          "nav": "10312.40353825",
-          "peak": "10312.40353825",
+          "nav": "10110.19954730",
+          "peak": "10110.19954730",
           "position": "2.00000000",
           "timestamp": "2024-03-05T13:00:00Z"
         },
@@ -868,8 +915,8 @@
           "bar": 14,
           "close": "103.00000000",
           "drawdown": "0",
-          "nav": "10514.60752920",
-          "peak": "10514.60752920",
+          "nav": "10308.43875411",
+          "peak": "10308.43875411",
           "position": "2.00000000",
           "timestamp": "2024-03-05T14:00:00Z"
         },
@@ -877,8 +924,8 @@
           "bar": 15,
           "close": "104.00000000",
           "drawdown": "0",
-          "nav": "10718.77466569",
-          "peak": "10718.77466569",
+          "nav": "10508.60261342",
+          "peak": "10508.60261342",
           "position": "2.00000000",
           "timestamp": "2024-03-05T15:00:00Z"
         },
@@ -886,8 +933,8 @@
           "bar": 16,
           "close": "105.00000000",
           "drawdown": "0",
-          "nav": "10924.90494772",
-          "peak": "10924.90494772",
+          "nav": "10710.69112521",
+          "peak": "10710.69112521",
           "position": "2.00000000",
           "timestamp": "2024-03-05T16:00:00Z"
         },
@@ -895,8 +942,8 @@
           "bar": 17,
           "close": "106.00000000",
           "drawdown": "0",
-          "nav": "11132.99837529",
-          "peak": "11132.99837529",
+          "nav": "10914.70428950",
+          "peak": "10914.70428950",
           "position": "2.00000000",
           "timestamp": "2024-03-05T17:00:00Z"
         },
@@ -904,8 +951,8 @@
           "bar": 18,
           "close": "107.00000000",
           "drawdown": "0",
-          "nav": "11343.05494841",
-          "peak": "11343.05494841",
+          "nav": "11120.64210629",
+          "peak": "11120.64210629",
           "position": "2.00000000",
           "timestamp": "2024-03-05T18:00:00Z"
         },
@@ -913,8 +960,8 @@
           "bar": 19,
           "close": "108.00000000",
           "drawdown": "0",
-          "nav": "11555.07466707",
-          "peak": "11555.07466707",
+          "nav": "11328.50457556",
+          "peak": "11328.50457556",
           "position": "2.00000000",
           "timestamp": "2024-03-05T19:00:00Z"
         },
@@ -922,8 +969,8 @@
           "bar": 20,
           "close": "109.00000000",
           "drawdown": "0",
-          "nav": "11769.05753128",
-          "peak": "11769.05753128",
+          "nav": "11538.29169733",
+          "peak": "11538.29169733",
           "position": "2.00000000",
           "timestamp": "2024-03-05T20:00:00Z"
         },
@@ -931,8 +978,8 @@
           "bar": 21,
           "close": "110.00000000",
           "drawdown": "0",
-          "nav": "11985.00354103",
-          "peak": "11985.00354103",
+          "nav": "11750.00347160",
+          "peak": "11750.00347160",
           "position": "2.00000000",
           "timestamp": "2024-03-05T21:00:00Z"
         },
@@ -940,8 +987,8 @@
           "bar": 22,
           "close": "111.00000000",
           "drawdown": "0",
-          "nav": "12202.91269632",
-          "peak": "12202.91269632",
+          "nav": "11963.63989835",
+          "peak": "11963.63989835",
           "position": "2.00000000",
           "timestamp": "2024-03-05T22:00:00Z"
         },
@@ -949,8 +996,8 @@
           "bar": 23,
           "close": "112.00000000",
           "drawdown": "0",
-          "nav": "12422.78499715",
-          "peak": "12422.78499715",
+          "nav": "12179.20097760",
+          "peak": "12179.20097760",
           "position": "2.00000000",
           "timestamp": "2024-03-05T23:00:00Z"
         }
@@ -960,10 +1007,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:3f9584f0a239f590f6bd263b760b451525c4d08a6e04701dd11ac5ddc2fe8fa8",
+      "artifact_hash": "sha256:50f75da6d88e31b253922ad59b179636c8f14837fff6814273ab9fee6b935c1c",
       "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:053b1f99c2c9295d801fddb837af63c446c25ecfcf6ca9dbe00a47e08cd3c7d5",
+      "input_hash": "sha256:bd90ea57bd23e88094e7aebbe0b8a764c3ab8f274d08493b4aa78a5d8b67e3b5",
       "points": [
         {
           "bar": 0,
@@ -1041,17 +1088,17 @@
           "bar": 8,
           "close": "100.00000000",
           "drawdown": "0",
-          "nav": "10025.12562814",
-          "peak": "10025.12562814",
-          "position": "0.50000000",
+          "nav": "10000.00000000",
+          "peak": "10000.00000000",
+          "position": "0",
           "timestamp": "2024-08-01T08:00:00Z"
         },
         {
           "bar": 9,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10050.18844221",
-          "peak": "10050.18844221",
+          "nav": "10025.00000000",
+          "peak": "10025.00000000",
           "position": "0.50000000",
           "timestamp": "2024-08-01T09:00:00Z"
         },
@@ -1059,8 +1106,8 @@
           "bar": 10,
           "close": "100.00000000",
           "drawdown": "0.00248756",
-          "nav": "10025.18797345",
-          "peak": "10050.18844221",
+          "nav": "10000.06218905",
+          "peak": "10025.00000000",
           "position": "0.50000000",
           "timestamp": "2024-08-01T10:00:00Z"
         },
@@ -1068,8 +1115,8 @@
           "bar": 11,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10050.25094338",
-          "peak": "10050.25094338",
+          "nav": "10025.06234453",
+          "peak": "10025.06234453",
           "position": "0.50000000",
           "timestamp": "2024-08-01T11:00:00Z"
         },
@@ -1077,8 +1124,8 @@
           "bar": 12,
           "close": "100.00000000",
           "drawdown": "0.00248756",
-          "nav": "10025.25031915",
-          "peak": "10050.25094338",
+          "nav": "10000.12437850",
+          "peak": "10025.06234453",
           "position": "0.50000000",
           "timestamp": "2024-08-01T12:00:00Z"
         },
@@ -1086,8 +1133,8 @@
           "bar": 13,
           "close": "99.50000000",
           "drawdown": "0.00498134",
-          "nav": "10000.18719335",
-          "peak": "10050.25094338",
+          "nav": "9975.12406755",
+          "peak": "10025.06234453",
           "position": "0.50000000",
           "timestamp": "2024-08-01T13:00:00Z"
         },
@@ -1095,8 +1142,8 @@
           "bar": 14,
           "close": "100.00000000",
           "drawdown": "0.00248130",
-          "nav": "10025.31329182",
-          "peak": "10050.25094338",
+          "nav": "10000.18719335",
+          "peak": "10025.06234453",
           "position": "0.50000000",
           "timestamp": "2024-08-01T14:00:00Z"
         },
@@ -1104,8 +1151,8 @@
           "bar": 15,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10050.37657505",
-          "peak": "10050.37657505",
+          "nav": "10025.18766133",
+          "peak": "10025.18766133",
           "position": "0.50000000",
           "timestamp": "2024-08-01T15:00:00Z"
         },
@@ -1113,8 +1160,8 @@
           "bar": 16,
           "close": "100.00000000",
           "drawdown": "0.00248756",
-          "nav": "10025.37563830",
-          "peak": "10050.37657505",
+          "nav": "10000.24938357",
+          "peak": "10025.18766133",
           "position": "0.50000000",
           "timestamp": "2024-08-01T16:00:00Z"
         },
@@ -1122,8 +1169,8 @@
           "bar": 17,
           "close": "99.50000000",
           "drawdown": "0.00498134",
-          "nav": "10000.31219920",
-          "peak": "10050.37657505",
+          "nav": "9975.24876011",
+          "peak": "10025.18766133",
           "position": "0.50000000",
           "timestamp": "2024-08-01T17:00:00Z"
         },
@@ -1131,8 +1178,8 @@
           "bar": 18,
           "close": "100.00000000",
           "drawdown": "0.00248130",
-          "nav": "10025.43861176",
-          "peak": "10050.37657505",
+          "nav": "10000.31219920",
+          "peak": "10025.18766133",
           "position": "0.50000000",
           "timestamp": "2024-08-01T18:00:00Z"
         },
@@ -1140,8 +1187,8 @@
           "bar": 19,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10050.50220829",
-          "peak": "10050.50220829",
+          "nav": "10025.31297970",
+          "peak": "10025.31297970",
           "position": "0.50000000",
           "timestamp": "2024-08-01T19:00:00Z"
         },
@@ -1149,8 +1196,8 @@
           "bar": 20,
           "close": "100.00000000",
           "drawdown": "0.00248756",
-          "nav": "10025.50095902",
-          "peak": "10050.50220829",
+          "nav": "10000.37439020",
+          "peak": "10025.31297970",
           "position": "0.50000000",
           "timestamp": "2024-08-01T20:00:00Z"
         },
@@ -1158,8 +1205,8 @@
           "bar": 21,
           "close": "99.50000000",
           "drawdown": "0.00498134",
-          "nav": "10000.43720662",
-          "peak": "10050.50220829",
+          "nav": "9975.37345422",
+          "peak": "10025.31297970",
           "position": "0.50000000",
           "timestamp": "2024-08-01T21:00:00Z"
         },
@@ -1167,8 +1214,8 @@
           "bar": 22,
           "close": "100.00000000",
           "drawdown": "0.00248130",
-          "nav": "10025.56393327",
-          "peak": "10050.50220829",
+          "nav": "10000.43720662",
+          "peak": "10025.31297970",
           "position": "0.50000000",
           "timestamp": "2024-08-01T22:00:00Z"
         },
@@ -1176,8 +1223,8 @@
           "bar": 23,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10050.62784310",
-          "peak": "10050.62784310",
+          "nav": "10025.43829964",
+          "peak": "10025.43829964",
           "position": "0.50000000",
           "timestamp": "2024-08-01T23:00:00Z"
         }
@@ -1187,10 +1234,10 @@
       "trade_count": 1
     },
     {
-      "artifact_hash": "sha256:0579bd4b523585094f214ff8e2298c82a4c975e01efb1d328d8c075336c9376f",
+      "artifact_hash": "sha256:bfc2aa150bb1685b492b16980327f5fe8ab9f01c22fc2fe1fd4173d01d9ab8e8",
       "bars": 24,
       "engine": "deterministic",
-      "input_hash": "sha256:8c9be46e95e15f980f5aacd8fef866eb756e80308bb4d2ddbe0eb10bf3db2ada",
+      "input_hash": "sha256:eba259d1088d35fe28ec30bfbd6c0a511b301305f8f904855a516b43f0437477",
       "points": [
         {
           "bar": 0,
@@ -1205,17 +1252,17 @@
           "bar": 1,
           "close": "100.50000000",
           "drawdown": "0",
-          "nav": "10100.00000000",
-          "peak": "10100.00000000",
-          "position": "2.00000000",
+          "nav": "10000.00000000",
+          "peak": "10000.00000000",
+          "position": "0",
           "timestamp": "2024-08-01T01:00:00Z"
         },
         {
           "bar": 2,
           "close": "100.00000000",
           "drawdown": "0.00995025",
-          "nav": "9999.50248756",
-          "peak": "10100.00000000",
+          "nav": "9900.49751244",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T02:00:00Z"
         },
@@ -1223,8 +1270,8 @@
           "bar": 3,
           "close": "99.50000000",
           "drawdown": "0.01985075",
-          "nav": "9899.50746269",
-          "peak": "10100.00000000",
+          "nav": "9801.49253731",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T03:00:00Z"
         },
@@ -1232,8 +1279,8 @@
           "bar": 4,
           "close": "100.00000000",
           "drawdown": "0.01000000",
-          "nav": "9999.00000000",
-          "peak": "10100.00000000",
+          "nav": "9900.00000000",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T04:00:00Z"
         },
@@ -1241,8 +1288,8 @@
           "bar": 5,
           "close": "100.50000000",
           "drawdown": "0.00010000",
-          "nav": "10098.99000000",
-          "peak": "10100.00000000",
+          "nav": "9999.00000000",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T05:00:00Z"
         },
@@ -1250,8 +1297,8 @@
           "bar": 6,
           "close": "100.00000000",
           "drawdown": "0.01004925",
-          "nav": "9998.50253731",
-          "peak": "10100.00000000",
+          "nav": "9899.50746269",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T06:00:00Z"
         },
@@ -1259,8 +1306,8 @@
           "bar": 7,
           "close": "99.50000000",
           "drawdown": "0.01994876",
-          "nav": "9898.51751194",
-          "peak": "10100.00000000",
+          "nav": "9800.51238806",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T07:00:00Z"
         },
@@ -1268,8 +1315,8 @@
           "bar": 8,
           "close": "100.00000000",
           "drawdown": "0.01009900",
-          "nav": "9998.00010000",
-          "peak": "10100.00000000",
+          "nav": "9899.01000000",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T08:00:00Z"
         },
@@ -1277,8 +1324,8 @@
           "bar": 9,
           "close": "100.50000000",
           "drawdown": "0.00019999",
-          "nav": "10097.98010100",
-          "peak": "10100.00000000",
+          "nav": "9998.00010000",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T09:00:00Z"
         },
@@ -1286,8 +1333,8 @@
           "bar": 10,
           "close": "100.00000000",
           "drawdown": "0.01014825",
-          "nav": "9997.50268706",
-          "peak": "10100.00000000",
+          "nav": "9898.51751194",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T10:00:00Z"
         },
@@ -1295,8 +1342,8 @@
           "bar": 11,
           "close": "100.50000000",
           "drawdown": "0.00024973",
-          "nav": "10097.47771393",
-          "peak": "10100.00000000",
+          "nav": "9997.50268706",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T11:00:00Z"
         },
@@ -1304,8 +1351,8 @@
           "bar": 12,
           "close": "100.00000000",
           "drawdown": "0.01019750",
-          "nav": "9997.00529887",
-          "peak": "10100.00000000",
+          "nav": "9898.02504838",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T12:00:00Z"
         },
@@ -1313,8 +1360,8 @@
           "bar": 13,
           "close": "99.50000000",
           "drawdown": "0.02009552",
-          "nav": "9897.03524588",
-          "peak": "10100.00000000",
+          "nav": "9799.04479790",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T13:00:00Z"
         },
@@ -1322,8 +1369,8 @@
           "bar": 14,
           "close": "100.00000000",
           "drawdown": "0.01024723",
-          "nav": "9996.50293679",
-          "peak": "10100.00000000",
+          "nav": "9897.52766019",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T14:00:00Z"
         },
@@ -1331,8 +1378,8 @@
           "bar": 15,
           "close": "100.50000000",
           "drawdown": "0.00034971",
-          "nav": "10096.46796616",
-          "peak": "10100.00000000",
+          "nav": "9996.50293679",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T15:00:00Z"
         },
@@ -1340,8 +1387,8 @@
           "bar": 16,
           "close": "100.00000000",
           "drawdown": "0.01029648",
-          "nav": "9996.00559834",
-          "peak": "10100.00000000",
+          "nav": "9897.03524588",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T16:00:00Z"
         },
@@ -1349,8 +1396,8 @@
           "bar": 17,
           "close": "99.50000000",
           "drawdown": "0.02019351",
-          "nav": "9896.04554235",
-          "peak": "10100.00000000",
+          "nav": "9798.06489342",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T17:00:00Z"
         },
@@ -1358,8 +1405,8 @@
           "bar": 18,
           "close": "100.00000000",
           "drawdown": "0.01034621",
-          "nav": "9995.50328650",
-          "peak": "10100.00000000",
+          "nav": "9896.53790742",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T18:00:00Z"
         },
@@ -1367,8 +1414,8 @@
           "bar": 19,
           "close": "100.50000000",
           "drawdown": "0.00044967",
-          "nav": "10095.45831936",
-          "peak": "10100.00000000",
+          "nav": "9995.50328650",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T19:00:00Z"
         },
@@ -1376,8 +1423,8 @@
           "bar": 20,
           "close": "100.00000000",
           "drawdown": "0.01039545",
-          "nav": "9995.00599778",
-          "peak": "10100.00000000",
+          "nav": "9896.04554235",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T20:00:00Z"
         },
@@ -1385,8 +1432,8 @@
           "bar": 21,
           "close": "99.50000000",
           "drawdown": "0.02029149",
-          "nav": "9895.05593780",
-          "peak": "10100.00000000",
+          "nav": "9797.08508693",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T21:00:00Z"
         },
@@ -1394,8 +1441,8 @@
           "bar": 22,
           "close": "100.00000000",
           "drawdown": "0.01044517",
-          "nav": "9994.50373617",
-          "peak": "10100.00000000",
+          "nav": "9895.54825363",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T22:00:00Z"
         },
@@ -1403,8 +1450,8 @@
           "bar": 23,
           "close": "100.50000000",
           "drawdown": "0.00054963",
-          "nav": "10094.44877353",
-          "peak": "10100.00000000",
+          "nav": "9994.50373617",
+          "peak": "10000.00000000",
           "position": "2.00000000",
           "timestamp": "2024-08-01T23:00:00Z"
         }

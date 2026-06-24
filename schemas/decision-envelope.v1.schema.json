@@ -115,6 +115,15 @@
         "PASS",
         "NEW_BLOCK_BREACH",
         "RECEIPT_MISMATCH",
+        "PROOF_HASH_MISMATCH",
+        "LEDGER_CHAIN_BROKEN",
+        "CHECKPOINT_MISMATCH",
+        "EXECUTION_LEDGER_BROKEN",
+        "MERKLE_INCLUSION_FAILED",
+        "APPROVAL_LINK_MISMATCH",
+        "APPROVAL_CONSUMED",
+        "APPROVAL_EXPIRED",
+        "CHAIN_LINK_MISMATCH",
         "BASELINE_UNCHAINED",
         "BASELINE_GENESIS",
         "COVERAGE_INCOMPLETE",
@@ -145,15 +154,38 @@
       "enum": [
         "pass",
         "withheld",
+        "reduce_size",
         "reject",
         "unverified_no_verdict"
       ],
       "title": "Status",
       "type": "string"
+    },
+    "VerdictTier": {
+      "enum": [
+        "ALLOW",
+        "REDUCE_SIZE",
+        "HUMAN_REVIEW",
+        "BLOCK"
+      ],
+      "title": "VerdictTier",
+      "type": "string"
     }
   },
   "additionalProperties": false,
   "properties": {
+    "adjusted_size_cap": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Adjusted Size Cap"
+    },
     "capabilities": {
       "$ref": "#/$defs/Capabilities"
     },
@@ -188,6 +220,17 @@
     },
     "status": {
       "$ref": "#/$defs/Status"
+    },
+    "verdict_tier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerdictTier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

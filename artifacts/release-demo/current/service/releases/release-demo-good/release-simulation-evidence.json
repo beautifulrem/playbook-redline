@@ -1,0 +1,18 @@
+{
+  "evidence_hash": "sha256:f422a0077da2bc4e3f5d62b7406a8205e1c03e704088894ecd6e2e70f42a0627",
+  "imported_at": "2026-06-24T06:57:55Z",
+  "market": "bitget-demo",
+  "max_drawdown": "3.20",
+  "metadata": {},
+  "period_end": "2026-06-22",
+  "period_start": "2026-06-01",
+  "pnl": "42.50",
+  "release_id": "release-demo-good",
+  "schema_version": "redline.release.simulation_evidence.v1",
+  "sharpe_or_sortino": null,
+  "source": "local_backtest",
+  "source_file_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+  "symbol": "BTCUSDT",
+  "trade_count": 12,
+  "win_rate": "0.58"
+}

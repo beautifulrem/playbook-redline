@@ -287,6 +287,18 @@ class BitgetCredentials(BaseModel):
     source_kind: Literal["live", "mock"] = "live"
 
 
+def bitget_auth_headers(*, credentials: BitgetCredentials, method: str, request_path: str, body: bytes, timestamp: str | None = None) -> dict[str, str]:
+    timestamp = timestamp or str(int(datetime.now(UTC).timestamp() * 1000))
+    prehash = (timestamp + method.upper() + request_path).encode("utf-8") + body
+    signature = base64.b64encode(hmac.new(credentials.secret_key.encode("utf-8"), prehash, hashlib.sha256).digest()).decode("ascii")
+    return {
+        "ACCESS-KEY": credentials.access_key,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": timestamp,
+        "ACCESS-PASSPHRASE": credentials.passphrase,
+    }
+
+
 class SponsorTranscript:
     def __init__(self, path: Path):
         self.path = path
@@ -686,15 +698,7 @@ class BitgetSponsorAdapter:
         return SponsorStepResult(ok=True, state=step, evidence=evidence)
 
     def _auth_headers(self, *, method: str, request_path: str, body: bytes) -> dict[str, str]:
-        timestamp = str(int(datetime.now(UTC).timestamp() * 1000))
-        prehash = (timestamp + method.upper() + request_path).encode("utf-8") + body
-        signature = base64.b64encode(hmac.new(self.credentials.secret_key.encode("utf-8"), prehash, hashlib.sha256).digest()).decode("ascii")
-        return {
-            "ACCESS-KEY": self.credentials.access_key,
-            "ACCESS-SIGN": signature,
-            "ACCESS-TIMESTAMP": timestamp,
-            "ACCESS-PASSPHRASE": self.credentials.passphrase,
-        }
+        return bitget_auth_headers(credentials=self.credentials, method=method, request_path=request_path, body=body)
 
 
 def make_package_archive(*, package_dir: Path, out_path: Path) -> Path:

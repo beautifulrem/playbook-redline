@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
+
+from redline.service.auth import ServiceToken, parse_service_tokens
 
 
 ServiceEnvironment = Literal["local", "ci", "production"]
@@ -31,8 +33,22 @@ class ServiceConfig:
     max_active_runs: int = 8
     max_runs_total: int = 500
     run_retention_seconds: int = 7 * 24 * 60 * 60
+    service_tokens: tuple[ServiceToken, ...] = field(default_factory=tuple)
+    auth_session_secret: str | None = None
+    auth_users: str | None = None
+    dev_auth_user: str | None = None
+    dev_auth_enabled: bool = False
+    github_oauth_client_id: str | None = None
+    github_oauth_client_secret: str | None = None
+    github_oauth_redirect_uri: str | None = None
+    github_oauth_allowed_logins: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if not self.service_tokens:
+            object.__setattr__(self, "service_tokens", parse_service_tokens(None, fallback_token=self.token))
+        token_values = [item.token for item in self.service_tokens]
+        if len(set(token_values)) != len(token_values):
+            raise ValueError("REDLINE_SERVICE_TOKENS must not contain duplicate tokens")
         if self.environment not in {"local", "ci", "production"}:
             raise ValueError("REDLINE_SERVICE_ENV must be one of local, ci, production")
         if self.max_upload_bytes <= 0:
@@ -59,10 +75,15 @@ class ServiceConfig:
             if value < 0:
                 raise ValueError(f"{name} must be non-negative")
         if self.environment == "production":
-            if self.token in {"", "redline-demo", "redline-smoke", "test-token"} or len(self.token) < 32:
-                raise ValueError("production service requires a non-default REDLINE_SERVICE_TOKEN with at least 32 characters")
+            bad_tokens = [item for item in self.service_tokens if item.token in {"", "redline-demo", "redline-smoke", "test-token"} or len(item.token) < 32]
+            if bad_tokens:
+                raise ValueError("production service requires non-default Redline tokens with at least 32 characters")
             if "*" in self.cors_origins:
                 raise ValueError("production CORS origins must be explicit")
+            if not self.auth_session_secret or self.auth_session_secret in {"redline-dev-session", "redline-demo"} or len(self.auth_session_secret) < 32:
+                raise ValueError("production auth sessions require REDLINE_AUTH_SESSION_SECRET with at least 32 characters")
+            if self.github_oauth_client_id and (not self.github_oauth_client_secret or not self.github_oauth_redirect_uri):
+                raise ValueError("GitHub OAuth requires REDLINE_GITHUB_OAUTH_CLIENT_SECRET and REDLINE_GITHUB_OAUTH_REDIRECT_URI")
 
     @classmethod
     def from_env(cls) -> ServiceConfig:
@@ -87,6 +108,15 @@ class ServiceConfig:
             max_active_runs=_parse_nonnegative_int("REDLINE_SERVICE_MAX_ACTIVE_RUNS", 8),
             max_runs_total=_parse_nonnegative_int("REDLINE_SERVICE_MAX_RUNS_TOTAL", 500),
             run_retention_seconds=_parse_nonnegative_int("REDLINE_SERVICE_RUN_RETENTION_SECONDS", 7 * 24 * 60 * 60),
+            service_tokens=parse_service_tokens(os.environ.get("REDLINE_SERVICE_TOKENS"), fallback_token=os.environ.get("REDLINE_SERVICE_TOKEN", "redline-demo")),
+            auth_session_secret=os.environ.get("REDLINE_AUTH_SESSION_SECRET"),
+            auth_users=os.environ.get("REDLINE_AUTH_USERS"),
+            dev_auth_user=os.environ.get("REDLINE_DEV_AUTH_USER"),
+            dev_auth_enabled=_parse_bool("REDLINE_DEV_AUTH_ENABLED", "false"),
+            github_oauth_client_id=os.environ.get("REDLINE_GITHUB_OAUTH_CLIENT_ID"),
+            github_oauth_client_secret=os.environ.get("REDLINE_GITHUB_OAUTH_CLIENT_SECRET"),
+            github_oauth_redirect_uri=os.environ.get("REDLINE_GITHUB_OAUTH_REDIRECT_URI"),
+            github_oauth_allowed_logins=_parse_csv("REDLINE_AUTH_ALLOWED_GITHUB_LOGINS"),
         )
 
     @property

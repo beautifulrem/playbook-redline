@@ -1,0 +1,27 @@
+{
+  "proof_id": "proof:probe:10142a4c4d62b0f91a288df0",
+  "phase": "probe",
+  "kind": "probe",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
+  "artifact_hash": "sha256:10142a4c4d62b0f91a288df035673ef369716943a1bdbdd836f1c322f8d57bb9",
+  "assertions": [
+    {
+      "metric": "no_entry_when",
+      "op": "<=",
+      "threshold": "0",
+      "observed": "0",
+      "scenario_id": "btc-crash-2024-03-05",
+      "bar": 0,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:10142a4c4d62b0f91a288df0 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
+  "meta": {
+    "scenario_id": "btc-crash-2024-03-05",
+    "probe_id": "no_entry_when_crash"
+  }
+}

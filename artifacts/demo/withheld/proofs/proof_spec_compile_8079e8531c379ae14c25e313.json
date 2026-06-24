@@ -1,0 +1,20 @@
+{
+  "proof_id": "proof:spec_compile:8079e8531c379ae14c25e313",
+  "phase": "compile",
+  "kind": "spec_compile",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
+  "artifact_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
+  "meta": {
+    "compiler": "json",
+    "model": "",
+    "tool_schema_hash": "",
+    "degraded": "true",
+    "degraded_reason": ""
+  }
+}

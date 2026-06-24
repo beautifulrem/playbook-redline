@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import json
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -37,7 +36,8 @@ from redline.models import (
 from redline.package_identity import load_identity_lock
 from redline.probes import PROBE_REGISTRY, TRUSTED_PROBE_EVALUATE, TRUSTED_PROBE_TYPES
 from redline.proof_kernel import REQUIRED_PROOFS, decide
-from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, issue_receipt, make_decision_proof, make_verify_proof_reproduce
+from redline.merkle import merkle_root
+from redline.receipt import assert_no_issuance_conflict, atomic_write_receipt, compute_ledger_checkpoint_hash, issue_receipt, make_decision_proof, make_verify_proof_reproduce
 from redline.report import to_report
 from redline.trust import verify_checkpoint_attestation
 from redline.tripwire import VerdictPathViolation, verdict_path_tripwire
@@ -63,6 +63,8 @@ def load_suite(path: Path) -> Suite:
         if not scenario_path.is_absolute():
             scenario_path = (base / scenario_path).resolve()
         metadata = _scenario_file_metadata(scenario_path)
+        if scenario.source_file_hash is not None and scenario.source_file_hash != metadata["source_file_hash"]:
+            raise ValueError("source_file_hash mismatch")
         scenarios.append(scenario.model_copy(update={"path": str(scenario_path), **metadata}))
         lock_scenarios.append({**scenario.model_dump(mode="json"), **metadata})
     lock_payload = {
@@ -82,8 +84,10 @@ def _scenario_file_metadata(path: Path) -> dict[str, object]:
     with path.open(encoding="utf-8", newline="") as fh:
         rows = list(csv.DictReader(fh))
     timestamps = [row.get("timestamp", "") for row in rows if row.get("timestamp")]
+    file_hash = hash_file(path)
     return {
-        "data_hash": hash_file(path),
+        "data_hash": file_hash,
+        "source_file_hash": file_hash,
         "bar_count": len(rows),
         "period_start": timestamps[0] if timestamps else None,
         "period_end": timestamps[-1] if timestamps else None,
@@ -93,7 +97,7 @@ def _scenario_file_metadata(path: Path) -> dict[str, object]:
 def resolve_package_role_dir(package_dir: Path, role: str) -> Path:
     package_root = package_dir.resolve()
     role_path = Path(role)
-    if not role or role_path.is_absolute() or any(part in {"", ".", ".."} for part in role_path.parts):
+    if not role or role_path.is_absolute() or any(part in ("", ".", "..") for part in role_path.parts):
         raise ValueError(f"package role must stay under package root: {role}")
     resolved = (package_root / role_path).resolve()
     try:
@@ -154,6 +158,7 @@ def run_redline(
         baseline_receipt_path=baseline_receipt_path,
         baseline_trust_policy_path=baseline_trust_policy_path,
     )
+    prev_receipt_hash = baseline_receipt_hash if chain_status == ChainStatus.CHAINED and baseline_receipt_hash is not None else "sha256:genesis"
     proof_reproduce_kwargs = {
         "include_baseline_receipt": chain_status == ChainStatus.CHAINED,
         "include_trust_policy": chain_status == ChainStatus.CHAINED and baseline_trust_policy_path is not None,
@@ -168,6 +173,9 @@ def run_redline(
         verdict_bearing: bool,
         assertions: list[Assertion] | None = None,
         meta: dict[str, object] | None = None,
+        fill_model: str | None = None,
+        lookahead_guard: str | None = None,
+        fees_modeled: bool | None = None,
     ) -> Proof:
         return _simple_proof(
             kind=kind,
@@ -177,6 +185,9 @@ def run_redline(
             verdict_bearing=verdict_bearing,
             assertions=assertions,
             meta=meta,
+            fill_model=fill_model,
+            lookahead_guard=lookahead_guard,
+            fees_modeled=fees_modeled,
             **proof_reproduce_kwargs,
         )
 
@@ -224,9 +235,10 @@ def run_redline(
         reject_reason = ReasonCode.RECEIPT_BINDING_FAILED
     try:
         if reject_reason is None:
+            replay_config = _spec_replay_config(spec)
             for scenario in suite.scenarios:
-                traces.append(engine.replay(package=baseline_dir, scenario=scenario, role="baseline"))
-                traces.append(engine.replay(package=candidate_dir, scenario=scenario, role="candidate"))
+                traces.append(engine.replay(package=baseline_dir, scenario=scenario, role="baseline", replay_config=replay_config))
+                traces.append(engine.replay(package=candidate_dir, scenario=scenario, role="candidate", replay_config=replay_config))
     except ReplayEngineError as exc:
         reject_reason = exc.reason_code
 
@@ -242,6 +254,9 @@ def run_redline(
                 inputs={"suite": suite.suite_id, "baseline": baseline_hash, "candidate": candidate_hash},
                 artifact=[trace.model_dump(mode="json") for trace in traces],
                 verdict_bearing=True,
+                fill_model=spec.fill_model,
+                lookahead_guard="structural_next_bar",
+                fees_modeled=True,
             )
         )
         wellformed_assertions = _wellformed_assertions(traces)
@@ -339,7 +354,7 @@ def run_redline(
             coverage = CoverageManifest(
                 cells=coverage_cells,
                 complete=False,
-                missing=sorted(set([reject_reason.value, *missing])),
+                missing=_unique_sorted([reject_reason.value, *missing]),
             )
     else:
         coverage = CoverageManifest(cells=[], complete=False, missing=[reject_reason.value])
@@ -365,6 +380,7 @@ def run_redline(
         proofs=proofs,
         coverage=coverage,
         package_hash=package_hash,
+        prev_receipt_hash=prev_receipt_hash,
         baseline_name=baseline,
         baseline_hash=baseline_hash,
         baseline_receipt_hash=baseline_receipt_hash,
@@ -392,7 +408,7 @@ def run_redline(
     )
     if receipt is None:
         decision_proof = make_decision_proof(envelope=envelope, proofs=proofs, envelope_bundle=True, **proof_reproduce_kwargs)
-        if decision_proof.proof_id not in {proof.proof_id for proof in proofs}:
+        if decision_proof.proof_id not in [proof.proof_id for proof in proofs]:
             proofs.append(decision_proof)
     report_json = to_report(envelope=envelope, receipt=receipt, traces=traces, proofs=proofs)
     if receipt is not None:
@@ -464,6 +480,9 @@ def _simple_proof(
     verdict_bearing: bool,
     assertions: list[Assertion] | None = None,
     meta: dict[str, object] | None = None,
+    fill_model: str | None = None,
+    lookahead_guard: str | None = None,
+    fees_modeled: bool | None = None,
     include_baseline_receipt: bool = False,
     include_trust_policy: bool = False,
 ) -> Proof:
@@ -479,6 +498,9 @@ def _simple_proof(
         artifact_hash=artifact_hash,
         assertions=assertions or [],
         meta=meta or {},
+        fill_model=fill_model,
+        lookahead_guard=lookahead_guard,
+        fees_modeled=fees_modeled,
         reproduce=make_verify_proof_reproduce(
             proof_id=proof_id,
             include_baseline_receipt=include_baseline_receipt,
@@ -506,7 +528,7 @@ def _wellformed_assertions(traces: list[ReplayTrace]) -> list[Assertion]:
 
 
 def _candidate_absolute_assertions(assertions: list[Assertion]) -> list[Assertion]:
-    return [assertion for assertion in assertions if assertion.metric in {"max_drawdown", "trade_budget"}]
+    return [assertion for assertion in assertions if assertion.metric in ("max_drawdown", "trade_budget")]
 
 
 def _is_trusted_probe(probe_type: ProbeType, probe: object) -> bool:
@@ -534,16 +556,25 @@ def parse_run_inputs(package_dir: Path, suite_path: Path, spec_path: Path) -> tu
 
 
 def _validate_spec_suite_bindings(spec: RedlineSpec, suite: Suite) -> None:
-    scenario_ids = {scenario.id for scenario in suite.scenarios}
-    unknown = sorted(
-        {
+    scenario_ids = [scenario.id for scenario in suite.scenarios]
+    unknown = _unique_sorted(
+        [
             str(probe.params.get("scenario_id"))
             for probe in spec.probes
-            if probe.type == ProbeType.NO_ENTRY_WHEN and str(probe.params.get("scenario_id")) not in scenario_ids
-        }
+            if probe.type in (ProbeType.NO_ENTRY_WHEN, ProbeType.UNAUTHORIZED_ORDER, ProbeType.SKIP_CONFIRM, ProbeType.BLIND_RETRY)
+            and str(probe.params.get("scenario_id")) not in scenario_ids
+        ]
     )
     if unknown:
         raise ValueError(f"spec references unknown scenario_id: {', '.join(unknown)}")
+
+
+def _spec_replay_config(spec: RedlineSpec) -> dict[str, str]:
+    return {
+        "fill_model": spec.fill_model,
+        "fee_bps": spec.fee_bps,
+        "slippage_bps": spec.slippage_bps,
+    }
 
 
 def _baseline_chain(
@@ -625,8 +656,10 @@ def _baseline_receipt_trusted(*, receipt: Receipt, receipt_path: Path, trust_pol
         return False
     if not matched:
         return False
-    expected_checkpoint_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
+    expected_checkpoint_hash = compute_ledger_checkpoint_hash(checkpoint)
     if checkpoint.checkpoint_hash != expected_checkpoint_hash:
+        return False
+    if "merkle_root" in checkpoint.model_fields_set and checkpoint.merkle_root != merkle_root(checkpoint.subject_receipt_hashes):
         return False
     if checkpoint.ledger_hash != hash_file(ledger_path):
         return False
@@ -651,6 +684,14 @@ def _runner_lock_hash(engine_hash: str) -> str:
             "uv_lock_hash": hash_file(uv_lock) if uv_lock.exists() else None,
         }
     )
+
+
+def _unique_sorted(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return sorted(unique)
 
 
 def _portable_path(path: Path) -> str:

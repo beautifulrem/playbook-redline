@@ -83,12 +83,50 @@
       "title": "Assertions",
       "type": "array"
     },
+    "fees_modeled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fees Modeled"
+    },
+    "fill_model": {
+      "anyOf": [
+        {
+          "const": "next_bar_open",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fill Model"
+    },
     "inputs_hash": {
       "title": "Inputs Hash",
       "type": "string"
     },
     "kind": {
       "$ref": "#/$defs/ProofKind"
+    },
+    "lookahead_guard": {
+      "anyOf": [
+        {
+          "const": "structural_next_bar",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lookahead Guard"
     },
     "meta": {
       "additionalProperties": true,
