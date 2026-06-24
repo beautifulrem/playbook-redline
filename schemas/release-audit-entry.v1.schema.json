@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redline.local/schemas/release-audit-entry.v1.schema.json",
+  "title": "Redline Release Audit Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_id",
+    "event_type",
+    "actor",
+    "created_at",
+    "payload",
+    "previous_entry_hash",
+    "entry_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "redline.release.audit.v1"
+    },
+    "release_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "strategy_version_created",
+        "release_candidate_created",
+        "redline_run_bound",
+        "redline_verified",
+        "simulation_evidence_imported",
+        "risk_policy_bound",
+        "risk_policy_checked",
+        "approval_granted",
+        "approval_rejected",
+        "demo_order_requested",
+        "demo_order_placed",
+        "demo_order_blocked",
+        "release_ready",
+        "release_killed"
+      ]
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "previous_entry_hash": {
+      "type": "string",
+      "pattern": "^sha256:(genesis|[0-9a-f]{64})$"
+    },
+    "entry_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

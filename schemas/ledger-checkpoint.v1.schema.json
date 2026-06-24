@@ -30,6 +30,11 @@
       "title": "Ledger Tail Hash",
       "type": "string"
     },
+    "merkle_root": {
+      "default": "sha256:genesis",
+      "title": "Merkle Root",
+      "type": "string"
+    },
     "subject_receipt_hashes": {
       "items": {
         "type": "string"

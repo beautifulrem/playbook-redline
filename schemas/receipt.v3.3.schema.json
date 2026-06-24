@@ -536,6 +536,18 @@
     "ReceiptDecision": {
       "additionalProperties": false,
       "properties": {
+        "adjusted_size_cap": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjusted Size Cap"
+        },
         "llm_used_for_verdict": {
           "default": false,
           "title": "Llm Used For Verdict",
@@ -567,6 +579,17 @@
           "default": "deterministic_probe",
           "title": "Verdict Source",
           "type": "string"
+        },
+        "verdict_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerdictTier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -618,12 +641,7 @@
           "type": "string"
         },
         "status": {
-          "enum": [
-            "pass",
-            "withheld"
-          ],
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/Status"
         }
       },
       "required": [
@@ -727,6 +745,17 @@
       "title": "SpecInfo",
       "type": "object"
     },
+    "Status": {
+      "enum": [
+        "pass",
+        "withheld",
+        "reduce_size",
+        "reject",
+        "unverified_no_verdict"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
     "SuiteInfo": {
       "additionalProperties": false,
       "properties": {
@@ -758,6 +787,16 @@
       ],
       "title": "SuiteInfo",
       "type": "object"
+    },
+    "VerdictTier": {
+      "enum": [
+        "ALLOW",
+        "REDUCE_SIZE",
+        "HUMAN_REVIEW",
+        "BLOCK"
+      ],
+      "title": "VerdictTier",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -822,8 +861,11 @@
       "$ref": "#/$defs/SuiteInfo"
     },
     "version": {
-      "const": "redline.receipt.v3.2",
-      "default": "redline.receipt.v3.2",
+      "default": "redline.receipt.v3.3",
+      "enum": [
+        "redline.receipt.v3.2",
+        "redline.receipt.v3.3"
+      ],
       "title": "Version",
       "type": "string"
     }
