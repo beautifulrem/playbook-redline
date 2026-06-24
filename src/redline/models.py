@@ -21,14 +21,31 @@ class RedlineModel(BaseModel):
 class Status(StrEnum):
     PASS = "pass"
     WITHHELD = "withheld"
+    REDUCE_SIZE = "reduce_size"
     REJECT = "reject"
     UNVERIFIED_NO_VERDICT = "unverified_no_verdict"
+
+
+class VerdictTier(StrEnum):
+    ALLOW = "ALLOW"
+    REDUCE_SIZE = "REDUCE_SIZE"
+    HUMAN_REVIEW = "HUMAN_REVIEW"
+    BLOCK = "BLOCK"
 
 
 class ReasonCode(StrEnum):
     PASS = "PASS"
     NEW_BLOCK_BREACH = "NEW_BLOCK_BREACH"
     RECEIPT_MISMATCH = "RECEIPT_MISMATCH"
+    PROOF_HASH_MISMATCH = "PROOF_HASH_MISMATCH"
+    LEDGER_CHAIN_BROKEN = "LEDGER_CHAIN_BROKEN"
+    CHECKPOINT_MISMATCH = "CHECKPOINT_MISMATCH"
+    EXECUTION_LEDGER_BROKEN = "EXECUTION_LEDGER_BROKEN"
+    MERKLE_INCLUSION_FAILED = "MERKLE_INCLUSION_FAILED"
+    APPROVAL_LINK_MISMATCH = "APPROVAL_LINK_MISMATCH"
+    APPROVAL_CONSUMED = "APPROVAL_CONSUMED"
+    APPROVAL_EXPIRED = "APPROVAL_EXPIRED"
+    CHAIN_LINK_MISMATCH = "CHAIN_LINK_MISMATCH"
     BASELINE_UNCHAINED = "BASELINE_UNCHAINED"
     BASELINE_GENESIS = "BASELINE_GENESIS"
     COVERAGE_INCOMPLETE = "COVERAGE_INCOMPLETE"
@@ -78,6 +95,9 @@ class ProbeType(StrEnum):
     MAX_DRAWDOWN = "max_drawdown"
     NO_ENTRY_WHEN = "no_entry_when"
     TRADE_BUDGET = "trade_budget"
+    UNAUTHORIZED_ORDER = "unauthorized_order"
+    SKIP_CONFIRM = "skip_confirm"
+    BLIND_RETRY = "blind_retry"
 
 
 PLAYBOOK_ADAPTER_ID = "python_strategy_sandbox"
@@ -86,6 +106,8 @@ P0_ALLOWED_SCENARIO_IDS = ("btc-crash-2024-03-05", "btc-chop-2024-08")
 
 _DECIMAL_GT_ZERO_LE_ONE_PATTERN = r"^(?:(?:0?\.[0-9]*[1-9][0-9]*)|(?:1(?:\.0*)?))$"
 _DECIMAL_ZERO_TO_ONE_PATTERN = r"^(?:(?:0(?:\.[0-9]*)?)|(?:0?\.[0-9]+)|(?:1(?:\.0*)?))$"
+_DECIMAL_ZERO_TO_1000_PATTERN = r"^(?:(?:0(?:\.[0-9]*)?)|(?:[1-9][0-9]{0,2}(?:\.[0-9]*)?)|(?:1000(?:\.0*)?))$"
+_BPS_ZERO_TO_10000_PATTERN = r"^(?:(?:0(?:\.[0-9]*)?)|(?:[1-9][0-9]{0,3}(?:\.[0-9]*)?)|(?:10000(?:\.0*)?))$"
 _INT_ZERO_TO_1000_PATTERN = r"^0*(?:[0-9]{1,3}|1000)$"
 _INT_ZERO_TO_100000_PATTERN = r"^0*(?:[0-9]{1,5}|100000)$"
 
@@ -140,6 +162,72 @@ _PROBE_PARAMS_SCHEMA: dict[ProbeType, dict[str, Any]] = {
                 "pattern": _INT_ZERO_TO_1000_PATTERN,
                 "description": "Integer decimal string in [0, 1000].",
             }
+        },
+    },
+    ProbeType.UNAUTHORIZED_ORDER: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["scenario_id", "max_abs_position"],
+        "properties": {
+            "scenario_id": {
+                "type": "string",
+                "enum": list(P0_ALLOWED_SCENARIO_IDS),
+                "description": "Scenario id supported by the current P0 adapter contract.",
+            },
+            "max_abs_position": {
+                "type": "string",
+                "pattern": _DECIMAL_ZERO_TO_1000_PATTERN,
+                "description": "Finite decimal string in [0, 1000].",
+            },
+            "allowed_side": {
+                "type": "string",
+                "enum": ["both", "long_only", "short_only", "flat_only"],
+                "description": "Allowed position side for the scenario.",
+            },
+        },
+    },
+    ProbeType.SKIP_CONFIRM: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["scenario_id", "confirm_bar", "max_abs_position"],
+        "properties": {
+            "scenario_id": {
+                "type": "string",
+                "enum": list(P0_ALLOWED_SCENARIO_IDS),
+                "description": "Scenario id supported by the current P0 adapter contract.",
+            },
+            "confirm_bar": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_100000_PATTERN,
+                "description": "Integer decimal string in [0, 100000].",
+            },
+            "max_abs_position": {
+                "type": "string",
+                "pattern": _DECIMAL_ZERO_TO_1000_PATTERN,
+                "description": "Finite decimal string in [0, 1000].",
+            },
+        },
+    },
+    ProbeType.BLIND_RETRY: {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": ["scenario_id", "retry_after_bar", "max_retries"],
+        "properties": {
+            "scenario_id": {
+                "type": "string",
+                "enum": list(P0_ALLOWED_SCENARIO_IDS),
+                "description": "Scenario id supported by the current P0 adapter contract.",
+            },
+            "retry_after_bar": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_100000_PATTERN,
+                "description": "Integer decimal string in [0, 100000].",
+            },
+            "max_retries": {
+                "type": "string",
+                "pattern": _INT_ZERO_TO_1000_PATTERN,
+                "description": "Integer decimal string in [0, 1000].",
+            },
         },
     },
 }
@@ -221,11 +309,35 @@ class ProbeSpec(RedlineModel):
             max_abs_position = _decimal_param(self.params, "max_abs_position")
             if max_abs_position is None or max_abs_position < 0 or max_abs_position > Decimal("1"):
                 raise ValueError("no_entry_when max_abs_position must be finite and in [0, 1]")
+        elif self.type == ProbeType.UNAUTHORIZED_ORDER:
+            _validate_scenario_param(self.params, "unauthorized_order")
+            max_abs_position = _decimal_param(self.params, "max_abs_position")
+            if max_abs_position is None or max_abs_position < 0 or max_abs_position > Decimal("1000"):
+                raise ValueError("unauthorized_order max_abs_position must be finite and in [0, 1000]")
+            allowed_side = self.params.get("allowed_side", "both")
+            if allowed_side not in {"both", "long_only", "short_only", "flat_only"}:
+                raise ValueError("unauthorized_order allowed_side must be one of both,long_only,short_only,flat_only")
+        elif self.type == ProbeType.SKIP_CONFIRM:
+            _validate_scenario_param(self.params, "skip_confirm")
+            confirm_bar = _integer_param(self.params, "confirm_bar")
+            if confirm_bar is None or confirm_bar < 0 or confirm_bar != confirm_bar.to_integral_value() or confirm_bar > Decimal("100000"):
+                raise ValueError("skip_confirm confirm_bar must be a finite integer in [0, 100000]")
+            max_abs_position = _decimal_param(self.params, "max_abs_position")
+            if max_abs_position is None or max_abs_position < 0 or max_abs_position > Decimal("1000"):
+                raise ValueError("skip_confirm max_abs_position must be finite and in [0, 1000]")
+        elif self.type == ProbeType.BLIND_RETRY:
+            _validate_scenario_param(self.params, "blind_retry")
+            retry_after_bar = _integer_param(self.params, "retry_after_bar")
+            if retry_after_bar is None or retry_after_bar < 0 or retry_after_bar != retry_after_bar.to_integral_value() or retry_after_bar > Decimal("100000"):
+                raise ValueError("blind_retry retry_after_bar must be a finite integer in [0, 100000]")
+            max_retries = _integer_param(self.params, "max_retries")
+            if max_retries is None or max_retries < 0 or max_retries != max_retries.to_integral_value() or max_retries > Decimal("1000"):
+                raise ValueError("blind_retry max_retries must be a finite integer in [0, 1000]")
         return self
 
 
 class RedlineSpec(RedlineModel):
-    version: Literal["redline.spec.v2.1"] = "redline.spec.v2.1"
+    version: Literal["redline.spec.v2.1", "redline.spec.v2.2"] = "redline.spec.v2.2"
     spec_id: str
     probes: list[ProbeSpec] = Field(
         min_length=1,
@@ -250,12 +362,19 @@ class RedlineSpec(RedlineModel):
     model: str | None = None
     tool_schema_hash: str | None = None
     degraded_reason: str | None = None
+    fill_model: Literal["next_bar_open"] = "next_bar_open"
+    fee_bps: str = Field(default="0", pattern=_BPS_ZERO_TO_10000_PATTERN, description="Non-negative basis points in [0, 10000].")
+    slippage_bps: str = Field(default="0", pattern=_BPS_ZERO_TO_10000_PATTERN, description="Non-negative basis points in [0, 10000].")
 
     @model_validator(mode="after")
     def require_block_probe(self) -> RedlineSpec:
         _ensure_unique_ids("probe", [probe.id for probe in self.probes])
         if not any(probe.block for probe in self.probes):
             raise ValueError("redline spec must define at least one block probe")
+        for key in ("fee_bps", "slippage_bps"):
+            value = _decimal_param({"value": getattr(self, key)}, "value")
+            if value is None or value < 0 or value > Decimal("10000"):
+                raise ValueError(f"{key} must be finite and in [0, 10000]")
         return self
 
 
@@ -264,6 +383,7 @@ class Scenario(RedlineModel):
     path: str
     timeframe: str = "1h"
     data_hash: str | None = None
+    source_file_hash: str | None = None
     bar_count: int | None = None
     period_start: str | None = None
     period_end: str | None = None
@@ -367,11 +487,27 @@ def _decimal_param(params: dict[str, str], key: str) -> Decimal | None:
     return value if value.is_finite() else None
 
 
+def _decimal_text(raw: str) -> Decimal | None:
+    if re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw) is None:
+        return None
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() else None
+
+
 def _integer_param(params: dict[str, str], key: str) -> Decimal | None:
     raw = params.get(key)
     if raw is None or re.fullmatch(r"[0-9]+", raw) is None:
         return None
     return Decimal(raw)
+
+
+def _validate_scenario_param(params: dict[str, str], probe_name: str) -> None:
+    scenario_id = params.get("scenario_id")
+    if not isinstance(scenario_id, str) or scenario_id not in P0_ALLOWED_SCENARIO_IDS:
+        raise ValueError(f"{probe_name} requires a supported scenario_id")
 
 
 class Proof(RedlineModel):
@@ -383,6 +519,9 @@ class Proof(RedlineModel):
     artifact_hash: str
     assertions: list[Assertion] = Field(default_factory=list)
     reproduce: str | None = None
+    fill_model: Literal["next_bar_open"] | None = None
+    lookahead_guard: Literal["structural_next_bar"] | None = None
+    fees_modeled: bool | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -396,12 +535,24 @@ class DecisionContext(RedlineModel):
 class DecisionEnvelope(RedlineModel):
     envelope_version: Literal["redline.decision.v1"] = "redline.decision.v1"
     status: Status
+    verdict_tier: VerdictTier | None = None
+    adjusted_size_cap: str | None = None
     reason_code: ReasonCode
     chain_status: ChainStatus
     required_proof_ids: list[str]
     satisfied_proof_ids: list[str]
     coverage: CoverageManifest
     capabilities: Capabilities
+
+    @model_validator(mode="after")
+    def require_reduce_size_cap(self) -> DecisionEnvelope:
+        if self.verdict_tier is VerdictTier.REDUCE_SIZE:
+            cap = _decimal_text(self.adjusted_size_cap or "")
+            if cap is None or cap <= 0 or cap > 1:
+                raise ValueError("REDUCE_SIZE verdict requires adjusted_size_cap in (0, 1]")
+        elif self.adjusted_size_cap is not None:
+            raise ValueError("adjusted_size_cap is only valid for REDUCE_SIZE verdicts")
+        return self
 
 
 class PackageInfo(RedlineModel):
@@ -470,6 +621,7 @@ class LedgerCheckpoint(RedlineModel):
     ledger_tail_hash: str
     ledger_entry_count: int
     subject_receipt_hashes: list[str]
+    merkle_root: str = "sha256:genesis"
     anchor_kind: Literal["local-artifact", "external-trust-root"] = "local-artifact"
     checkpoint_hash: str
 
@@ -529,6 +681,93 @@ class PackageAnnotation(RedlineModel):
     annotation_hash: str
 
 
+class ExecutionIntent(RedlineModel):
+    version: Literal["redline.execution.intent.v1"] = "redline.execution.intent.v1"
+    symbol: str = "BTCUSDT"
+    product_type: str = "USDT-FUTURES"
+    margin_mode: Literal["isolated", "crossed"] = "isolated"
+    margin_coin: str = "USDT"
+    size: str = "0.0001"
+    side: Literal["buy", "sell"] = "buy"
+    trade_side: Literal["open", "close"] | None = "open"
+    order_type: Literal["market", "limit"] = "market"
+    force: Literal["ioc", "fok", "gtc", "post_only"] | None = None
+    price: str | None = None
+    confirm_mainnet_order: bool = False
+
+    @model_validator(mode="after")
+    def require_valid_order_fields(self) -> ExecutionIntent:
+        if re.fullmatch(r"[A-Z0-9]+", self.symbol) is None:
+            raise ValueError("execution symbol must be uppercase alphanumeric")
+        if re.fullmatch(r"[A-Z0-9-]+", self.product_type) is None:
+            raise ValueError("execution product_type must be uppercase alphanumeric or hyphenated")
+        if re.fullmatch(r"[A-Z0-9]+", self.margin_coin) is None:
+            raise ValueError("execution margin_coin must be uppercase alphanumeric")
+        size = _decimal_text(self.size)
+        if size is None or size <= 0:
+            raise ValueError("execution size must be a positive decimal")
+        if self.order_type == "limit" and not self.price:
+            raise ValueError("limit execution requires price")
+        if self.price is not None:
+            price = _decimal_text(self.price)
+            if price is None or price <= 0:
+                raise ValueError("execution price must be a positive decimal")
+        return self
+
+
+class ExecutionLedgerEntry(RedlineModel):
+    version: Literal["redline.execution.ledger_entry.v1"] = "redline.execution.ledger_entry.v1"
+    run_id: str
+    receipt_hash: str
+    issuance_ledger_entry_hash: str = "sha256:genesis"
+    issuance_checkpoint_hash: str = "sha256:genesis"
+    approval_hash: str = "sha256:unapproved"
+    verdict: Status
+    client_oid: str
+    bitget_order_id: str
+    response_hash: str
+    placed_at: str
+    previous_entry_hash: str
+    entry_hash: str
+
+
+class ExecutionEvidence(RedlineModel):
+    version: Literal["redline.execution.evidence.v1"] = "redline.execution.evidence.v1"
+    run_id: str
+    receipt_hash: str
+    issuance_ledger_entry_hash: str = "sha256:genesis"
+    issuance_checkpoint_hash: str = "sha256:genesis"
+    approval_hash: str = "sha256:unapproved"
+    verdict: Status
+    client_oid: str
+    bitget_order_id: str
+    response_hash: str
+    placed_at: str
+    symbol: str
+    product_type: str
+    order_mode: Literal["demo", "mainnet"]
+    paptrading: str | None = "1"
+    execution_ledger_entry_hash: str
+    artifact_hash: str
+
+
+class ReleaseBundleAttestation(RedlineModel):
+    schema_version: Literal["redline.attestation.v1"] = "redline.attestation.v1"
+    release_id: str
+    bundle_hash: str
+    manifest_hash: str
+    evidence_merkle_root: str = "sha256:genesis"
+    attestation_provider: Literal["local_signed", "evm_tx", "hedera_hcs"] = "local_signed"
+    attested_at: str
+    attester_principal: str
+    key_id: str = "local"
+    issuer: str = "redline"
+    public_key: str
+    external_reference: dict[str, str] = Field(default_factory=dict)
+    signature: str
+    attestation_hash: str
+
+
 class BaselineInfo(RedlineModel):
     package_hash: str
     baseline_receipt_hash: str | None = None
@@ -567,13 +806,15 @@ class RunnerInfo(RedlineModel):
 
 
 class ResultInfo(RedlineModel):
-    status: Literal["pass", "withheld"]
+    status: Status
     new_breaches: list[Assertion]
     result_hash: str
 
 
 class ReceiptDecision(RedlineModel):
     reason_code: ReasonCode
+    verdict_tier: VerdictTier | None = None
+    adjusted_size_cap: str | None = None
     required_proof_ids_source: str = "REQUIRED_PROOFS[status]"
     required_proof_ids: list[str]
     satisfied_proof_ids: list[str]
@@ -598,7 +839,8 @@ class PublishInfo(RedlineModel):
 
 
 class Receipt(RedlineModel):
-    version: Literal["redline.receipt.v3.2"] = "redline.receipt.v3.2"
+    version: Literal["redline.receipt.v3.2", "redline.receipt.v3.3"] = "redline.receipt.v3.3"
+    prev_receipt_hash: str = "sha256:genesis"
     package: PackageInfo
     edit_provenance: EditProvenance
     baseline: BaselineInfo

@@ -23,7 +23,7 @@ import redline.cli as cli_module
 import redline.sponsor.bitget as bitget_module
 import redline.runner as runner_module
 
-from redline.canonical import CanonicalizationError, canonical_number, hash_obj, hash_tree, sha256_bytes
+from redline.canonical import CanonicalizationError, canonical_number, hash_file, hash_obj, hash_tree, sha256_bytes
 from redline.cli import app
 from redline.engine_adapter import DeterministicReplayEngine
 from redline.engine_adapter.deterministic import build_worker_command
@@ -39,13 +39,17 @@ from redline.models import (
     Proof,
     ProbeOutcome,
     ProbeResult,
+    ProbeSpec,
     ProbeType,
     ProofKind,
     ReasonCode,
     ReportJson,
     Receipt,
+    ReplayPoint,
     ReplayTrace,
+    Scenario,
     Status,
+    VerdictTier,
     VerificationLevel,
     VerificationStatus,
 )
@@ -59,6 +63,8 @@ from redline.schemas import export_schemas
 from redline.spec_compiler import OutOfScopeError
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.mcp_server import build_server, redline_check_receipt, redline_compile_spec, redline_export_if_clean, redline_import_playbook, redline_run_suite, redline_verify_receipt
+from redline.merkle import merkle_proof, merkle_root, verify_inclusion
+from redline.render import HONEST_STATEMENT, load_evidence_panel, render_evidence_comparison_html
 from redline.surfaces import (
     capture_edit_provenance,
     compile_spec,
@@ -102,6 +108,33 @@ def _receipt_key_hash(receipt: Receipt) -> str:
             "spec_hash": receipt.spec.spec_hash,
         }
     )
+
+
+def _make_probe_trace(positions: list[str], *, scenario_id: str = "btc-crash-2024-03-05") -> ReplayTrace:
+    decimal_positions = [Decimal(position) for position in positions]
+    points = [
+        ReplayPoint(
+            bar=index,
+            timestamp=f"2026-01-01T{index:02d}:00:00Z",
+            close=Decimal("100"),
+            nav=Decimal("10000"),
+            peak=Decimal("10000"),
+            drawdown=Decimal("0"),
+            position=position,
+        )
+        for index, position in enumerate(decimal_positions)
+    ]
+    trade_count = sum(Decimal("1") for index in range(1, len(decimal_positions)) if decimal_positions[index] != decimal_positions[index - 1])
+    trace_without_hash = {
+        "scenario_id": scenario_id,
+        "role": "candidate",
+        "engine": "deterministic",
+        "bars": len(points),
+        "trade_count": int(trade_count),
+        "points": points,
+        "input_hash": hash_obj({"scenario_id": scenario_id, "positions": positions}),
+    }
+    return ReplayTrace(**trace_without_hash, artifact_hash=hash_obj(trace_without_hash))
 
 
 def _rewrite_ledger_for_receipt(run_dir: Path, receipt: Receipt) -> None:
@@ -186,6 +219,113 @@ def _make_chained_pass_fixture(tmp_path: Path, *, policy_id: str = "test-policy"
     assert chained.envelope.reason_code == ReasonCode.PASS
     _sign_run_checkpoint(tmp_path / "run", private_key, policy_id=policy_id, key_id=key_id, issuer=issuer)
     return package, chained
+
+
+def test_receipt_prev_hash_chain_continuous(tmp_path: Path) -> None:
+    _package, chained = _make_chained_pass_fixture(tmp_path)
+    assert chained.receipt is not None
+    baseline_receipt = load_receipt(tmp_path / "baseline" / "receipt.json")
+    chained_receipt = load_receipt(tmp_path / "run" / "receipt.json")
+
+    assert baseline_receipt.prev_receipt_hash == "sha256:genesis"
+    assert chained_receipt.baseline.baseline_receipt_hash == baseline_receipt.receipt_hash
+    assert chained_receipt.prev_receipt_hash == baseline_receipt.receipt_hash
+
+    tampered = chained_receipt.model_copy(update={"prev_receipt_hash": "sha256:" + "f" * 64})
+    assert compute_receipt_hash(tampered) != chained_receipt.receipt_hash
+
+
+def test_prev_hash_missing_old_receipt_defaults_to_genesis(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+
+    legacy_payload = json.loads((tmp_path / "run" / "receipt.json").read_text(encoding="utf-8"))
+    legacy_payload.pop("prev_receipt_hash", None)
+    legacy_payload["receipt_hash"] = ""
+    legacy_hash = compute_receipt_hash(Receipt.model_validate(legacy_payload))
+    legacy_payload["receipt_hash"] = legacy_hash
+
+    legacy_receipt = Receipt.model_validate(legacy_payload)
+
+    assert legacy_receipt.prev_receipt_hash == "sha256:genesis"
+    assert "prev_receipt_hash" not in legacy_receipt.model_fields_set
+    assert compute_receipt_hash(legacy_receipt) == legacy_hash
+
+
+def test_merkle_root_and_inclusion_proofs_are_deterministic() -> None:
+    leaves = [
+        "sha256:" + "1" * 64,
+        {"receipt_hash": "sha256:" + "2" * 64, "kind": "approval"},
+        ["execution", "sha256:" + "3" * 64],
+    ]
+
+    root = merkle_root(leaves)
+
+    assert root.startswith("sha256:")
+    assert root == merkle_root(tuple(leaves))
+    assert root != merkle_root(list(reversed(leaves)))
+    assert merkle_root([]) == "sha256:genesis"
+    for index, leaf in enumerate(leaves):
+        proof = merkle_proof(leaves, index)
+        assert verify_inclusion(leaf, index, proof, root, leaf_count=len(leaves))
+
+
+def test_merkle_inclusion_rejects_tampered_leaf_path_or_root() -> None:
+    leaves = ["sha256:" + "a" * 64, "sha256:" + "b" * 64, "sha256:" + "c" * 64]
+    root = merkle_root(leaves)
+    proof = merkle_proof(leaves, 2)
+
+    assert verify_inclusion(leaves[2], 2, proof, root, leaf_count=len(leaves))
+    assert not verify_inclusion("sha256:" + "d" * 64, 2, proof, root, leaf_count=len(leaves))
+    assert not verify_inclusion(leaves[2], 1, proof, root, leaf_count=len(leaves))
+    assert not verify_inclusion(leaves[2], 2, [{"side": "left", "hash": "sha256:" + "0" * 64}, *proof[1:]], root, leaf_count=len(leaves))
+    assert not verify_inclusion(leaves[2], 2, proof, "sha256:" + "f" * 64, leaf_count=len(leaves))
+    assert not verify_inclusion(leaves[2], 2, proof, root, leaf_count=2)
+    with pytest.raises(IndexError):
+        merkle_proof(leaves, 3)
+
+
+def test_merkle_checkpoint_root_covers_subject_receipt_hashes(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    receipt = load_receipt(tmp_path / "run" / "receipt.json")
+    extra_receipt_hash = "sha256:" + "9" * 64
+
+    checkpoint = create_ledger_checkpoint(
+        ledger_path=tmp_path / "run" / "issuance-ledger.jsonl",
+        subject_receipt_hashes=[receipt.receipt_hash, extra_receipt_hash],
+        ledger_path_label="issuance-ledger.jsonl",
+    )
+
+    expected_subjects = sorted({receipt.receipt_hash, extra_receipt_hash})
+    assert checkpoint.subject_receipt_hashes == expected_subjects
+    assert checkpoint.merkle_root == merkle_root(expected_subjects)
+    tampered = checkpoint.model_copy(update={"merkle_root": merkle_root([receipt.receipt_hash])})
+    assert hash_obj(tampered.model_copy(update={"checkpoint_hash": ""})) != checkpoint.checkpoint_hash
+
+
+def test_merkle_checkpoint_verifier_rejects_recomputed_wrong_root(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path / "run")
+    assert artifacts.receipt is not None
+    checkpoint_path = tmp_path / "run" / "issuance-ledger.checkpoint.json"
+    checkpoint_data = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint_data["merkle_root"] = merkle_root(["sha256:" + "0" * 64])
+    forged = LedgerCheckpoint.model_validate(checkpoint_data)
+    checkpoint_data["checkpoint_hash"] = hash_obj(forged.model_copy(update={"checkpoint_hash": ""}))
+    checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    result = verify(
+        receipt_path=tmp_path / "run" / "receipt.json",
+        package=package,
+        suite_path=SUITE,
+        spec_path=SPEC,
+        level=VerificationLevel.REPLAYED,
+    )
+
+    assert result.status == VerificationStatus.REJECTED
+    assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
 def test_required_proofs_covers_all_statuses() -> None:
@@ -318,6 +458,115 @@ def test_suite_lock_hash_covers_scenario_csv_content(tmp_path: Path) -> None:
         assert "suite_lock_hash mismatch" in str(exc)
     else:
         raise AssertionError("suite lock must cover scenario data bytes")
+
+
+def test_tape_source_hash_tamper_rejects(tmp_path: Path) -> None:
+    shutil.copytree(SUITE.parent, tmp_path / "suites")
+    suite_path = tmp_path / "suites" / "demo_suite.json"
+    suite_data = json.loads(suite_path.read_text(encoding="utf-8"))
+    suite_data["suite_lock_hash"] = None
+    suite_path.write_text(json.dumps(suite_data), encoding="utf-8")
+    suite = load_suite(suite_path)
+
+    for scenario in suite.scenarios:
+        assert scenario.source_file_hash == hash_file(Path(scenario.path))
+        assert scenario.source_file_hash == scenario.data_hash
+
+    locked = json.loads(suite_path.read_text(encoding="utf-8"))
+    locked["suite_lock_hash"] = None
+    for scenario in locked["scenarios"]:
+        loaded = next(item for item in suite.scenarios if item.id == scenario["id"])
+        scenario["source_file_hash"] = loaded.source_file_hash
+    suite_path.write_text(json.dumps(locked), encoding="utf-8")
+    csv_path = tmp_path / "suites" / "btc_chop.csv"
+    csv_path.write_text(csv_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="source_file_hash mismatch"):
+        load_suite(suite_path)
+
+
+def test_probe_unauthorized_order_passes_and_breaches() -> None:
+    ProbeSpec(
+        id="unauthorized_order",
+        type=ProbeType.UNAUTHORIZED_ORDER,
+        params={"scenario_id": "btc-crash-2024-03-05", "max_abs_position": "1", "allowed_side": "long_only"},
+    )
+    probe = PROBE_REGISTRY[ProbeType.UNAUTHORIZED_ORDER]
+    baseline = _make_probe_trace(["0", "0", "0"])
+
+    passing = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["0", "0.5", "1"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "max_abs_position": "1", "allowed_side": "long_only"},
+    )
+    size_breach = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["0", "1.5", "1"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "max_abs_position": "1", "allowed_side": "long_only"},
+    )
+    side_breach = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["0", "-0.1", "0"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "max_abs_position": "1", "allowed_side": "long_only"},
+    )
+
+    assert passing.outcome == ProbeOutcome.PASS
+    assert size_breach.outcome == ProbeOutcome.BREACH
+    assert size_breach.assertions[0].metric == "unauthorized_order_size"
+    assert side_breach.outcome == ProbeOutcome.BREACH
+    assert side_breach.assertions[0].metric == "unauthorized_order_side"
+
+
+def test_probe_skip_confirm_passes_and_breaches() -> None:
+    ProbeSpec(
+        id="skip_confirm",
+        type=ProbeType.SKIP_CONFIRM,
+        params={"scenario_id": "btc-crash-2024-03-05", "confirm_bar": "2", "max_abs_position": "0"},
+    )
+    probe = PROBE_REGISTRY[ProbeType.SKIP_CONFIRM]
+    baseline = _make_probe_trace(["0", "0", "0", "0"])
+
+    passing = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["1", "1", "0", "0"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "confirm_bar": "2", "max_abs_position": "0"},
+    )
+    breach = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["1", "1", "0.5", "0"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "confirm_bar": "2", "max_abs_position": "0"},
+    )
+
+    assert passing.outcome == ProbeOutcome.PASS
+    assert breach.outcome == ProbeOutcome.BREACH
+    assert breach.evidence_bar == 2
+    assert breach.assertions[0].metric == "skip_confirm"
+
+
+def test_probe_blind_retry_passes_and_breaches() -> None:
+    ProbeSpec(
+        id="blind_retry",
+        type=ProbeType.BLIND_RETRY,
+        params={"scenario_id": "btc-crash-2024-03-05", "retry_after_bar": "1", "max_retries": "1"},
+    )
+    probe = PROBE_REGISTRY[ProbeType.BLIND_RETRY]
+    baseline = _make_probe_trace(["0", "0", "0", "0"])
+
+    passing = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["0", "1", "1", "1"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "retry_after_bar": "1", "max_retries": "1"},
+    )
+    breach = probe.evaluate(
+        baseline=baseline,
+        candidate=_make_probe_trace(["0", "1", "0", "1"]),
+        params={"scenario_id": "btc-crash-2024-03-05", "retry_after_bar": "1", "max_retries": "1"},
+    )
+
+    assert passing.outcome == ProbeOutcome.PASS
+    assert breach.outcome == ProbeOutcome.BREACH
+    assert breach.evidence_bar == 2
+    assert breach.assertions[0].metric == "blind_retry"
 
 
 def test_package_canonicalization_rejects_symlink_escape(tmp_path: Path) -> None:
@@ -927,6 +1176,96 @@ def test_complete_coverage_requires_probe_proof_for_each_cell() -> None:
     assert envelope.coverage.missing == ["s2:p1:missing_probe_proof"]
 
 
+def test_reduce_size_tier_caps_position() -> None:
+    def proof(kind: ProofKind, *, assertions: list[Assertion] | None = None, meta: dict[str, object] | None = None) -> Proof:
+        artifact_hash = hash_obj({"kind": kind.value, "assertions": [item.model_dump(mode="json") for item in assertions or []], "meta": meta or {}})
+        return Proof(
+            proof_id=f"proof:{kind.value}:{artifact_hash.removeprefix('sha256:')[:24]}",
+            phase="test",
+            kind=kind,
+            verdict_bearing=True,
+            inputs_hash=artifact_hash,
+            artifact_hash=artifact_hash,
+            assertions=assertions or [],
+            meta=meta or {},
+        )
+
+    breach = Assertion(metric="max_drawdown", op="<=", threshold="0.08", observed="0.16", scenario_id="s1", bar=7, holds=False)
+    proofs = [
+        proof(
+            kind,
+            assertions=[breach] if kind is ProofKind.PROBE else [],
+            meta={"scenario_id": "s1", "probe_id": "p1", "breach_action": "reduce_size", "adjusted_size_cap": "0.5"} if kind is ProofKind.PROBE else {},
+        )
+        for kind in REQUIRED_PROOFS[Status.REDUCE_SIZE]
+        if kind is not ProofKind.DECISION
+    ]
+    coverage = CoverageManifest(cells=[("s1", "p1")], complete=True, missing=[])
+
+    envelope = decide(proofs=proofs, coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x", chain_status=ChainStatus.CHAINED))
+
+    assert envelope.status == Status.REDUCE_SIZE
+    assert envelope.verdict_tier == VerdictTier.REDUCE_SIZE
+    assert envelope.adjusted_size_cap == "0.5"
+    assert envelope.reason_code == ReasonCode.NEW_BLOCK_BREACH
+    assert any(proof_id.startswith("proof:decision:") for proof_id in envelope.required_proof_ids)
+
+    receipt = receipt_module.issue_receipt(
+        envelope=envelope,
+        proofs=proofs,
+        coverage=coverage,
+        package_hash="sha256:package",
+        baseline_name="baseline",
+        baseline_hash="sha256:baseline",
+        candidate_name="candidate",
+        candidate_hash="sha256:candidate",
+        spec_hash="sha256:spec",
+        spec_source_path="fixtures/specs/redline_spec.json",
+        suite_id="suite",
+        scenario_ids=["s1"],
+        suite_lock_hash="sha256:suite",
+        suite_source_path="fixtures/suites/demo_suite.json",
+        engine_source_tree_hash="sha256:engine",
+        runner_lock_hash="sha256:runner",
+        package_adapter_id="python_strategy_sandbox",
+        package_identity_lock_hash="sha256:identity-lock",
+        package_identity_lock_path="playbook_identity.lock",
+    )
+    assert receipt is not None
+    assert receipt.result.status == Status.REDUCE_SIZE
+    assert receipt.decision.verdict_tier == VerdictTier.REDUCE_SIZE
+    assert receipt.decision.adjusted_size_cap == "0.5"
+
+
+def test_reduce_size_requires_explicit_probe_metadata() -> None:
+    def proof(kind: ProofKind, *, assertions: list[Assertion] | None = None, meta: dict[str, object] | None = None) -> Proof:
+        artifact_hash = hash_obj({"kind": kind.value, "assertions": [item.model_dump(mode="json") for item in assertions or []], "meta": meta or {}})
+        return Proof(
+            proof_id=f"proof:{kind.value}:{artifact_hash.removeprefix('sha256:')[:24]}",
+            phase="test",
+            kind=kind,
+            verdict_bearing=True,
+            inputs_hash=artifact_hash,
+            artifact_hash=artifact_hash,
+            assertions=assertions or [],
+            meta=meta or {},
+        )
+
+    breach = Assertion(metric="max_drawdown", op="<=", threshold="0.08", observed="0.16", scenario_id="s1", bar=7, holds=False)
+    proofs = [
+        proof(kind, assertions=[breach] if kind is ProofKind.PROBE else [], meta={"scenario_id": "s1", "probe_id": "p1"} if kind is ProofKind.PROBE else {})
+        for kind in REQUIRED_PROOFS[Status.WITHHELD]
+        if kind is not ProofKind.DECISION
+    ]
+    coverage = CoverageManifest(cells=[("s1", "p1")], complete=True, missing=[])
+
+    envelope = decide(proofs=proofs, coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x", chain_status=ChainStatus.CHAINED))
+
+    assert envelope.status == Status.WITHHELD
+    assert envelope.verdict_tier == VerdictTier.BLOCK
+    assert envelope.adjusted_size_cap is None
+
+
 def test_empty_complete_coverage_never_passes() -> None:
     coverage = CoverageManifest.model_construct(cells=[], complete=True, missing=[])
     envelope = decide(proofs=[], coverage=coverage, context=DecisionContext(suite_id="suite", spec_hash="sha256:x"))
@@ -1036,8 +1375,9 @@ def test_duplicate_suite_scenario_and_probe_ids_are_schema_invalid(tmp_path: Pat
 
 def test_exported_spec_schema_requires_block_probe(tmp_path: Path) -> None:
     export_schemas(tmp_path)
-    schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads((tmp_path / "spec.v2.2.schema.json").read_text(encoding="utf-8"))
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     for probe in spec_data["probes"]:
         probe["block"] = False
     errors = list(Draft202012Validator(schema).iter_errors(spec_data))
@@ -1046,21 +1386,24 @@ def test_exported_spec_schema_requires_block_probe(tmp_path: Path) -> None:
 
 def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> None:
     export_schemas(tmp_path)
-    schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads((tmp_path / "spec.v2.2.schema.json").read_text(encoding="utf-8"))
     validator = Draft202012Validator(schema)
 
     def assert_rejected(spec_data: dict[str, object]) -> None:
         assert list(validator.iter_errors(spec_data))
 
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     spec_data["probes"][0]["params"]["max_drawdown"] = "999"
     assert_rejected(spec_data)
 
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     spec_data["probes"][2]["params"]["max_trades"] = "999999"
     assert_rejected(spec_data)
 
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     for probe in spec_data["probes"]:
         if probe["type"] == "no_entry_when":
             probe["params"]["before_bar"] = "not-an-int"
@@ -1068,6 +1411,7 @@ def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> 
     assert_rejected(spec_data)
 
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     for probe in spec_data["probes"]:
         if probe["type"] == "no_entry_when":
             probe["params"].pop("before_bar", None)
@@ -1075,6 +1419,7 @@ def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> 
     assert_rejected(spec_data)
 
     spec_data = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec_data["version"] = "redline.spec.v2.2"
     for probe in spec_data["probes"]:
         if probe["type"] == "no_entry_when":
             probe["params"]["scenario_id"] = "not-in-suite"
@@ -1083,12 +1428,64 @@ def test_exported_spec_schema_rejects_probe_parameter_bounds(tmp_path: Path) -> 
 
 def test_exported_schemas_disclose_runtime_unique_id_constraints(tmp_path: Path) -> None:
     export_schemas(tmp_path)
-    spec_schema = json.loads((tmp_path / "spec.v2.1.schema.json").read_text(encoding="utf-8"))
+    spec_schema = json.loads((tmp_path / "spec.v2.2.schema.json").read_text(encoding="utf-8"))
     suite_schema = json.loads((tmp_path / "suite.v2.schema.json").read_text(encoding="utf-8"))
     assert spec_schema["properties"]["probes"]["x-unique-by"] == "id"
     assert spec_schema["properties"]["probes"]["x-runtime-constraints"][0]["name"] == "unique_probe_ids"
     assert suite_schema["properties"]["scenarios"]["x-unique-by"] == "id"
     assert suite_schema["properties"]["scenarios"]["x-runtime-constraints"][0]["name"] == "unique_scenario_ids"
+
+
+def test_spec_v22_compiler_exports_execution_cost_contract(tmp_path: Path) -> None:
+    text_spec = tmp_path / "risk-policy.txt"
+    text_spec.write_text("Max drawdown <= 10%; trade budget <= 4.", encoding="utf-8")
+
+    compiled = compile_spec(text_spec)
+
+    assert compiled.version == "redline.spec.v2.2"
+    assert compiled.fill_model == "next_bar_open"
+    assert compiled.fee_bps == "0"
+    assert compiled.slippage_bps == "0"
+
+    schema_dir = tmp_path / "schemas"
+    export_schemas(schema_dir)
+    schema = json.loads((schema_dir / "spec.v2.2.schema.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+    payload = compiled.model_dump(mode="json")
+    validator.validate(payload)
+    assert schema["properties"]["fill_model"]["const"] == "next_bar_open"
+
+    invalid_fill_model = {**payload, "fill_model": "same_bar_close"}
+    assert list(validator.iter_errors(invalid_fill_model))
+    invalid_fee = {**payload, "fee_bps": "-1"}
+    assert list(validator.iter_errors(invalid_fee))
+    invalid_slippage = {**payload, "slippage_bps": "10000.1"}
+    assert list(validator.iter_errors(invalid_slippage))
+
+
+def test_spec_v22_execution_cost_params_feed_replay(tmp_path: Path) -> None:
+    zero_cost_spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    zero_cost_spec["version"] = "redline.spec.v2.2"
+    zero_cost_spec["fee_bps"] = "0"
+    zero_cost_spec["slippage_bps"] = "0"
+    zero_cost_spec["fill_model"] = "next_bar_open"
+    zero_cost_path = tmp_path / "zero-cost-spec.json"
+    zero_cost_path.write_text(json.dumps(zero_cost_spec, sort_keys=True), encoding="utf-8")
+
+    costed_spec = {**zero_cost_spec, "fee_bps": "10", "slippage_bps": "20"}
+    costed_path = tmp_path / "costed-spec.json"
+    costed_path.write_text(json.dumps(costed_spec, sort_keys=True), encoding="utf-8")
+
+    zero_cost = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=zero_cost_path, out_dir=None)
+    costed = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=costed_path, out_dir=None)
+
+    assert zero_cost.receipt is not None
+    assert costed.receipt is not None
+    loaded_costed_spec = load_spec(costed_path)
+    assert loaded_costed_spec.version == "redline.spec.v2.2"
+    assert costed.receipt.spec.spec_hash == hash_obj(loaded_costed_spec)
+    assert costed.traces[0].points[-1].nav < zero_cost.traces[0].points[-1].nav
+    assert costed.traces[1].points[-1].nav < zero_cost.traces[1].points[-1].nav
 
 
 def test_sandbox_network_violation_rejects(tmp_path: Path) -> None:
@@ -2310,6 +2707,37 @@ def test_verdict_path_import_gate_rejects_forbidden_imports(tmp_path: Path) -> N
     assert "forbidden dynamic import openai" in result.stderr
 
 
+def test_purity_gate_bans_entropy_and_float_set(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    (root / "src/redline/engine_adapter").mkdir(parents=True)
+    (root / "src/redline/probes").mkdir(parents=True)
+    (root / "src/redline/probes/__init__.py").write_text("", encoding="utf-8")
+    (root / "src/redline/engine_adapter/deterministic.py").write_text("import datetime\n", encoding="utf-8")
+    (root / "src/redline/proof_kernel.py").write_text("import random\n", encoding="utf-8")
+    (root / "src/redline/receipt.py").write_text("value = {1, 2}\n", encoding="utf-8")
+    (root / "src/redline/runner.py").write_text("value = set([1, 2])\n", encoding="utf-8")
+    (root / "src/redline/tripwire.py").write_text("value = frozenset([1])\n", encoding="utf-8")
+    (root / "src/redline/verifier.py").write_text("value = float('1.0')\n", encoding="utf-8")
+    (root / "src/redline/probes/behavior.py").write_text("value = {item for item in [1, 2]}\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check-verdict-path-imports.py"), str(root)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden import datetime" in result.stderr
+    assert "forbidden import random" in result.stderr
+    assert "forbidden deterministic builtin call float()" in result.stderr
+    assert "forbidden deterministic builtin call frozenset()" in result.stderr
+    assert "forbidden deterministic builtin call set()" in result.stderr
+    assert "forbidden set literal in verdict path" in result.stderr
+    assert "forbidden set comprehension in verdict path" in result.stderr
+
+
 def test_replay_hash_is_stable() -> None:
     suite = load_suite(SUITE)
     engine = DeterministicReplayEngine()
@@ -2317,6 +2745,93 @@ def test_replay_hash_is_stable() -> None:
     first = engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate")
     hashes = {engine.replay(package=PACKAGE / "candidate_good", scenario=scenario, role="candidate").artifact_hash for _ in range(100)}
     assert hashes == {first.artifact_hash}
+
+
+def test_next_bar_fill_kills_lookahead_strategy(tmp_path: Path) -> None:
+    package = tmp_path / "lookahead_package"
+    package.mkdir()
+    (package / "config.json").write_text("{}\n", encoding="utf-8")
+    (package / "strategy.py").write_text(
+        textwrap.dedent(
+            """
+            def signal(bar, state, config):
+                if bar["i"] == 1:
+                    return 1
+                return 0
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    scenario_path = tmp_path / "lookahead.csv"
+    scenario_path.write_text(
+        textwrap.dedent(
+            """
+            timestamp,open,high,low,close
+            2026-01-01T00:00:00Z,100,100,100,100
+            2026-01-01T01:00:00Z,100,200,100,200
+            2026-01-01T02:00:00Z,200,200,200,200
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    trace = DeterministicReplayEngine().replay(
+        package=package,
+        scenario=Scenario(id="lookahead-only", path=str(scenario_path)),
+        role="candidate",
+    )
+
+    assert trace.points[1].position == Decimal("0")
+    assert trace.points[1].nav == Decimal("10000")
+    assert trace.points[2].position == Decimal("1")
+    assert trace.points[-1].nav == Decimal("10000")
+    assert trace.trade_count == 1
+
+
+def test_fees_slippage_reduce_pnl_deterministically(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "fees_slippage.csv"
+    scenario_path.write_text(
+        textwrap.dedent(
+            """
+            timestamp,open,high,low,close
+            2026-01-01T00:00:00Z,100,100,100,100
+            2026-01-01T01:00:00Z,100,110,100,110
+            2026-01-01T02:00:00Z,110,110,110,110
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    def run_with_config(config: dict[str, str]) -> ReplayTrace:
+        package = tmp_path / ("package_" + str(len(list(tmp_path.iterdir()))))
+        package.mkdir()
+        (package / "config.json").write_text(json.dumps(config, sort_keys=True) + "\n", encoding="utf-8")
+        (package / "strategy.py").write_text(
+            textwrap.dedent(
+                """
+                def signal(bar, state, config):
+                    if bar["i"] == 0:
+                        return 2
+                    return 0
+                """
+            ).lstrip(),
+            encoding="utf-8",
+        )
+        return DeterministicReplayEngine().replay(
+            package=package,
+            scenario=Scenario(id="fees-slippage", path=str(scenario_path)),
+            role="candidate",
+        )
+
+    no_cost = run_with_config({})
+    costed = run_with_config({"fee_bps": "10", "slippage_bps": "20"})
+    repeat = run_with_config({"fee_bps": "10", "slippage_bps": "20"})
+
+    assert no_cost.points[-1].nav == Decimal("12000")
+    assert costed.points[-1].nav == Decimal("11761.2000")
+    assert costed.points[-1].nav < no_cost.points[-1].nav
+    assert costed.artifact_hash == repeat.artifact_hash
+    assert costed.trade_count == 2
 
 
 def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
@@ -2340,7 +2855,7 @@ def test_run_receipt_proofs_and_traces_are_bit_identical_100x() -> None:
         proof_fingerprints.add(tuple(proof.artifact_hash for proof in artifacts.receipt.proofs))
         trace_fingerprints.add(tuple(trace.artifact_hash for trace in artifacts.traces))
 
-    assert receipt_hashes == {"sha256:469ef684b3706357e311b46690497abc4588eb2d4cd05886de598cb60cae7450"}
+    assert receipt_hashes == {"sha256:f87f7109896a9bce9dda5528f6f72d7af85b167180fd6fd07c50bfc38e1fd052"}
     assert len(report_hashes) == 1
     assert len(proof_fingerprints) == 1
     assert len(trace_fingerprints) == 1
@@ -2419,6 +2934,21 @@ def test_verify_proof_rejects_forged_receipt_proof(tmp_path: Path) -> None:
     assert result.reason_code == ReasonCode.RECEIPT_MISMATCH
 
 
+def test_proof_tamper_gets_proof_specific_code(tmp_path: Path) -> None:
+    artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
+    assert artifacts.receipt is not None
+    proof = next(item for item in artifacts.receipt.proofs if item.kind == ProofKind.PACKAGE_CANONICAL)
+    proof_path = tmp_path / "proofs" / f"{proof.proof_id.replace(':', '_')}.json"
+    sidecar = json.loads(proof_path.read_text(encoding="utf-8"))
+    sidecar["artifact_hash"] = "sha256:" + "0" * 64
+    proof_path.write_text(json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    result = verify_proof(receipt_path=tmp_path / "receipt.json", proof_id=proof.proof_id)
+
+    assert result.status == "proof_mismatch"
+    assert result.reason_code == ReasonCode.PROOF_HASH_MISMATCH
+
+
 def test_verify_proof_rejects_duplicate_receipt_proof_ids(tmp_path: Path) -> None:
     artifacts = run_redline(package_dir=PACKAGE, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=tmp_path)
     assert artifacts.receipt is not None
@@ -2468,6 +2998,37 @@ def test_verify_proof_replays_when_package_is_supplied(tmp_path: Path) -> None:
     assert result.status == "proof_verified"
     (package / "candidate_good" / "config.json").write_text('{"entry_bar": 1, "exit_bar": 99, "leverage": "2.0"}\n', encoding="utf-8")
     mismatch = verify_proof(receipt_path=tmp_path / "run" / "receipt.json", proof_id=proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
+    assert mismatch.status == "proof_mismatch"
+    assert mismatch.reason_code == ReasonCode.PROOF_HASH_MISMATCH
+
+
+def test_lookahead_proof_fields_are_replayed_by_verify_proof(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    shutil.copytree(PACKAGE, package)
+    run_dir = tmp_path / "run"
+    artifacts = run_redline(package_dir=package, baseline="baseline", candidate="candidate_good", suite_path=SUITE, spec_path=SPEC, out_dir=run_dir)
+    assert artifacts.receipt is not None
+    proof = next(item for item in artifacts.receipt.proofs if item.kind == ProofKind.REPLAY)
+
+    assert proof.fill_model == "next_bar_open"
+    assert proof.lookahead_guard == "structural_next_bar"
+    assert proof.fees_modeled is True
+    verified = verify_proof(receipt_path=run_dir / "receipt.json", proof_id=proof.proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
+    assert verified.status == "proof_verified"
+
+    receipt_data = json.loads((run_dir / "receipt.json").read_text(encoding="utf-8"))
+    receipt_proof = next(item for item in receipt_data["proofs"] if item["proof_id"] == proof.proof_id)
+    receipt_proof["fees_modeled"] = False
+    receipt_data["receipt_hash"] = ""
+    tampered_receipt = Receipt.model_validate(receipt_data)
+    receipt_data["receipt_hash"] = compute_receipt_hash(tampered_receipt)
+    (run_dir / "receipt.json").write_text(json.dumps(receipt_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    sidecar_path = run_dir / "proofs" / f"{proof.proof_id.replace(':', '_')}.json"
+    sidecar_proof = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sidecar_proof["fees_modeled"] = False
+    sidecar_path.write_text(json.dumps(sidecar_proof, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    mismatch = verify_proof(receipt_path=run_dir / "receipt.json", proof_id=proof.proof_id, package=package, suite_path=SUITE, spec_path=SPEC)
     assert mismatch.status == "proof_mismatch"
     assert mismatch.reason_code == ReasonCode.RECEIPT_MISMATCH
 
@@ -6282,6 +6843,8 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
         "decision-envelope.v1.schema.json",
         "doctor-result.v1.schema.json",
         "edit-provenance.v1.schema.json",
+        "execution-evidence.v1.schema.json",
+        "execution-ledger-entry.v1.schema.json",
         "ledger-attestation.v1.schema.json",
         "ledger-checkpoint.v1.schema.json",
         "package-annotation.v1.schema.json",
@@ -6290,11 +6853,12 @@ def test_public_json_surfaces_have_schemas(tmp_path: Path) -> None:
         "proof.v1.schema.json",
         "proof-verification.v1.schema.json",
         "publish-preflight.v1.schema.json",
-        "receipt.v3.2.schema.json",
+        "receipt.v3.3.schema.json",
+        "release-attestation.v1.schema.json",
         "report.v1.schema.json",
         "sponsor-readback-evidence.v1.schema.json",
         "sponsor-step-result.v1.schema.json",
-        "spec.v2.1.schema.json",
+        "spec.v2.2.schema.json",
         "suite.v2.schema.json",
         "verification-result.v1.schema.json",
     }
@@ -6327,7 +6891,7 @@ def test_public_json_artifacts_validate_against_exported_schemas(tmp_path: Path)
 
     for run_name in ["pass", "withheld"]:
         run_dir = ROOT / "artifacts/demo" / run_name
-        validate("receipt.v3.2.schema.json", json.loads((run_dir / "receipt.json").read_text(encoding="utf-8")))
+        validate("receipt.v3.3.schema.json", json.loads((run_dir / "receipt.json").read_text(encoding="utf-8")))
         validate("decision-envelope.v1.schema.json", json.loads((run_dir / "envelope.json").read_text(encoding="utf-8")))
         validate("ledger-checkpoint.v1.schema.json", json.loads((run_dir / "issuance-ledger.checkpoint.json").read_text(encoding="utf-8")))
         for proof_path in sorted((run_dir / "proofs").glob("*.json")):
@@ -6570,6 +7134,144 @@ def test_ci_checks_sponsor_fixture_and_strict_demo_genesis() -> None:
     assert "remote-smoke-actions:" in makefile
     assert (ROOT / "scripts/render-blueprint-preflight.sh").is_file()
     assert (ROOT / "scripts/remote-smoke-actions.sh").is_file()
+
+
+def test_verify_evidence_workflow_guards_zero_key_release_chain() -> None:
+    workflow = (ROOT / ".github/workflows/verify-evidence.yml").read_text(encoding="utf-8")
+    assert "actions/checkout@v6" in workflow
+    assert "astral-sh/setup-uv@v8.2.0" in workflow
+    assert "uv sync --frozen --extra dev" in workflow
+    assert "uv run python scripts/check-verdict-path-imports.py" in workflow
+    assert 'uv run --extra dev pytest -q -k "verdict_path_import_gate or purity"' in workflow
+    assert "uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json" in workflow
+    assert "scripts/tamper-demo.sh" in workflow
+    assert 'test "$code" -ne 0' in workflow
+    assert "REDLINE_BITGET" not in workflow
+    assert "REDLINE_ATTESTATION_PRIVATE_KEY" not in workflow
+    assert "release-demo.sh" not in workflow
+
+
+def test_zero_key_judge_docs_and_openapi_contract_are_current() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    backend = (ROOT / "BACKEND_COMPLETENESS.md").read_text(encoding="utf-8")
+    service_api = (ROOT / "SERVICE_API.md").read_text(encoding="utf-8")
+    openapi = json.loads((ROOT / "schemas/service-openapi.json").read_text(encoding="utf-8"))
+    paths = openapi["paths"]
+
+    zero_key_commands = [
+        "uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json",
+        "scripts/tamper-demo.sh",
+        "open artifacts/release-demo/current/evidence.html",
+    ]
+
+    for text in [readme, backend]:
+        assert "评委 60 秒零密钥复核" in text
+        assert "demo-only" in text
+        assert "paptrading: 1" in text
+        assert "非 Bitget Playbook 正式发布" in text
+        assert "不需要 Bitget demo credentials" in text
+        for command in zero_key_commands:
+            assert command in text
+
+    assert "Judge 60-second zero-key review" in service_api
+    assert "judge button" in service_api
+    assert "EVIDENCE INVALID" in service_api
+    for command in zero_key_commands:
+        assert command in service_api
+
+    for path in [
+        "/v1/release-candidates/{release_id}/evidence.html",
+        "/v1/release-candidates/{release_id}/demo-showcase-orders",
+        "/v1/release-candidates/{release_id}/jobs/execute-demo",
+        "/v1/release-candidates/{release_id}/jobs/{job_id}/events",
+        "/v1/release-candidates/{release_id}/jobs/{job_id}/events.ndjson",
+        "/v1/judge/console",
+    ]:
+        assert path in paths
+
+
+def test_distinct_codes_cover_evidence_chain_surfaces() -> None:
+    distinct_codes = {
+        "proof": ReasonCode.PROOF_HASH_MISMATCH,
+        "ledger": ReasonCode.LEDGER_CHAIN_BROKEN,
+        "checkpoint": ReasonCode.CHECKPOINT_MISMATCH,
+        "execution": ReasonCode.EXECUTION_LEDGER_BROKEN,
+        "merkle": ReasonCode.MERKLE_INCLUSION_FAILED,
+        "approval": ReasonCode.APPROVAL_LINK_MISMATCH,
+        "approval_consumed": ReasonCode.APPROVAL_CONSUMED,
+        "approval_expired": ReasonCode.APPROVAL_EXPIRED,
+        "chain": ReasonCode.CHAIN_LINK_MISMATCH,
+    }
+
+    assert len(set(distinct_codes.values())) == len(distinct_codes)
+    assert ReasonCode.RECEIPT_MISMATCH not in distinct_codes.values()
+
+
+def test_violation_reason_code_schemas_and_exit_codes_are_in_sync() -> None:
+    reason_values = {item.value for item in ReasonCode}
+    assert set(cli_module.EXIT_BY_REASON) == set(ReasonCode)
+    for schema_name in [
+        "decision-envelope.v1.schema.json",
+        "proof-verification.v1.schema.json",
+        "receipt.v3.3.schema.json",
+        "report.v1.schema.json",
+        "verification-result.v1.schema.json",
+    ]:
+        schema = json.loads((ROOT / "schemas" / schema_name).read_text(encoding="utf-8"))
+        schema_values = set(schema["$defs"]["ReasonCode"]["enum"])
+        assert reason_values <= schema_values
+
+
+def test_violation_catalog_in_sync(tmp_path: Path) -> None:
+    from redline.violations import REASON_META, render_violation_catalog
+
+    assert set(REASON_META) == set(ReasonCode)
+    for code, meta in REASON_META.items():
+        assert meta.severity in {"blocking", "advisory"}
+        assert isinstance(meta.recoverable, bool)
+        assert meta.summary
+        assert code.value in meta.summary or code is ReasonCode.PASS
+
+    generated = render_violation_catalog()
+    checked_in = (ROOT / "docs/VIOLATION_CODES.md").read_text(encoding="utf-8")
+    assert checked_in == generated
+
+    result = subprocess.run(
+        [sys.executable, "scripts/gen-violation-catalog.py", "--check"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_evidence_html_golden_regenerated_from_code() -> None:
+    current = ROOT / "artifacts/release-demo/current"
+    runs_dir = current / "service" / "runs"
+    html_path = current / "evidence.html"
+    assert html_path.exists()
+    assert runs_dir.exists()
+
+    run_dirs = sorted(path for path in runs_dir.iterdir() if path.is_dir() and (path / "receipt.json").exists())
+    good_run_dir = next(path for path in run_dirs if (path / "execution-evidence.json").exists())
+    bad_run_dir = next(path for path in run_dirs if load_receipt(path / "receipt.json").result.status == Status.WITHHELD)
+
+    regenerated_html = render_evidence_comparison_html(
+        load_evidence_panel(good_run_dir, title="PASS -> Bitget demo order"),
+        load_evidence_panel(bad_run_dir, title="WITHHELD -> blocked before Bitget"),
+    )
+
+    assert regenerated_html == html_path.read_text(encoding="utf-8")
+    assert HONEST_STATEMENT in regenerated_html
+    assert "Bitget 未被调用" in regenerated_html
+    assert "passphrase" not in regenerated_html.lower()
+    assert "access key" not in regenerated_html.lower()
+    for run_dir in [good_run_dir, bad_run_dir]:
+        receipt_path = run_dir / "receipt.json"
+        receipt = load_receipt(receipt_path)
+        assert compute_receipt_hash(receipt) == receipt.receipt_hash
+        assert receipt.model_dump_json(indent=2) + "\n" == receipt_path.read_text(encoding="utf-8")
 
 
 def test_locked_golden_case_manifest_matches_spec() -> None:
