@@ -206,6 +206,10 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-input:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 1px; }
 .rl-tamper__val { flex: 1 1 240px; min-width: 0; font-family: var(--rl-mono); font-size: var(--rl-tele); color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-2) var(--rl-3); overflow-wrap: anywhere; }
 
+.rl-ta { display: block; width: 100%; min-height: 180px; resize: vertical; font-family: var(--rl-mono); font-size: 11px; line-height: 1.5; color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-3); white-space: pre; overflow: auto; }
+.rl-ta:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 1px; }
+.rl-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rl-3); margin-top: var(--rl-3); }
+
 
 .rl-stripe { display: flex; align-items: stretch; border: var(--rl-border-strong); border-color: var(--rl-hazard); background: var(--rl-hazard-ink); }
 .rl-stripe::before, .rl-stripe::after { content: ""; flex: 0 0 32px; background: repeating-linear-gradient(45deg, var(--rl-hazard) 0 7px, var(--rl-hazard-ink) 7px 14px); }

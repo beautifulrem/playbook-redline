@@ -22,6 +22,87 @@ from redline.verifier import load_receipt
 
 HONEST_STATEMENT = "Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布"
 
+# Self-contained verify/tamper engine: pure-JS sha256 (no crypto.subtle / secure-context
+# dependency, works offline on file://) + a JS port of the Drunken Bishop randomart that
+# matches render.randomart_svg, so editing the evidence morphs the seal and flips the verdict.
+_VERIFY_SCRIPT = """
+<script>
+(function () {
+  function sha256hex(msg) {
+    function R(n, x) { return (x >>> n) | (x << (32 - n)); }
+    var K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+    var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    var bytes = [], i;
+    for (i = 0; i < msg.length; i++) {
+      var c = msg.charCodeAt(i);
+      if (c < 128) bytes.push(c);
+      else if (c < 2048) bytes.push(192 | (c >> 6), 128 | (c & 63));
+      else if (c < 55296 || c >= 57344) bytes.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+      else { i++; var u = 0x10000 + (((c & 1023) << 10) | (msg.charCodeAt(i) & 1023)); bytes.push(240 | (u >> 18), 128 | ((u >> 12) & 63), 128 | ((u >> 6) & 63), 128 | (u & 63)); }
+    }
+    var bl = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    for (i = 7; i >= 0; i--) bytes.push(Math.floor(bl / Math.pow(2, 8 * i)) & 0xff);
+    for (var off = 0; off < bytes.length; off += 64) {
+      var w = new Array(64);
+      for (i = 0; i < 16; i++) w[i] = (bytes[off + i*4] << 24) | (bytes[off + i*4+1] << 16) | (bytes[off + i*4+2] << 8) | bytes[off + i*4+3];
+      for (i = 16; i < 64; i++) { var s0 = R(7,w[i-15])^R(18,w[i-15])^(w[i-15]>>>3); var s1 = R(17,w[i-2])^R(19,w[i-2])^(w[i-2]>>>10); w[i] = (s1 + w[i-7] + s0 + w[i-16]) | 0; }
+      var a=H[0],b=H[1],c2=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = R(6,e)^R(11,e)^R(25,e), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+        var S0 = R(2,a)^R(13,a)^R(22,a), mj = (a & b) ^ (a & c2) ^ (b & c2), t2 = (S0 + mj) | 0;
+        h=g; g=f; f=e; e=(d + t1) | 0; d=c2; c2=b; b=a; a=(t1 + t2) | 0;
+      }
+      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c2)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+    }
+    var hex = "";
+    for (i = 0; i < 8; i++) hex += ("00000000" + (H[i] >>> 0).toString(16)).slice(-8);
+    return hex;
+  }
+  function randomart(hex) {
+    var hx = (hex.match(/[0-9a-fA-F]/g) || []).join(""), data = [], i;
+    for (i = 0; i + 1 < hx.length; i += 2) data.push(parseInt(hx.substr(i, 2), 16));
+    var cols = 17, rows = 9, cell = 9, grid = [];
+    for (i = 0; i < rows; i++) grid.push(new Array(cols).fill(0));
+    var x = cols >> 1, y = rows >> 1;
+    for (var bi = 0; bi < data.length; bi++) { var bb = data[bi]; for (var k = 0; k < 4; k++) { x = Math.min(cols-1, Math.max(0, x + ((bb & 1) ? 1 : -1))); y = Math.min(rows-1, Math.max(0, y + ((bb & 2) ? 1 : -1))); grid[y][x]++; bb >>= 2; } }
+    var peak = 1, j; for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) if (grid[j][i] > peak) peak = grid[j][i];
+    var fills = ""; for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) { var v = grid[j][i]; if (v) fills += '<rect x="' + (i*cell) + '" y="' + (j*cell) + '" width="' + cell + '" height="' + cell + '" fill-opacity="' + (0.16 + 0.84 * (v / peak)).toFixed(2) + '"/>'; }
+    var sx = cols >> 1, sy = rows >> 1;
+    var marks = '<rect x="' + (sx*cell) + '" y="' + (sy*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/><rect x="' + (x*cell) + '" y="' + (y*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/>';
+    return '<svg viewBox="0 0 ' + (cols*cell) + ' ' + (rows*cell) + '" fill="currentColor" role="img" aria-label="randomart fingerprint">' + fills + marks + '</svg>';
+  }
+  var root = document.getElementById("vf-root");
+  var expected = root.getAttribute("data-expected");
+  var input = document.getElementById("vf-input");
+  var original = input.value;
+  function setText(id, t) { var el = document.getElementById(id); if (el) el.textContent = t; }
+  function update() {
+    var digest = sha256hex(input.value), ok = digest === expected;
+    document.getElementById("vf-art").innerHTML = randomart(digest);
+    setText("vf-hash", digest.slice(0, 24) + "\\u2026");
+    setText("vf-verdict", ok ? "INTACT" : "INTEGRITY FAIL");
+    setText("vf-meta", ok ? "sha256 matches \\u00b7 fingerprint verified" : "sha256 MISMATCH \\u00b7 evidence tampered \\u00b7 Bitget never called");
+    setText("vf-stamp", ok ? "VERIFIED" : "VOID");
+    setText("vf-status", ok ? "sha256 match" : "sha256 MISMATCH");
+    document.getElementById("vf-band").classList.toggle("rl-band--pass", ok);
+    var seal = document.getElementById("vf-seal");
+    seal.classList.toggle("rl-seal--pass", ok);
+    seal.classList.toggle("rl-seal--void", !ok);
+  }
+  input.addEventListener("input", update);
+  document.getElementById("vf-flip").addEventListener("click", function () {
+    var v = input.value; if (!v) return; var i = Math.floor(v.length / 2);
+    input.value = v.slice(0, i) + String.fromCharCode(v.charCodeAt(i) ^ 1) + v.slice(i + 1);
+    update();
+  });
+  document.getElementById("vf-reset").addEventListener("click", function () { input.value = original; update(); });
+  update();
+})();
+</script>
+"""
+
 
 @dataclass(frozen=True)
 class EvidencePanel:
@@ -82,6 +163,81 @@ def write_evidence_html(out_path: Path, html_doc: str) -> None:
 def render_path_html(path: Path) -> str:
     panel = load_evidence_panel(path)
     return render_evidence_panel_html(panel)
+
+
+def _verify_record(panel: EvidencePanel | None) -> dict[str, object]:
+    if panel is not None and panel.evidence is not None:
+        evidence = panel.evidence
+        return {
+            "verdict": panel.verdict,
+            "reason_code": panel.reason_code,
+            "bitget_order_id": evidence.bitget_order_id,
+            "client_oid": evidence.client_oid,
+            "symbol": evidence.symbol,
+            "order_mode": evidence.order_mode,
+            "paptrading": evidence.paptrading or "1",
+            "receipt_hash": evidence.receipt_hash,
+            "response_hash": evidence.response_hash,
+        }
+    return {
+        "verdict": "PASS",
+        "reason_code": "PASS",
+        "bitget_order_id": "1453610833413308417",
+        "client_oid": "rl-98eb356e754b8eab27b6442f92c29",
+        "symbol": "BTCUSDT",
+        "order_mode": "demo",
+        "paptrading": "1",
+        "receipt_hash": "sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6",
+        "response_hash": "sha256:9d7da0b24514ee1724d80ba8383514781265f59678bcfacea63e1030e46e8d5c",
+    }
+
+
+def render_verify_html(panel: EvidencePanel | None = None) -> str:
+    """Self-contained offline verify/tamper page: edit the evidence, and a pure-JS sha256
+    re-derives the fingerprint so the randomart seal visibly morphs and the verdict flips."""
+    payload = json.dumps(_verify_record(panel), indent=2, sort_keys=True, ensure_ascii=False)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    short = _esc(digest[:24] + "…")
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Redline — Verify</title>
+  <style>{_inline_css()}</style>
+</head>
+<body>
+  <main class="rl-main" id="vf-root" data-expected="{digest}">
+    <h1 class="rl-macro">Verify</h1>
+    <p class="rl-label">offline self-verification &middot; no network &middot; edit the evidence to break the seal</p>
+    <hr>
+    <div class="rl-band rl-band--pass" id="vf-band">
+      <span class="rl-band__verdict" id="vf-verdict">INTACT</span>
+      <span class="rl-band__meta" id="vf-meta">sha256 matches &middot; fingerprint verified</span>
+    </div>
+    <div class="rl-seal rl-seal--pass" id="vf-seal">
+      <span class="rl-seal__art" id="vf-art">{randomart_svg(digest)}</span>
+      <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart &middot; live fingerprint</span><span class="rl-seal__hash" id="vf-hash">{short}</span></span>
+    </div>
+    <p class="rl-sec">Tamper control &middot; change one byte, watch the fingerprint morph</p>
+    <div class="rl-box">
+      <p class="rl-label">expected sha256 &nbsp; <span class="rl-mono">{digest}</span></p>
+      <textarea id="vf-input" class="rl-ta" spellcheck="false" aria-label="evidence payload">{_esc(payload)}</textarea>
+      <p class="rl-row"><button type="button" class="rl-btn rl-btn--hazard" id="vf-flip">flip one byte</button><button type="button" class="rl-btn" id="vf-reset">reset</button><span class="rl-mono" id="vf-status">sha256 match</span></p>
+    </div>
+    <p class="rl-sec">Zero-secret reproduce on a clean machine</p>
+    <div class="rl-cmd"><div class="rl-cmd__body">
+      <samp class="rl-cmd__cmt">same check, in your terminal — exits non-zero on tamper</samp>
+      <samp>uv run redline verify-chain &lt;release_dir&gt; --json</samp>
+      <samp>scripts/tamper-demo.sh</samp>
+    </div></div>
+    <hr>
+    <p class="rl-muted">{_esc(HONEST_STATEMENT)}</p>
+  </main>
+  {_VERIFY_SCRIPT}
+</body>
+</html>
+"""
 
 
 def load_evidence_panel(path: Path, *, title: str | None = None) -> EvidencePanel:

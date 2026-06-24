@@ -1780,6 +1780,13 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
             )
         )
 
+    @router.get("/verify", response_class=HTMLResponse)
+    def verify_endpoint() -> HTMLResponse:
+        # public, zero-secret, self-contained: offline tamper demo (no auth required)
+        from redline.render import render_verify_html
+
+        return HTMLResponse(render_verify_html())
+
     @router.post("/runs", response_model=RunResponse, status_code=202, dependencies=[Depends(_require_scope(RELEASE_WRITE))])
     def create_run_endpoint(payload: RunCreateRequest, request: Request) -> RunResponse:
         return service.create_run(request_id=request.state.request_id, request=payload)

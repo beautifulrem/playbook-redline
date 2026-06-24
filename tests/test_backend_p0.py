@@ -7277,6 +7277,27 @@ def test_evidence_html_golden_regenerated_from_code() -> None:
         assert receipt.model_dump_json(indent=2) + "\n" == receipt_path.read_text(encoding="utf-8")
 
 
+def test_verify_page_self_contained_and_self_verifies() -> None:
+    import hashlib
+
+    from redline.render import _verify_record, render_verify_html
+
+    record = _verify_record(None)
+    payload = json.dumps(record, indent=2, sort_keys=True, ensure_ascii=False)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    doc = render_verify_html()
+    # the embedded expected digest equals sha256 of the embedded payload -> the page self-verifies
+    assert f'data-expected="{digest}"' in doc
+    assert digest in doc
+    assert "INTACT" in doc
+    assert "randomart" in doc.lower()
+    # self-contained / offline: no external references, no rendered secret material
+    assert "http://" not in doc
+    assert "https://" not in doc
+    assert "passphrase" not in doc.lower()
+    assert "-----begin" not in doc.lower()
+
+
 def test_locked_golden_case_manifest_matches_spec() -> None:
     manifest = [
         {"case": "pass-receipt", "artifact": "artifacts/demo/pass/receipt.json", "expected_exit": 10, "reason_code": ReasonCode.BASELINE_GENESIS},
