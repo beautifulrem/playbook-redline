@@ -70,7 +70,7 @@ def load_release_attestation(path: Path) -> ReleaseBundleAttestation:
         raise ValueError("release attestation is invalid") from exc
 
 
-def verify_release_attestation(*, attestation_path: Path, bundle_path: Path) -> dict[str, Any]:
+def verify_release_attestation(*, attestation_path: Path, bundle_path: Path, trusted_public_key: str | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     expected_evidence_merkle_root: str | None = None
 
@@ -108,6 +108,13 @@ def verify_release_attestation(*, attestation_path: Path, bundle_path: Path) -> 
         public_key = _parse_public_key(attestation.public_key)
         public_key.verify(_parse_signature(attestation.signature), _attestation_payload(attestation))
         record("signature", True, attestation.public_key)
+        # Integrity-only by default (the embedded key self-signs). When a trusted key is
+        # pinned, require the attestation to be signed by exactly that key — this is what
+        # turns a self-consistent, self-signed forgery from `ok=true` into a failure.
+        if trusted_public_key is not None:
+            if attestation.public_key != trusted_public_key:
+                raise ValueError("attestation public key does not match the pinned trusted key")
+            record("trusted-key-pin", True, trusted_public_key)
     except (OSError, ValueError, InvalidSignature) as exc:
         record("attestation-verification", False, type(exc).__name__ if isinstance(exc, InvalidSignature) else str(exc))
     ok = all(item["ok"] for item in checks)

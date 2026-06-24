@@ -3693,3 +3693,44 @@ def test_risk_policy_mainnet_veto_not_bypassed_by_notional_reduce():
     )
     demo_decision = risk_policy_breach(policy, demo_attempt)
     assert demo_decision.decision == "reduce"
+
+
+def test_verify_chain_trusted_key_pin_rejects_foreign_signer(tmp_path: Path, monkeypatch) -> None:
+    """Independent-review MED hardening: offline attestation verify is integrity-only by
+    default (the embedded key self-signs), but with --trusted-public-key pinned it must
+    reject any attestation not signed by that exact key — closing the self-signed-forgery
+    gap in the zero-secret judge path."""
+    monkeypatch.setenv("REDLINE_BITGET_DEMO_ACCESS_KEY", "demo-key")
+    monkeypatch.setenv("REDLINE_BITGET_DEMO_SECRET_KEY", "demo-secret-do-not-leak")
+    monkeypatch.setenv("REDLINE_BITGET_DEMO_PASSPHRASE", "demo-passphrase")
+    client = _client(tmp_path)
+    calls: list[dict[str, object]] = []
+    client.app.state.redline_service.execution_transport = _bitget_demo_transport(calls, order_id_factory=lambda _count: "demo-order-pin")
+    _run, release = _create_release_ready_for_showcase_job(client, tmp_path, release_id="rel_pin", version_id="strategy-pin")
+    assert client.post(f"/v1/release-candidates/{release['release_id']}/attest", headers=_headers(), json={}).json()["ok"] is True
+    release_dir_path = tmp_path / "service" / "releases" / release["release_id"]
+    attestation = json.loads((release_dir_path / "release-attestation.json").read_text(encoding="utf-8"))
+    real_key = attestation["public_key"]
+    for secret_name in (
+        "REDLINE_BITGET_DEMO_ACCESS_KEY",
+        "REDLINE_BITGET_DEMO_SECRET_KEY",
+        "REDLINE_BITGET_DEMO_PASSPHRASE",
+        "REDLINE_ATTESTATION_PRIVATE_KEY",
+        "REDLINE_TRUST_PRIVATE_KEY",
+    ):
+        monkeypatch.delenv(secret_name, raising=False)
+
+    # Pinned to the genuine signer -> passes and records the pin check.
+    pinned_ok = CliRunner().invoke(cli_app, ["verify-chain", str(release_dir_path), "--trusted-public-key", real_key, "--json"])
+    assert pinned_ok.exit_code == 0, pinned_ok.stdout
+    ok_payload = json.loads(pinned_ok.stdout)
+    assert ok_payload["ok"] is True
+    assert any(item["name"] == "trusted-key-pin" and item["ok"] for item in ok_payload["checks"])
+
+    # Pinned to a foreign key -> fails (this is where a self-signed forgery would land).
+    foreign_key = "ed25519-public:" + "0" * 64
+    pinned_bad = CliRunner().invoke(cli_app, ["verify-chain", str(release_dir_path), "--trusted-public-key", foreign_key, "--json"])
+    assert pinned_bad.exit_code != 0
+    bad_payload = json.loads(pinned_bad.stdout)
+    assert bad_payload["ok"] is False
+    assert not any(item["name"] == "trusted-key-pin" and item["ok"] for item in bad_payload["checks"])

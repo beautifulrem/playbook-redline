@@ -440,9 +440,10 @@ def verify_release_bundle(
 def verify_chain_cmd(
     target: Path,
     attestation: Optional[Path] = typer.Option(None, "--attestation"),
+    trusted_public_key: Optional[str] = typer.Option(None, "--trusted-public-key"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    result = verify_release_chain(target, attestation_path=attestation)
+    result = verify_release_chain(target, attestation_path=attestation, trusted_public_key=trusted_public_key)
     if json_out:
         console.print_json(data=result)
     else:
@@ -518,9 +519,10 @@ def attest_release_bundle_cmd(
 def verify_release_attestation_cmd(
     attestation: Path,
     bundle: Path = typer.Option(..., "--bundle"),
+    trusted_public_key: Optional[str] = typer.Option(None, "--trusted-public-key"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    result = verify_release_attestation(attestation_path=attestation, bundle_path=bundle)
+    result = verify_release_attestation(attestation_path=attestation, bundle_path=bundle, trusted_public_key=trusted_public_key)
     if json_out:
         console.print_json(data=result)
     else:

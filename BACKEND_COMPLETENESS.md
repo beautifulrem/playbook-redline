@@ -137,16 +137,16 @@ on itself):
   verification would require switching the receipt hash to exclude-none
   semantics and regenerating every artifact (release-demo regeneration needs
   Bitget demo credentials) — deferred by decision.
-- **Offline bundle / attestation verification is integrity-only, not
-  authenticity.** `verify-release-bundle` / `verify-release-attestation` prove
+- **Offline bundle / attestation verification is integrity-only unless a signer
+  is pinned.** By default `verify-chain` / `verify-release-attestation` prove
   internal consistency and that the embedded Ed25519 signature matches the
-  attestation's own public key — they do **not** pin a trusted signer, so a
-  self-consistent bundle self-signed with an attacker's key passes `ok=true`. A
-  judge needing authenticity must pin the expected public key
-  (`--trusted-ledger-public-key` / trust policy, as the checkpoint path already
-  supports). The live service is unaffected: genuine bundles are produced only
-  after a full REPLAYED verify under a server-held trust policy before any order
-  is placed.
+  attestation's own public key — without a pin, a self-consistent bundle
+  self-signed with an attacker's key would pass `ok=true`. Pass
+  `--trusted-public-key <ed25519-public:...>` (supported on `verify-chain` and
+  `verify-release-attestation`) to require that exact signer; a foreign or
+  self-signed key then fails on a `trusted-key-pin` check. The live service is
+  unaffected: genuine bundles are produced only after a full REPLAYED verify
+  under a server-held trust policy before any order is placed.
 
 ## 评委 60 秒零密钥复核
 
