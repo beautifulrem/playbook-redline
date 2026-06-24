@@ -16,6 +16,17 @@ AI-edited trading playbooks can move faster than manual review, but every edit a
 - Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --package` let judges replay the evidence locally.
 - Extensibility: probe definitions, suites, package import, report rendering, internal MCP helper surfaces, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel; the public FastMCP registration exposes only the safe receipt-check tool.
 
+## Hackathon Submission Reference
+
+- Project submission form: https://forms.gle/wemHkddKAxR3wFFz9
+- Developer manual and submission rules: https://bitget-ai.gitbook.io/hackathon/untitled#ti-jiao-gui-ze
+- Registration/submission window: June 16, 2026 00:00 through June 25, 2026 24:00 (UTC+8).
+- Strategy submissions should prepare both simulated-trading and live-trading
+  data. Current Playbook trading support is live-only, so simulated data should
+  be produced separately, either by running local/backtest data or by using
+  tools such as GetAgent Studio.
+- Before final submission, re-check the developer manual for the current required fields, judging materials, demo expectations, and any rule changes.
+
 ## What Is Included
 
 - Deterministic replay engine for fixture playbooks
@@ -172,6 +183,62 @@ The service OpenAPI contract is checked in at `schemas/service-openapi.json`.
 Frontend-facing endpoint semantics and response examples are documented in
 `SERVICE_API.md`.
 
+### 评委 60 秒零密钥复核
+
+A fresh checkout can verify the checked-in release evidence without calling
+Bitget and without any local secret material. This path is intentionally
+demo-only, uses evidence from Bitget `paptrading: 1`, and is **非 Bitget Playbook 正式发布**.
+
+```bash
+uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json
+scripts/tamper-demo.sh
+open artifacts/release-demo/current/evidence.html
+```
+
+Expected result: `verify-chain` reports a passing chained release, the tamper
+demo exits non-zero after proving a modified bundle fails verification, and the
+HTML page shows the read-only judge evidence view. This review path 不需要 Bitget demo credentials; credentials are only required when you intentionally
+rerun `scripts/release-demo.sh` or `scripts/execution-demo.sh` to create new
+demo orders.
+
+`POST /v1/runs/{run_id}/execute` is the demo execution gate. It consumes a
+replayed, chained, signed `PASS` receipt and places one Bitget demo order using
+Demo API credentials plus `paptrading: 1`. WITHHELD, hash-only, unsigned,
+unchained, tampered, missing-credential, and default-mainnet cases return
+`blocked` before any order call. The gate writes `execution-evidence.json` and
+`execution-ledger.jsonl` as hash-checked run artifacts. For the full boundary,
+see `BACKEND_COMPLETENESS.md`; for a real demo run, export demo credentials and
+run `scripts/execution-demo.sh`.
+
+The production release backend adds versioned strategy releases on top of the
+run gate. A release candidate must bind a Redline `PASS` run, import
+simulated-trading evidence, bind a risk policy, receive human approval, execute
+a Bitget demo order, and generate a hash-verified evidence bundle before it is
+`release_ready`. The release API includes `/v1/strategy-versions`,
+`/v1/release-candidates`, `/simulation-evidence`, `/risk-policy`, `/approve`,
+`/execute-demo`, `/demo-showcase-orders`, `/evidence`, `/evidence.html`,
+`/attest`, `/attestation`, `/attestation.html`, `/audit-ledger`, and
+`/jobs/showcase-order`, `/jobs/{job_id}/events`, and `/v1/release-safety`.
+`redline render-evidence` can render a demo-only,
+read-only judge evidence page from existing run/release artifacts, and
+release-ready candidates can create additional demo-only showcase orders for
+live judge clicks, either synchronously or through a release job with an event
+ledger. `/v1/judge/console` is a backend-rendered control surface that lists
+release candidates and links through to release detail pages with job events,
+bundle verification, and attestation status. `redline attest-release-bundle`
+signs a verified release bundle hash into a local attestation that judges can
+verify offline. Local/demo human reviewers can use dev session auth so approval
+evidence binds to an authenticated principal instead of request-body text.
+Mainnet
+publish remains gated and disabled by default; demo execution does not imply
+Playbook live activation. See `PRODUCTION_RELEASE_BACKEND.md`,
+`HACKATHON_SUBMISSION.md`, and run:
+
+```bash
+scripts/release-demo.sh
+scripts/hackathon-submit-check.sh
+```
+
 Deployment shape: Render Blueprint + containerized FastAPI service. Local/CI can
 use SQLite under `REDLINE_SERVICE_ROOT`; Render uses Postgres metadata plus a
 persistent disk for hash-verified artifacts. This keeps long-running proof jobs
@@ -232,6 +299,7 @@ fixtures/         demo packages, suites, specs
 schemas/          exported JSON schemas
 artifacts/demo/   checked-in demo receipts and proof artifacts
 artifacts/sponsor recorded sponsor-attestation shape fixture
+BACKEND_COMPLETENESS.md demo execution and publish boundary
 SERVICE_API.md    service API contract for frontend/demo integration
 DEPLOYMENT.md     container deployment and judge runbook
 Dockerfile        production-style service image

@@ -37,6 +37,10 @@ def build_artifact_manifest(run_id: str, out_dir: Path) -> ArtifactManifest:
         ("receipt", "receipt", "receipt.json"),
         ("issuance-ledger", "ledger", "issuance-ledger.jsonl"),
         ("issuance-ledger-checkpoint", "ledger-checkpoint", "issuance-ledger.checkpoint.json"),
+        ("execution-evidence", "execution-evidence", "execution-evidence.json"),
+        ("execution-ledger", "execution-ledger", "execution-ledger.jsonl"),
+        ("exchange-preflight-evidence", "exchange-preflight-evidence", "exchange-preflight-evidence.json"),
+        ("order-status-evidence", "order-status-evidence", "order-status-evidence.json"),
     ]:
         path = out_dir / rel_path
         if path.exists():

@@ -4,7 +4,22 @@ from pathlib import Path
 from typing import Protocol
 
 from redline.service.config import ServiceConfig
-from redline.service.models import ArtifactInfo, ArtifactManifest, PackageResponse, RunCreateRequest, RunResponse, RunState, RunWorkItem
+from redline.service.models import (
+    ArtifactInfo,
+    ArtifactManifest,
+    PackageResponse,
+    ReleaseCandidateResponse,
+    ReleaseJobEventResponse,
+    ReleaseJobResponse,
+    ReleaseJobStatus,
+    ReleaseJobType,
+    ReleaseJobWorkItem,
+    RunCreateRequest,
+    RunResponse,
+    RunState,
+    RunWorkItem,
+    StrategyVersionResponse,
+)
 from redline.service.store import ServiceStore
 
 
@@ -12,6 +27,66 @@ class RunMetadataStore(Protocol):
     def upsert_package(self, package: PackageResponse) -> None: ...
 
     def get_package(self, package_id: str) -> PackageResponse | None: ...
+
+    def create_strategy_version(self, version: StrategyVersionResponse) -> StrategyVersionResponse: ...
+
+    def get_strategy_version(self, version_id: str) -> StrategyVersionResponse | None: ...
+
+    def list_strategy_versions(self, *, limit: int = 50) -> list[StrategyVersionResponse]: ...
+
+    def create_release_candidate(self, release: ReleaseCandidateResponse) -> ReleaseCandidateResponse: ...
+
+    def update_release_candidate(self, release: ReleaseCandidateResponse) -> ReleaseCandidateResponse: ...
+
+    def get_release_candidate(self, release_id: str) -> ReleaseCandidateResponse | None: ...
+
+    def list_release_candidates(self, *, limit: int = 50) -> list[ReleaseCandidateResponse]: ...
+
+    def append_release_audit_entry(self, *, release_id: str, entry: dict) -> None: ...
+
+    def list_release_audit_entries(self, *, release_id: str) -> list[dict]: ...
+
+    def create_release_job(
+        self,
+        *,
+        job_id: str,
+        release_id: str,
+        job_type: ReleaseJobType,
+        request_hash: str,
+        request: dict,
+        idempotency_key: str | None,
+        requested_by: str,
+    ) -> ReleaseJobResponse: ...
+
+    def get_release_job(self, *, release_id: str, job_id: str) -> ReleaseJobResponse | None: ...
+
+    def list_release_jobs(self, *, release_id: str, limit: int = 50) -> list[ReleaseJobResponse]: ...
+
+    def claim_next_release_job(self, *, worker_id: str) -> ReleaseJobWorkItem | None: ...
+
+    def recover_interrupted_release_jobs(self) -> list[ReleaseJobResponse]: ...
+
+    def cancel_release_job(self, *, release_id: str, job_id: str) -> ReleaseJobResponse | None: ...
+
+    def mark_release_job_status(
+        self,
+        *,
+        job_id: str,
+        status: ReleaseJobStatus,
+        result: dict | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> None: ...
+
+    def append_release_job_event(self, *, release_id: str, job_id: str, event_type: str, payload: dict | None = None) -> ReleaseJobEventResponse: ...
+
+    def list_release_job_events(self, *, release_id: str, job_id: str) -> list[ReleaseJobEventResponse]: ...
+
+    def list_schema_migrations(self) -> list[dict[str, str]]: ...
+
+    def get_idempotency_record(self, *, scope: str, key: str) -> dict | None: ...
+
+    def put_idempotency_record(self, *, scope: str, key: str, request_hash: str, response: dict, status_code: int) -> None: ...
 
     def create_run(
         self,
@@ -37,6 +112,8 @@ class RunMetadataStore(Protocol):
         report_hash: str | None,
         artifact_manifest: ArtifactManifest,
     ) -> None: ...
+
+    def update_artifact_manifest(self, *, run_id: str, artifact_manifest: ArtifactManifest) -> None: ...
 
     def mark_error(self, *, run_id: str, error_code: str, message: str) -> None: ...
 

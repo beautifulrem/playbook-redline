@@ -20,7 +20,7 @@ _FORBIDDEN_PREFIXES = (
     "socket",
     "subprocess",
 )
-_FORBIDDEN_EVENTS = {
+_FORBIDDEN_EVENTS = (
     "os.chmod",
     "os.chown",
     "os.link",
@@ -41,7 +41,7 @@ _FORBIDDEN_EVENTS = {
     "shutil.copystat",
     "shutil.copytree",
     "shutil.move",
-}
+)
 _FORBIDDEN_IMPORT_PREFIXES = (
     "anthropic",
     "_ctypes",

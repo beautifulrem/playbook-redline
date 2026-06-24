@@ -30,8 +30,10 @@ from redline.models import (
     VerificationStatus,
 )
 from redline.canonical import sha256_bytes
+from redline.merkle import merkle_root
 from redline.package_identity import load_identity_lock, write_identity_lock
 from redline.proof_kernel import decision_envelope_from_receipt
+from redline.receipt import compute_ledger_checkpoint_hash
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, assert_local_pass, make_annotated_package_archive, make_package_archive
 from redline.spec_compiler import LLMTransport, compile_text_spec
 from redline.verifier import load_receipt, verify
@@ -820,8 +822,12 @@ def _load_checkpoint(path: Path) -> LedgerCheckpoint | None:
         checkpoint = LedgerCheckpoint.model_validate(json.loads(path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, ValidationError):
         return None
-    expected_hash = hash_obj(checkpoint.model_copy(update={"checkpoint_hash": ""}))
-    return checkpoint if checkpoint.checkpoint_hash == expected_hash else None
+    expected_hash = compute_ledger_checkpoint_hash(checkpoint)
+    if checkpoint.checkpoint_hash != expected_hash:
+        return None
+    if "merkle_root" in checkpoint.model_fields_set and checkpoint.merkle_root != merkle_root(checkpoint.subject_receipt_hashes):
+        return None
+    return checkpoint
 
 
 def _load_attestation(path: Path) -> LedgerCheckpointAttestation | None:

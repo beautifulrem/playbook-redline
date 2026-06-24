@@ -12,13 +12,21 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
+from redline.attestation import attest_release_bundle, verify_release_attestation, write_release_attestation
+from redline.chain import verify_execution_evidence_file, verify_release_chain
 from redline.canonical import CanonicalizationError, hash_obj, hash_tree, sha256_bytes
+from redline.hackathon_pack import build_hackathon_submission_pack
 from redline.models import DoctorCheck, DoctorResult, EditProvenance, ReasonCode, Status, VerificationLevel, VerificationStatus
 from redline.proof_kernel import REQUIRED_PROOFS
 from redline.runner import load_spec, load_suite, resolve_package_role_dir, run_redline
 from redline.receipt import IssuanceLedgerConflict
+from redline.render import load_evidence_panel, render_evidence_comparison_html, render_path_html, write_evidence_html
 from redline.schemas import export_schemas as export_schema_files
 from redline.spec_compiler import OutOfScopeError
+from redline.service.config import ServiceConfig
+from redline.service.migrations import expected_migration_versions
+from redline.service.release import verify_release_evidence_bundle
+from redline.service.storage import create_metadata_store
 from redline.sponsor.bitget import BitgetSponsorAdapter, SponsorState, SponsorStepResult, make_package_archive, validate_sponsor_evidence_shape, verify_sponsor_readback_evidence
 from redline.surfaces import (
     capture_edit_provenance,
@@ -48,6 +56,13 @@ EXIT_BY_REASON: dict[ReasonCode, int] = {
     ReasonCode.OUT_OF_SCOPE: 2,
     ReasonCode.NEW_BLOCK_BREACH: 3,
     ReasonCode.RECEIPT_MISMATCH: 4,
+    ReasonCode.PROOF_HASH_MISMATCH: 4,
+    ReasonCode.LEDGER_CHAIN_BROKEN: 4,
+    ReasonCode.CHECKPOINT_MISMATCH: 4,
+    ReasonCode.EXECUTION_LEDGER_BROKEN: 4,
+    ReasonCode.MERKLE_INCLUSION_FAILED: 4,
+    ReasonCode.APPROVAL_LINK_MISMATCH: 4,
+    ReasonCode.CHAIN_LINK_MISMATCH: 4,
     ReasonCode.RECEIPT_BINDING_FAILED: 4,
     ReasonCode.ENGINE_IDENTITY_MISMATCH: 4,
     ReasonCode.NONFINITE_VALUE: 4,
@@ -59,6 +74,8 @@ EXIT_BY_REASON: dict[ReasonCode, int] = {
     ReasonCode.PROBE_ERROR: 6,
     ReasonCode.ENGINE_FAILURE: 6,
     ReasonCode.DATA_MISSING: 6,
+    ReasonCode.APPROVAL_CONSUMED: 6,
+    ReasonCode.APPROVAL_EXPIRED: 6,
     ReasonCode.BASELINE_UNCHAINED: 7,
     ReasonCode.SPONSOR_READBACK_MISMATCH: 8,
     ReasonCode.SPONSOR_EVIDENCE_UNVERIFIED: 6,
@@ -332,6 +349,223 @@ def report(
         console.print(f"report rejected: {exc}")
         raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH]) from exc
     console.print(f"report written: {out}")
+
+
+@app.command("render-evidence")
+def render_evidence(
+    path: Optional[Path] = typer.Argument(None, help="Run or release artifact directory."),
+    out: Path = typer.Option(Path("artifacts/evidence.html"), "--out"),
+    good: Optional[Path] = typer.Option(None, "--good", help="PASS run or release directory."),
+    bad: Optional[Path] = typer.Option(None, "--bad", help="WITHHELD run or release directory."),
+) -> None:
+    if (good is None) != (bad is None):
+        console.print("render-evidence rejected: --good and --bad must be provided together")
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
+    if good is not None and bad is not None:
+        html_doc = render_evidence_comparison_html(
+            load_evidence_panel(good, title="PASS -> Bitget demo order"),
+            load_evidence_panel(bad, title="WITHHELD -> blocked before Bitget"),
+        )
+    else:
+        if path is None:
+            console.print("render-evidence rejected: provide a path or --good/--bad")
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID])
+        html_doc = render_path_html(path)
+    write_evidence_html(out, html_doc)
+    console.print(f"evidence html written: {out}")
+
+
+@app.command("service-migrations")
+def service_migrations(
+    root: Path = typer.Option(Path("artifacts/service"), "--root"),
+    metadata_store: str = typer.Option("sqlite", "--metadata-store"),
+    database_url: Optional[str] = typer.Option(None, "--database-url"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    expected = expected_migration_versions()
+    applied: list[dict[str, str]] = []
+    if not dry_run:
+        try:
+            config = ServiceConfig(
+                root=root,
+                token="redline-migration-status",
+                metadata_store=metadata_store,  # type: ignore[arg-type]
+                database_url=database_url,
+                workers=1,
+            )
+            applied = create_metadata_store(config).list_schema_migrations()
+        except ValueError as exc:
+            console.print(f"service-migrations rejected: {exc}")
+            raise typer.Exit(EXIT_BY_REASON[ReasonCode.SCHEMA_INVALID]) from exc
+    applied_versions = {item["version"] for item in applied}
+    payload = {
+        "schema_version": "redline.service_migrations.status.v1",
+        "metadata_store": metadata_store,
+        "dry_run": dry_run,
+        "expected_versions": expected,
+        "applied": applied,
+        "pending_versions": [version for version in expected if version not in applied_versions],
+    }
+    if json_out:
+        console.print_json(data=payload)
+        return
+    table = Table("field", "value")
+    table.add_row("metadata_store", metadata_store)
+    table.add_row("dry_run", str(dry_run).lower())
+    table.add_row("expected", ", ".join(expected))
+    table.add_row("applied", ", ".join(sorted(applied_versions)) if applied_versions else "none")
+    table.add_row("pending", ", ".join(payload["pending_versions"]) if payload["pending_versions"] else "none")
+    console.print(table)
+
+
+@app.command("verify-release-bundle")
+def verify_release_bundle(
+    bundle: Path,
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = verify_release_evidence_bundle(bundle)
+    if json_out:
+        console.print_json(data=result)
+    else:
+        table = Table("check", "ok", "detail")
+        for check_item in result["checks"]:
+            table.add_row(str(check_item["name"]), str(check_item["ok"]).lower(), str(check_item.get("detail") or ""))
+        console.print(table)
+    if not result["ok"]:
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH])
+
+
+@app.command("verify-chain")
+def verify_chain_cmd(
+    target: Path,
+    attestation: Optional[Path] = typer.Option(None, "--attestation"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = verify_release_chain(target, attestation_path=attestation)
+    if json_out:
+        console.print_json(data=result)
+    else:
+        table = Table("check", "ok", "detail")
+        for check_item in result["checks"]:
+            table.add_row(str(check_item["name"]), str(check_item["ok"]).lower(), str(check_item.get("detail") or ""))
+        console.print(table)
+    if not result["ok"]:
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH])
+
+
+@app.command("verify-execution-evidence")
+def verify_execution_evidence_cmd(
+    evidence: Path,
+    ledger: Optional[Path] = typer.Option(None, "--ledger"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = verify_execution_evidence_file(evidence, ledger_path=ledger)
+    if json_out:
+        console.print_json(data=result)
+    else:
+        table = Table("check", "ok", "reason", "detail")
+        for check_item in result["checks"]:
+            table.add_row(
+                str(check_item["name"]),
+                str(check_item["ok"]).lower(),
+                str(check_item.get("reason_code") or ""),
+                str(check_item.get("detail") or ""),
+            )
+        console.print(table)
+    if not result["ok"]:
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH])
+
+
+@app.command("attest-release-bundle")
+def attest_release_bundle_cmd(
+    bundle: Path,
+    out: Optional[Path] = typer.Option(None, "--out"),
+    private_key: Optional[str] = typer.Option(None, "--private-key"),
+    private_key_file: Optional[Path] = typer.Option(None, "--private-key-file"),
+    attester_principal: str = typer.Option("local:auto", "--attester-principal"),
+    key_id: str = typer.Option("local", "--key-id"),
+    issuer: str = typer.Option("redline", "--issuer"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    key_text = private_key or os.environ.get("REDLINE_ATTESTATION_PRIVATE_KEY") or os.environ.get("REDLINE_TRUST_PRIVATE_KEY")
+    if key_text is None and private_key_file is not None:
+        key_text = private_key_file.read_text(encoding="utf-8").strip()
+    out_path = out or (bundle.parent / "release-attestation.json")
+    try:
+        attestation = attest_release_bundle(
+            bundle_path=bundle,
+            private_key_text=key_text,
+            attester_principal=attester_principal,
+            key_id=key_id,
+            issuer=issuer,
+        )
+        write_release_attestation(out_path, attestation)
+    except FileNotFoundError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc.filename}", bundle)
+    except (OSError, json.JSONDecodeError):
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "release bundle input is not valid JSON", bundle)
+    except (ValidationError, ValueError):
+        _exit_bad_input(ReasonCode.RECEIPT_MISMATCH, json_out, "release bundle could not be attested", bundle)
+    payload = {**attestation.model_dump(mode="json"), "attestation_path": str(out_path)}
+    if json_out:
+        console.print_json(data=payload)
+    else:
+        _print_envelope("attested", attestation.attestation_hash, out_path)
+
+
+@app.command("verify-release-attestation")
+def verify_release_attestation_cmd(
+    attestation: Path,
+    bundle: Path = typer.Option(..., "--bundle"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    result = verify_release_attestation(attestation_path=attestation, bundle_path=bundle)
+    if json_out:
+        console.print_json(data=result)
+    else:
+        table = Table("check", "ok", "detail")
+        for check_item in result["checks"]:
+            table.add_row(str(check_item["name"]), str(check_item["ok"]).lower(), str(check_item.get("detail") or ""))
+        console.print(table)
+    if not result["ok"]:
+        raise typer.Exit(EXIT_BY_REASON[ReasonCode.RECEIPT_MISMATCH])
+
+
+@app.command("hackathon-pack")
+def hackathon_pack_cmd(
+    bundle: Optional[Path] = typer.Argument(None, help="Release evidence bundle. Defaults to the newest artifacts/release-demo bundle."),
+    out: Path = typer.Option(Path("artifacts/hackathon-submission-pack"), "--out"),
+    attestation: Optional[Path] = typer.Option(None, "--attestation"),
+    manifest: Optional[Path] = typer.Option(Path("artifacts/hackathon-submit-manifest.json"), "--manifest"),
+    attester_principal: str = typer.Option("hackathon-pack", "--attester-principal"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        result = build_hackathon_submission_pack(
+            bundle_path=bundle,
+            out_dir=out,
+            attestation_path=attestation,
+            manifest_path=manifest,
+            attester_principal=attester_principal,
+        )
+    except FileNotFoundError as exc:
+        _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc}", out)
+    except CanonicalizationError as exc:
+        _exit_bad_input(exc.reason_code, json_out, str(exc), out)
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, f"hackathon pack input is invalid: {exc}", out)
+    if json_out:
+        console.print_json(data=result)
+    else:
+        table = Table("field", "value")
+        table.add_row("pack_dir", str(result["pack_dir"]))
+        table.add_row("release_id", str(result["release_id"]))
+        table.add_row("bundle", str(result["latest_release_bundle"]))
+        table.add_row("attestation", str(result["latest_attestation"]))
+        table.add_row("manifest", str(result["pack_manifest"]))
+        table.add_row("orders", str(len(result["latest_real_bitget_orders"])))
+        console.print(table)
 
 
 @app.command()
