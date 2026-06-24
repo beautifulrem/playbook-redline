@@ -1,0 +1,83 @@
+/* Playbook Redline — design system (Tactical Telemetry / CRT terminal).
+   Single source of truth. INLINED into evidence/verify pages (offline self-contained,
+   zero-secret) and into console pages. No build step, no external dependency.
+   Invariants enforced by scripts/check-design-tokens.sh:
+     - colors only via --rl-* tokens (no raw hex outside :root)
+     - no border-radius > 0, no gradients, no blurred box-shadow */
+
+:root {
+  color-scheme: dark;
+
+  /* substrate — deactivated CRT (never pure black) */
+  --rl-bg:          #0B0B0C;
+  --rl-surface:     #121214;
+  --rl-surface-2:   #17171A;
+  --rl-line:        #2A2A2E;
+  --rl-line-strong: #3A3A40;
+
+  /* phosphor — text */
+  --rl-fg:    #EAEAEA;
+  --rl-muted: #8A8A92;
+  --rl-faint: #5A5A62;
+
+  /* the ONLY alert color — aviation hazard red (BLOCK / WITHHELD / INVALID / tamper / freeze) */
+  --rl-hazard:     #FF2A2A;
+  --rl-hazard-ink: #1A0606;
+
+  /* single PASS-readout green — used ONLY for a verified PASS, never as general text */
+  --rl-pass: #4AF626;
+
+  /* type */
+  --rl-mono:    ui-monospace, "JetBrains Mono", "IBM Plex Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --rl-grotesk: "Archivo Black", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rl-tele:    0.8125rem;   /* 13px telemetry */
+  --rl-track:   0.06em;
+
+  /* spacing scale */
+  --rl-1: 4px;  --rl-2: 8px;  --rl-3: 12px;  --rl-4: 16px;  --rl-6: 24px;  --rl-10: 40px;  --rl-16: 64px;
+
+  /* geometry — rigid, 90 degrees only */
+  --rl-radius:        0;
+  --rl-border:        1px solid var(--rl-line);
+  --rl-border-strong: 1px solid var(--rl-line-strong);
+  --rl-maxw:          1240px;
+}
+
+*, *::before, *::after { box-sizing: border-box; border-radius: var(--rl-radius); }
+
+html { background: var(--rl-bg); }
+
+body {
+  margin: 0;
+  background: var(--rl-bg);
+  color: var(--rl-fg);
+  font-family: var(--rl-mono);
+  font-size: var(--rl-tele);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: var(--rl-track);
+}
+
+/* macro typographic infrastructure — verdict words + page headers */
+.rl-macro {
+  font-family: var(--rl-grotesk);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  font-size: clamp(2.25rem, 6vw, 6.5rem);
+  margin: 0;
+}
+
+/* telemetry label / value primitives */
+.rl-label { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); }
+.rl-mono  { font-family: var(--rl-mono); overflow-wrap: anywhere; }
+.rl-faint { color: var(--rl-faint); }
+
+a { color: var(--rl-fg); text-underline-offset: 3px; }
+
+/* container */
+.rl-main { max-width: var(--rl-maxw); margin: 0 auto; padding: var(--rl-6); }
+hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
