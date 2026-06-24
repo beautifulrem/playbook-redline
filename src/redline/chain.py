@@ -11,7 +11,7 @@ from redline.service.release import BUNDLE_NAME, resolve_release_run_dir, verify
 from redline.sponsor.bitget_execution import ExecutionBlocked, load_execution_evidence, load_execution_ledger
 
 
-def verify_release_chain(input_path: Path, *, attestation_path: Path | None = None) -> dict[str, Any]:
+def verify_release_chain(input_path: Path, *, attestation_path: Path | None = None, trusted_public_key: str | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
     def record(name: str, ok: bool, detail: str = "") -> None:
@@ -36,7 +36,7 @@ def verify_release_chain(input_path: Path, *, attestation_path: Path | None = No
     checks.extend(bundle_result.get("checks", []))
     resolved_attestation_path = attestation_path or (release_dir / RELEASE_ATTESTATION_NAME)
     if resolved_attestation_path.exists():
-        attestation_result = verify_release_attestation(attestation_path=resolved_attestation_path, bundle_path=bundle_path)
+        attestation_result = verify_release_attestation(attestation_path=resolved_attestation_path, bundle_path=bundle_path, trusted_public_key=trusted_public_key)
     else:
         attestation_result = {
             "schema_version": "redline.release_attestation.verify.v1",
