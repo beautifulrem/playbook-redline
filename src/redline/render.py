@@ -203,7 +203,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Redline — Verify</title>
+  <title>Redline · Verify</title>
   <style>{_inline_css()}</style>
 </head>
 <body>
@@ -227,7 +227,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
     </div>
     <p class="rl-sec">Zero-secret reproduce on a clean machine</p>
     <div class="rl-cmd"><div class="rl-cmd__body">
-      <samp class="rl-cmd__cmt">same check, in your terminal — exits non-zero on tamper</samp>
+      <samp class="rl-cmd__cmt">same check in your terminal, exits non-zero on tamper</samp>
       <samp>uv run redline verify-chain &lt;release_dir&gt; --json</samp>
       <samp>scripts/tamper-demo.sh</samp>
     </div></div>

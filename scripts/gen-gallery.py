@@ -20,7 +20,7 @@ CSS = Path("src/redline/static/redline.css").read_text(encoding="utf-8")
 BODY = """
 <main class="rl-main">
   <h1 class="rl-macro">REDLINE</h1>
-  <p class="rl-label">Tactical Telemetry — design system gallery · DEMO · paptrading:1 · non-mainnet</p>
+  <p class="rl-label">Tactical Telemetry · design system gallery · DEMO paptrading:1 non-mainnet</p>
   <hr>
 
   <h2 class="rl-sec">Status band</h2>
@@ -69,7 +69,7 @@ BODY = """
   </table>
   </div>
 
-  <h2 class="rl-sec">Chain walk — verifiable chain</h2>
+  <h2 class="rl-sec">Chain walk · verifiable chain</h2>
   <div class="rl-chain">
     <div class="rl-chain__node"><span class="rl-chain__label">edit</span><span class="rl-chain__hash">sha256:0a91…7e2c</span><span class="rl-chain__st--ok">✔ provenance</span></div>
     <div class="rl-chain__node"><span class="rl-chain__label">verdict</span><span class="rl-chain__hash">sha256:4263…645d6</span><span class="rl-chain__st--ok">✔ replayed</span></div>
@@ -82,8 +82,8 @@ BODY = """
     <div class="rl-chain__node"><span class="rl-chain__label">edit</span><span class="rl-chain__hash">sha256:0a91…7e2c</span><span class="rl-chain__st--ok">✔ provenance</span></div>
     <div class="rl-chain__node"><span class="rl-chain__label">verdict</span><span class="rl-chain__hash">sha256:4263…645d6</span><span class="rl-chain__st--ok">✔ replayed</span></div>
     <div class="rl-chain__node rl-chain__node--fail"><span class="rl-chain__label">approval</span><span class="rl-chain__hash">sha256:dead…beef</span><span class="rl-chain__st--bad">✗ digest mismatch</span><span class="rl-chain__flag">first failed</span></div>
-    <div class="rl-chain__node"><span class="rl-chain__label">execution</span><span class="rl-chain__hash">— halted —</span><span class="rl-chain__st--skip">not reached</span></div>
-    <div class="rl-chain__node"><span class="rl-chain__label">attestation</span><span class="rl-chain__hash">— none —</span><span class="rl-chain__st--skip">not reached</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">execution</span><span class="rl-chain__hash">halted</span><span class="rl-chain__st--skip">not reached</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">attestation</span><span class="rl-chain__hash">none</span><span class="rl-chain__st--skip">not reached</span></div>
   </div>
 
   <h2 class="rl-sec">Proofbar</h2>
@@ -101,7 +101,7 @@ BODY = """
     <div class="rl-tier__seg"><b>L2</b>live-gated</div>
   </div>
 
-  <h2 class="rl-sec">Command block — zero-secret verify</h2>
+  <h2 class="rl-sec">Command block · zero-secret verify</h2>
   <div class="rl-cmd">
     <div class="rl-cmd__head"><span>verify on a clean machine</span><span>no secrets · offline</span></div>
     <div class="rl-cmd__body">

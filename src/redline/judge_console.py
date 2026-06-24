@@ -210,10 +210,10 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
     approval = release.get("approval") or {}
     steps = [
         ("receipt", str(release.get("redline_reason_code") or "verdict"), bool(release.get("redline_reason_code"))),
-        ("approval", str(approval.get("reviewer_id") or "—"), bool(approval.get("reviewer_id"))),
+        ("approval", str(approval.get("reviewer_id") or "-"), bool(approval.get("reviewer_id"))),
         ("execution", _short_id(execution.get("bitget_order_id")), bool(execution.get("bitget_order_id"))),
-        ("attestation", "ed25519" if attestation_status.get("ok") else "—", bool(attestation_status.get("ok"))),
-        ("merkle", "root" if bundle_status.get("ok") else "—", bool(bundle_status.get("ok"))),
+        ("attestation", "ed25519" if attestation_status.get("ok") else "-", bool(attestation_status.get("ok"))),
+        ("merkle", "root" if bundle_status.get("ok") else "-", bool(bundle_status.get("ok"))),
     ]
     nodes = []
     failed = False
@@ -221,7 +221,7 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
         if failed:
             status = '<span class="rl-chain__st--skip">not reached</span>'
             node_cls = ""
-            detail = "—"
+            detail = "-"
         elif ok:
             status = '<span class="rl-chain__st--ok">&#10004; verified</span>'
             node_cls = ""
