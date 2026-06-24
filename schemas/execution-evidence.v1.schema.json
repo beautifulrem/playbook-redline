@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "Status": {
+      "enum": [
+        "pass",
+        "withheld",
+        "reduce_size",
+        "reject",
+        "unverified_no_verdict"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_hash": {
+      "default": "sha256:unapproved",
+      "title": "Approval Hash",
+      "type": "string"
+    },
+    "artifact_hash": {
+      "title": "Artifact Hash",
+      "type": "string"
+    },
+    "bitget_order_id": {
+      "title": "Bitget Order Id",
+      "type": "string"
+    },
+    "client_oid": {
+      "title": "Client Oid",
+      "type": "string"
+    },
+    "execution_ledger_entry_hash": {
+      "title": "Execution Ledger Entry Hash",
+      "type": "string"
+    },
+    "issuance_checkpoint_hash": {
+      "default": "sha256:genesis",
+      "title": "Issuance Checkpoint Hash",
+      "type": "string"
+    },
+    "issuance_ledger_entry_hash": {
+      "default": "sha256:genesis",
+      "title": "Issuance Ledger Entry Hash",
+      "type": "string"
+    },
+    "order_mode": {
+      "enum": [
+        "demo",
+        "mainnet"
+      ],
+      "title": "Order Mode",
+      "type": "string"
+    },
+    "paptrading": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "1",
+      "title": "Paptrading"
+    },
+    "placed_at": {
+      "title": "Placed At",
+      "type": "string"
+    },
+    "product_type": {
+      "title": "Product Type",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "response_hash": {
+      "title": "Response Hash",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "symbol": {
+      "title": "Symbol",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Status"
+    },
+    "version": {
+      "const": "redline.execution.evidence.v1",
+      "default": "redline.execution.evidence.v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "receipt_hash",
+    "verdict",
+    "client_oid",
+    "bitget_order_id",
+    "response_hash",
+    "placed_at",
+    "symbol",
+    "product_type",
+    "order_mode",
+    "execution_ledger_entry_hash",
+    "artifact_hash"
+  ],
+  "title": "ExecutionEvidence",
+  "type": "object"
+}

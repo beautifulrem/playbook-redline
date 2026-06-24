@@ -164,6 +164,18 @@
     "DecisionEnvelope": {
       "additionalProperties": false,
       "properties": {
+        "adjusted_size_cap": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjusted Size Cap"
+        },
         "capabilities": {
           "$ref": "#/$defs/Capabilities"
         },
@@ -198,6 +210,17 @@
         },
         "status": {
           "$ref": "#/$defs/Status"
+        },
+        "verdict_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerdictTier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -260,12 +283,50 @@
           "title": "Assertions",
           "type": "array"
         },
+        "fees_modeled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fees Modeled"
+        },
+        "fill_model": {
+          "anyOf": [
+            {
+              "const": "next_bar_open",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fill Model"
+        },
         "inputs_hash": {
           "title": "Inputs Hash",
           "type": "string"
         },
         "kind": {
           "$ref": "#/$defs/ProofKind"
+        },
+        "lookahead_guard": {
+          "anyOf": [
+            {
+              "const": "structural_next_bar",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lookahead Guard"
         },
         "meta": {
           "additionalProperties": true,
@@ -406,6 +467,15 @@
         "PASS",
         "NEW_BLOCK_BREACH",
         "RECEIPT_MISMATCH",
+        "PROOF_HASH_MISMATCH",
+        "LEDGER_CHAIN_BROKEN",
+        "CHECKPOINT_MISMATCH",
+        "EXECUTION_LEDGER_BROKEN",
+        "MERKLE_INCLUSION_FAILED",
+        "APPROVAL_LINK_MISMATCH",
+        "APPROVAL_CONSUMED",
+        "APPROVAL_EXPIRED",
+        "CHAIN_LINK_MISMATCH",
         "BASELINE_UNCHAINED",
         "BASELINE_GENESIS",
         "COVERAGE_INCOMPLETE",
@@ -580,10 +650,21 @@
       "enum": [
         "pass",
         "withheld",
+        "reduce_size",
         "reject",
         "unverified_no_verdict"
       ],
       "title": "Status",
+      "type": "string"
+    },
+    "VerdictTier": {
+      "enum": [
+        "ALLOW",
+        "REDUCE_SIZE",
+        "HUMAN_REVIEW",
+        "BLOCK"
+      ],
+      "title": "VerdictTier",
       "type": "string"
     },
     "VerificationLevel": {
