@@ -20,17 +20,17 @@ BODY = """
   <p class="rl-label">Tactical Telemetry — design system gallery · DEMO · paptrading:1 · non-mainnet</p>
   <hr>
 
-  <p class="rl-sec">Status band</p>
+  <h2 class="rl-sec">Status band</h2>
   <div class="rl-band rl-band--pass">
     <span class="rl-band__verdict">PASS</span>
     <span class="rl-band__meta">REPLAYED · CHAINED · SIGNED · TIER L1</span>
   </div>
-  <div class="rl-band rl-band--withheld" style="margin-top:12px">
+  <div class="rl-band">
     <span class="rl-band__verdict">WITHHELD</span>
     <span class="rl-band__meta">NEW_BLOCK_BREACH · BITGET NOT CALLED</span>
   </div>
 
-  <p class="rl-sec">Telemetry</p>
+  <h2 class="rl-sec">Telemetry</h2>
   <div class="rl-box">
     <dl class="rl-dl">
       <dt>receipt_hash</dt><dd class="rl-mono">sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6</dd>
@@ -40,7 +40,7 @@ BODY = """
     </dl>
   </div>
 
-  <p class="rl-sec">Badges</p>
+  <h2 class="rl-sec">Badges</h2>
   <p>
     <span class="rl-badge rl-badge--ok">ATTESTED</span>
     <span class="rl-badge">RELEASE_READY</span>
@@ -48,24 +48,26 @@ BODY = """
     <span class="rl-badge">QUEUED</span>
   </p>
 
-  <p class="rl-sec">Safety grid</p>
+  <h2 class="rl-sec">Safety grid</h2>
   <div class="rl-grid rl-grid--3">
     <div class="rl-box"><span class="rl-box__label">release freeze</span><strong>FALSE</strong></div>
     <div class="rl-box"><span class="rl-box__label">execution freeze</span><strong>FALSE</strong></div>
     <div class="rl-box"><span class="rl-box__label">mainnet enabled</span><strong class="rl-c-hazard">FALSE</strong></div>
   </div>
 
-  <p class="rl-sec">Release table</p>
+  <h2 class="rl-sec">Release table</h2>
+  <div class="rl-scroll-x">
   <table class="rl-table">
-    <thead><tr><th>release</th><th>state</th><th>canonical order</th><th>tier</th><th>attestation</th></tr></thead>
+    <thead><tr><th scope="col">release</th><th scope="col">state</th><th scope="col">canonical order</th><th scope="col">tier</th><th scope="col">attestation</th></tr></thead>
     <tbody>
       <tr><td>release-demo-good</td><td><span class="rl-badge rl-badge--ok">release_ready</span></td><td class="rl-mono">1453***8417</td><td>L1</td><td><span class="rl-badge rl-badge--ok">ATTESTED</span></td></tr>
       <tr><td>release-demo-bad</td><td><span class="rl-badge rl-badge--fail">blocked_withheld</span></td><td>none</td><td>L0</td><td><span class="rl-badge">missing</span></td></tr>
     </tbody>
   </table>
+  </div>
 
   <hr>
-  <p class="rl-label rl-faint">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布</p>
+  <p class="rl-muted">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布。 <span class="rl-faint">REV 2.6 · UNIT RL-01</span></p>
 </main>
 """
 

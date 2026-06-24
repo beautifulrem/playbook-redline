@@ -18,7 +18,7 @@
   /* phosphor — text */
   --rl-fg:    #EAEAEA;
   --rl-muted: #8A8A92;
-  --rl-faint: #5A5A62;
+  --rl-faint: #7E7F87;
 
   /* the ONLY alert color — aviation hazard red (BLOCK / WITHHELD / INVALID / tamper / freeze) */
   --rl-hazard:     #FF2A2A;
@@ -72,7 +72,8 @@ body {
 /* telemetry label / value primitives */
 .rl-label { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); }
 .rl-mono  { font-family: var(--rl-mono); overflow-wrap: anywhere; }
-.rl-faint { color: var(--rl-faint); }
+.rl-muted { color: var(--rl-muted); }
+.rl-faint { color: var(--rl-faint); }   /* dimmest tier; AA-compliant on --rl-bg, for de-emphasized decoration (REV/UNIT) */
 
 a { color: var(--rl-fg); text-underline-offset: 3px; }
 
@@ -85,6 +86,11 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 /* color utilities (token-bound) */
 .rl-c-hazard { color: var(--rl-hazard); }
 .rl-c-pass   { color: var(--rl-pass); }
+/* dense telemetry tables scroll rather than break columns — always-visible thin bar as the affordance */
+.rl-scroll-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--rl-line-strong) var(--rl-surface); }
+.rl-scroll-x::-webkit-scrollbar { height: 7px; }
+.rl-scroll-x::-webkit-scrollbar-track { background: var(--rl-surface); }
+.rl-scroll-x::-webkit-scrollbar-thumb { background: var(--rl-line-strong); }
 
 /* ===================== components (WS-A.2) ===================== */
 
@@ -103,13 +109,12 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-sec::before { content: "[ "; }
 .rl-sec::after  { content: " ]"; }
 
-/* STATUS BAND — the verdict stamp (replaces the rotated rubber stamp) */
-.rl-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rl-3) var(--rl-6); padding: var(--rl-4) var(--rl-6); border: var(--rl-border-strong); border-left-width: 6px; background: var(--rl-surface); }
+/* STATUS BAND — the verdict stamp. Fail-closed: any verdict that is NOT --pass renders hazard. */
+.rl-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rl-3) var(--rl-6); padding: var(--rl-4) var(--rl-6); border: var(--rl-border-strong); border-left-width: 6px; border-left-color: var(--rl-hazard); background: var(--rl-surface); }
+.rl-band + .rl-band { margin-top: var(--rl-3); }
 .rl-band--pass { border-left-color: var(--rl-pass); }
-.rl-band--fail, .rl-band--withheld, .rl-band--invalid { border-left-color: var(--rl-hazard); }
-.rl-band__verdict { font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: -0.03em; line-height: 1; font-size: clamp(1.75rem, 4vw, 3rem); color: var(--rl-fg); }
+.rl-band__verdict { font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: -0.03em; line-height: 1; font-size: clamp(1.75rem, 4vw, 3rem); color: var(--rl-hazard); }
 .rl-band--pass .rl-band__verdict { color: var(--rl-pass); }
-.rl-band--fail .rl-band__verdict, .rl-band--withheld .rl-band__verdict, .rl-band--invalid .rl-band__verdict { color: var(--rl-hazard); }
 .rl-band__meta { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); }
 
 /* TELEMETRY DL — label/value telemetry */
@@ -125,6 +130,9 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 
 /* TABLE — razor lines, dense, mono */
 .rl-table { width: 100%; border-collapse: collapse; }
-.rl-table th, .rl-table td { padding: var(--rl-2) var(--rl-3); border-top: var(--rl-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.rl-table th, .rl-table td { padding: var(--rl-2) var(--rl-3); border-top: var(--rl-border); text-align: left; vertical-align: top; white-space: nowrap; }
 .rl-table th { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-weight: 600; font-size: 11px; }
 .rl-table tbody tr:hover { background: var(--rl-surface); }
+
+/* narrow viewports: stack the band so the verdict meta never clips off-screen */
+@media (max-width: 560px) { .rl-band { flex-direction: column; align-items: flex-start; gap: var(--rl-2); } }
