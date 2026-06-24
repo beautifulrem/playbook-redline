@@ -1,18 +1,18 @@
 {
   "schema_version": "redline.attestation.v1",
   "release_id": "release-demo-good",
-  "bundle_hash": "sha256:1b129d0508b958c809ad95c18db6e15e23abb98d72e835c7e6baf8840b7729b7",
-  "manifest_hash": "sha256:b8058930594fb0a5ec308578966fccf25f0713fdf79658a9d3e05b1f7f0c9e19",
-  "evidence_merkle_root": "sha256:f4e642ea2aec56eb2e6ec8956c4661555df7ef82563095d5ee30c7a6800ba913",
+  "bundle_hash": "sha256:262b05e12124492f77e609e277006728d7f7acc887ed0b534acf226af39d35cd",
+  "manifest_hash": "sha256:9d7da0b24514ee1724d80ba8383514781265f59678bcfacea63e1030e46e8d5c",
+  "evidence_merkle_root": "sha256:3cb18dc48aef67b2005c3f2b736894a28082c2ca3285df03b4932ea1ded80cc1",
   "attestation_provider": "local_signed",
-  "attested_at": "2026-06-24T06:58:06Z",
+  "attested_at": "2026-06-24T09:36:06Z",
   "attester_principal": "service-token",
   "key_id": "service-local",
   "issuer": "redline-service",
-  "public_key": "ed25519-public:6d76cc831d71e462faaf41a0d8e35698c21ef298c54a6bf88ccfc47e7ef72fc7",
+  "public_key": "ed25519-public:eb1e49fb90db35ac91683c37113a8418bec3446792c4a9e9c08c734beccdcba7",
   "external_reference": {
     "kind": "local-signed"
   },
-  "signature": "ed25519-signature:3a6091bc67ebbbf61f180dbdff86becef2cf719ac9a8a6e77b5938d4e0b3792b4c856a07ca94867afb101c66e3efd3500fc2a6b2c154555ea7e148834ac81b08",
-  "attestation_hash": "sha256:b43eaa358216d91085d71901e038c6f93b6da56e7eb6396dcf0c3ae709743128"
+  "signature": "ed25519-signature:8b1fc6b90e1305eb992d677c9b742af5ee792633cfe85aa9f85eb25c2f9653aa7166aa9c0418b0fa348af54ac97c0a769645692941e70ff99464bc1babdec809",
+  "attestation_hash": "sha256:7d6fcf68c8873c8f35d121160ab0d83d98221229d345f0646d5dfba0db934b01"
 }

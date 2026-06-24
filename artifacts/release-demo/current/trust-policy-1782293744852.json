@@ -1,0 +1,17 @@
+{
+  "version": "redline.trust_policy.v1",
+  "policy_id": "release-demo-policy",
+  "audience": "redline.publish",
+  "allow_demo": false,
+  "keys": [
+    {
+      "key_id": "release-demo-key",
+      "public_key": "ed25519-public:b4ce925e77d05c98785e3f74ff3cec039de3b5775b6fda51bdd2ceeb77af73ac",
+      "issuer": "redline-release-demo",
+      "revoked": false,
+      "valid_from": null,
+      "valid_until": null
+    }
+  ],
+  "policy_hash": "sha256:0a6572b0fd1bbfce103da7f9154b81aee38e775faec7647d11c3f26f0393778b"
+}

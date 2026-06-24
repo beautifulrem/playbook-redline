@@ -604,5 +604,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:4dd4475834ca1b058ba4b9051efca05aa7bc4759db5b46fbf9a44cd314f48440"
+  "receipt_hash": "sha256:586f95c71e4f7df421676c54d15d4cdbc5e12dabc13af26d0be3a91996167fbc"
 }

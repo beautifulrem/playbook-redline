@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <title>Redline Evidence Comparison</title>
+  <title>Release release-demo-good · showcase show_3896bfc0ed13d1ef9f9a7982</title>
   <style>
     :root { --paper: #f6f7f9; --ink: #15171a; --muted: #5f6875; --line: #c9d1dc; --pass: #147a4d; --blocked: #9a5b00; --bad: #b3261e; --blue: #1f5f99; }
     * { box-sizing: border-box; }
@@ -31,11 +31,11 @@
 </head>
 <body>
   <main>
-    <h1>Redline Evidence Comparison</h1>
-    <div class="grid comparison">
+    <h1>Release release-demo-good · showcase show_3896bfc0ed13d1ef9f9a7982</h1>
+    <div class="grid">
       <section class="panel pass">
         <p class="stamp">PASS · REPLAYED + chained + signed · DEMO · paptrading:1 · 非 mainnet</p>
-        <h2>PASS -&gt; Bitget demo order</h2>
+        <h2>Release release-demo-good · showcase show_3896bfc0ed13d1ef9f9a7982</h2>
         <h2>Redline 侧</h2>
         <dl>
           <dt>verdict</dt><dd>PASS</dd>
@@ -46,35 +46,17 @@
         </dl>
         <h2>执行侧</h2>
         <dl>
-          <dt>bitget_order_id</dt><dd>1453610833413308417</dd>
-          <dt>client_oid</dt><dd>rl-98eb356e754b0eab27b6442f92c29</dd>
-          <dt>placed_at</dt><dd>2026-06-24T09:35:50Z</dd>
+          <dt>bitget_order_id</dt><dd>1453610855685062657</dd>
+          <dt>client_oid</dt><dd>rl-0263a9d3acfa42e9c38dbc78f4fab</dd>
+          <dt>placed_at</dt><dd>2026-06-24T09:35:55Z</dd>
           <dt>symbol</dt><dd>BTCUSDT</dd>
           <dt>product_type</dt><dd>USDT-FUTURES</dd>
           <dt>order_mode</dt><dd>demo</dd>
           <dt>paptrading</dt><dd>1</dd>
           <dt>receipt_hash</dt><dd>sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
-          <dt>response_hash</dt><dd>sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2</dd>
+          <dt>response_hash</dt><dd>sha256:dbc870758830548ba433bc2f8e0ea1c46f73201ec31628b965c0667df36b0873</dd>
         </dl>
         
-      </section>
-      <section class="panel blocked">
-        <p class="stamp">WITHHELD · BLOCKED · DEMO · paptrading:1 · 非 mainnet</p>
-        <h2>WITHHELD -&gt; blocked before Bitget</h2>
-        <h2>Redline 侧</h2>
-        <dl>
-          <dt>verdict</dt><dd>WITHHELD</dd>
-          <dt>reason_code</dt><dd>NEW_BLOCK_BREACH</dd>
-          <dt>chain_status</dt><dd>chained</dd>
-          <dt>receipt_hash</dt><dd>sha256:289405d2f8dd0460bc2778d5ed5a7d941ea1c1f4d8e166b14dd17fb821bd7dcf</dd>
-          <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0; max_drawdown &lt;= 0.08000000 observed 0.00498134; max_drawdown &lt;= 0.08000000 observed 0.02029149; max_drawdown &lt;= 0.08000000 observed 0.17663366; no_entry_when &lt;= 0 observed 0; no_entry_when &lt;= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget &lt;= 20.00000000 observed 1.00000000; 2 anchored scenarios</dd>
-        </dl>
-        
-        <h2>拦截侧</h2>
-        <dl>
-          <dt>block reason_code</dt><dd>NEW_BLOCK_BREACH</dd>
-          <dt>exchange call</dt><dd>Bitget 未被调用</dd>
-        </dl>
       </section>
     </div>
     <p class="note">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布</p>

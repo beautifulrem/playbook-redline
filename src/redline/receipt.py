@@ -91,7 +91,12 @@ def make_decision_proof(
 
 
 def compute_receipt_hash(receipt: Receipt) -> str:
-    payload = receipt.model_copy(update={"receipt_hash": ""}).model_dump(mode="python")
+    # exclude_none: a None optional field is semantically an absent field. Including it as
+    # `null` silently breaks cross-version verification — a legacy v3.2 receipt that never
+    # carried v3.3's optional fields (verdict_tier, adjusted_size_cap, leak-free proof
+    # fields, ...) would otherwise hash differently and read as tampered. prev_receipt_hash
+    # defaults to a non-None sentinel, so it still needs the model_fields_set pop for v3.2.
+    payload = receipt.model_copy(update={"receipt_hash": ""}).model_dump(mode="python", exclude_none=True)
     if "prev_receipt_hash" not in receipt.model_fields_set:
         payload.pop("prev_receipt_hash", None)
     return hash_obj(payload)
