@@ -548,7 +548,7 @@
     "stop_before_final_publish": true,
     "version_id": null
   },
-  "receipt_hash": "sha256:4dd4475834ca1b058ba4b9051efca05aa7bc4759db5b46fbf9a44cd314f48440",
+  "receipt_hash": "sha256:586f95c71e4f7df421676c54d15d4cdbc5e12dabc13af26d0be3a91996167fbc",
   "report_hash": "sha256:05f2c4098257a0972e2a2809aeee2fd2fbc9995eb6be3954f9905bcf0970eb22",
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; max_drawdown <= 0.08000000 observed 0.02029149; max_drawdown <= 0.08000000 observed 0.17663366; no_entry_when <= 0 observed 0; no_entry_when <= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "traces": [

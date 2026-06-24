@@ -2,8 +2,8 @@
   "audit_log_slice": [
     {
       "actor": "strategy-author",
-      "created_at": "2026-06-24T06:57:54Z",
-      "entry_hash": "sha256:3a02eb8beee5fe34df6e127ca8d0c033de633c49919e3432ee6e8b7bccf3b056",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:a117d21f3d5632ffc52c8632b4fcd0678dd06a92616fda0840c7e1311fb3ab5c",
       "event_type": "strategy_version_created",
       "payload": {
         "actor_auth": {
@@ -30,8 +30,8 @@
     },
     {
       "actor": "strategy-author",
-      "created_at": "2026-06-24T06:57:54Z",
-      "entry_hash": "sha256:a707ecd939fcad8b71bffea3bdb3075ef33cf55a5bc3eabc7440299f20449aa3",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:9faf12a4606e7678d8a785c9d17a56742afcd0b1f258c2336c716a8e7ea12599",
       "event_type": "release_candidate_created",
       "payload": {
         "actor_auth": {
@@ -50,67 +50,67 @@
         },
         "state": "draft"
       },
-      "previous_entry_hash": "sha256:3a02eb8beee5fe34df6e127ca8d0c033de633c49919e3432ee6e8b7bccf3b056",
+      "previous_entry_hash": "sha256:a117d21f3d5632ffc52c8632b4fcd0678dd06a92616fda0840c7e1311fb3ab5c",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:46c9a44109090d57fcdacb739d96ae4f3ba8e99fa550647a31f30cd20f3f6bc3",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:40155c64e0bc414bb8ba077bfa06243bb7911c39d9cd80c70fadefa6d1add3f6",
       "event_type": "redline_run_bound",
       "payload": {
         "reason_code": "PASS",
-        "run_id": "run_c55be55a42ede4f90437cb74",
+        "run_id": "run_1094a295995fc4cdc7dde24b",
         "run_state": "pass"
       },
-      "previous_entry_hash": "sha256:a707ecd939fcad8b71bffea3bdb3075ef33cf55a5bc3eabc7440299f20449aa3",
+      "previous_entry_hash": "sha256:9faf12a4606e7678d8a785c9d17a56742afcd0b1f258c2336c716a8e7ea12599",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:5e8a1410e765749206ebc7395b899cd6440b1d36f3f987ab03d62bd8b917915e",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:f027338246ade290eba1a12749cc1a7e29494d9a996eb6972049816d74801a5d",
       "event_type": "redline_verified",
       "payload": {
-        "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+        "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
         "report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa"
       },
-      "previous_entry_hash": "sha256:46c9a44109090d57fcdacb739d96ae4f3ba8e99fa550647a31f30cd20f3f6bc3",
+      "previous_entry_hash": "sha256:40155c64e0bc414bb8ba077bfa06243bb7911c39d9cd80c70fadefa6d1add3f6",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:a999c43ee4a84c471caa6d75f6f2cddd7c66da79b47e1e6656e2c21a2e77e024",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:4a6847d74564751f24c199e1bc4b23f6dbcb583034d220f2998df5ee755ac195",
       "event_type": "simulation_evidence_imported",
       "payload": {
-        "evidence_hash": "sha256:f422a0077da2bc4e3f5d62b7406a8205e1c03e704088894ecd6e2e70f42a0627",
+        "evidence_hash": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9",
         "source": "local_backtest",
         "symbol": "BTCUSDT"
       },
-      "previous_entry_hash": "sha256:5e8a1410e765749206ebc7395b899cd6440b1d36f3f987ab03d62bd8b917915e",
+      "previous_entry_hash": "sha256:f027338246ade290eba1a12749cc1a7e29494d9a996eb6972049816d74801a5d",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:26b898086d72de9287f088df8a583f9eae29a61b9d6f46adda00cf68b05ca030",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:460d9baa416baade6369a86d10900a713f909aa81da0ec83c355dfe2e1719a5b",
       "event_type": "risk_policy_bound",
       "payload": {
         "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
       },
-      "previous_entry_hash": "sha256:a999c43ee4a84c471caa6d75f6f2cddd7c66da79b47e1e6656e2c21a2e77e024",
+      "previous_entry_hash": "sha256:4a6847d74564751f24c199e1bc4b23f6dbcb583034d220f2998df5ee755ac195",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:c7d7bf2104c16f620624a7854703838aef629397e2e5bd4c9d0fe10a169f63c5",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:5adfbfd8784293786692cd6f6e1132e7641356ff6a2f51a4625b6ac65e90271e",
       "event_type": "risk_policy_checked",
       "payload": {
         "breach": null,
@@ -119,14 +119,14 @@
           "decision": "allow"
         }
       },
-      "previous_entry_hash": "sha256:26b898086d72de9287f088df8a583f9eae29a61b9d6f46adda00cf68b05ca030",
+      "previous_entry_hash": "sha256:460d9baa416baade6369a86d10900a713f909aa81da0ec83c355dfe2e1719a5b",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:2995c3f26edbbafd31d5707c5b611b638efa194fa1b7ace192880992b1c911d9",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:dae28c0096551072c435ee430a96276280c56b1a46f3669f1931a193e7d187a4",
       "event_type": "approval_granted",
       "payload": {
         "actor_auth": {
@@ -143,63 +143,63 @@
           "auth_subject": "service-token",
           "principal_id": "service-token"
         },
-        "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+        "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
         "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
         "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
         "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
       },
-      "previous_entry_hash": "sha256:c7d7bf2104c16f620624a7854703838aef629397e2e5bd4c9d0fe10a169f63c5",
+      "previous_entry_hash": "sha256:5adfbfd8784293786692cd6f6e1132e7641356ff6a2f51a4625b6ac65e90271e",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:55Z",
-      "entry_hash": "sha256:9feda437d939793d660fb8595fba77c2f8a12b38988dd34d67b963889e33f5d6",
+      "created_at": "2026-06-24T09:35:45Z",
+      "entry_hash": "sha256:fa1fcc2b3fe64192c755d3d7bd474244aa9397ee6bfb6b43a50eaaae27bcc3bc",
       "event_type": "demo_order_requested",
       "payload": {
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:2995c3f26edbbafd31d5707c5b611b638efa194fa1b7ace192880992b1c911d9",
+      "previous_entry_hash": "sha256:dae28c0096551072c435ee430a96276280c56b1a46f3669f1931a193e7d187a4",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:58Z",
-      "entry_hash": "sha256:ce7ae6da2eb8ddfa89ba747ed0f1195e10cf4d474b2147f6d4edbf01af010cef",
+      "created_at": "2026-06-24T09:35:51Z",
+      "entry_hash": "sha256:9106f85ef8ec41435e94fc5c615d20bb02b7c49836017963045cfc7a399ebb68",
       "event_type": "demo_order_placed",
       "payload": {
-        "bitget_order_id": "1453***8145",
-        "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
+        "bitget_order_id": "1453***8417",
+        "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:9feda437d939793d660fb8595fba77c2f8a12b38988dd34d67b963889e33f5d6",
+      "previous_entry_hash": "sha256:fa1fcc2b3fe64192c755d3d7bd474244aa9397ee6bfb6b43a50eaaae27bcc3bc",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:58Z",
-      "entry_hash": "sha256:a1c5c724de983bce18031fccbb90b2956f68361c2e49413aee535463646ec70d",
+      "created_at": "2026-06-24T09:35:51Z",
+      "entry_hash": "sha256:97114430f23e585d7bad5d8bf1387152c3240a3050a8e298173582fbcef1de1c",
       "event_type": "release_ready",
       "payload": {
         "state": "release_ready"
       },
-      "previous_entry_hash": "sha256:ce7ae6da2eb8ddfa89ba747ed0f1195e10cf4d474b2147f6d4edbf01af010cef",
+      "previous_entry_hash": "sha256:9106f85ef8ec41435e94fc5c615d20bb02b7c49836017963045cfc7a399ebb68",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:58Z",
-      "entry_hash": "sha256:883b932bdafe775637ee430390fd3f0ea22f4c40b651a2044f9d2925d0101d18",
+      "created_at": "2026-06-24T09:35:51Z",
+      "entry_hash": "sha256:8ecd679971f245ebac7beaea647a39c09fa14fe9ac9a00ce6141085dcb10b4bd",
       "event_type": "approval_granted",
       "payload": {
         "actor_auth": {
@@ -216,52 +216,52 @@
           "auth_subject": "service-token",
           "principal_id": "service-token"
         },
-        "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+        "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
         "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
         "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
         "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
       },
-      "previous_entry_hash": "sha256:a1c5c724de983bce18031fccbb90b2956f68361c2e49413aee535463646ec70d",
+      "previous_entry_hash": "sha256:97114430f23e585d7bad5d8bf1387152c3240a3050a8e298173582fbcef1de1c",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:57:58Z",
-      "entry_hash": "sha256:a0b5558c0026aa5f7952f7f683be12f53c358ced4d6a1d34bec49997958a1e12",
+      "created_at": "2026-06-24T09:35:51Z",
+      "entry_hash": "sha256:dce15c51a80349d2ef1ebedf87c39d8a11c400d1c055e3343c28440bbb86a0bb",
       "event_type": "showcase_demo_order_requested",
       "payload": {
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:883b932bdafe775637ee430390fd3f0ea22f4c40b651a2044f9d2925d0101d18",
+      "previous_entry_hash": "sha256:8ecd679971f245ebac7beaea647a39c09fa14fe9ac9a00ce6141085dcb10b4bd",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:00Z",
-      "entry_hash": "sha256:116669f55b1b4ebea49566f6950ac9aadb63ef0b729549df64339670b600290b",
+      "created_at": "2026-06-24T09:35:56Z",
+      "entry_hash": "sha256:93e7947dde8d47eba9be25da3bcbcf7ff40401df76395030dffba40fe7a06634",
       "event_type": "showcase_demo_order_placed",
       "payload": {
-        "attempt_id": "show_00b165f8509686fd2f7d676c",
-        "bitget_order_id": "1453***7361",
-        "client_oid": "rl-877fe463837225b1cb4f67f6f5b6a",
+        "attempt_id": "show_3896bfc0ed13d1ef9f9a7982",
+        "bitget_order_id": "1453***2657",
+        "client_oid": "rl-0263a9d3acfa42e9c38dbc78f4fab",
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:a0b5558c0026aa5f7952f7f683be12f53c358ced4d6a1d34bec49997958a1e12",
+      "previous_entry_hash": "sha256:dce15c51a80349d2ef1ebedf87c39d8a11c400d1c055e3343c28440bbb86a0bb",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:00Z",
-      "entry_hash": "sha256:b65de5b0d4016708849a5609ecc72944d98e110e408eebb3b51e21dd280e6e37",
+      "created_at": "2026-06-24T09:35:56Z",
+      "entry_hash": "sha256:b57ecc357d13f58d881df21f94db9ca7f44ccb846389d6f44eb40748a5473c2e",
       "event_type": "approval_granted",
       "payload": {
         "actor_auth": {
@@ -278,52 +278,52 @@
           "auth_subject": "service-token",
           "principal_id": "service-token"
         },
-        "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+        "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
         "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
         "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
         "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
       },
-      "previous_entry_hash": "sha256:116669f55b1b4ebea49566f6950ac9aadb63ef0b729549df64339670b600290b",
+      "previous_entry_hash": "sha256:93e7947dde8d47eba9be25da3bcbcf7ff40401df76395030dffba40fe7a06634",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:00Z",
-      "entry_hash": "sha256:fcf8d7d16937b004be4bca90ddc8f20407e1a62bcd60714fc974491b91d993d3",
+      "created_at": "2026-06-24T09:35:56Z",
+      "entry_hash": "sha256:9b534bf647bf6ce65cdd0f898211f83c04fa293db383a6620017daef1322c74d",
       "event_type": "showcase_demo_order_requested",
       "payload": {
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:b65de5b0d4016708849a5609ecc72944d98e110e408eebb3b51e21dd280e6e37",
+      "previous_entry_hash": "sha256:b57ecc357d13f58d881df21f94db9ca7f44ccb846389d6f44eb40748a5473c2e",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:04Z",
-      "entry_hash": "sha256:97fe9f4ee68fbb92724455b9414380f546028e99cdd0cdbc5fa7ecca34e9fe23",
+      "created_at": "2026-06-24T09:36:01Z",
+      "entry_hash": "sha256:8f08c768b9820883891ce8e75cd64982ed94c01f8fded98c6cd54daea30d79c2",
       "event_type": "showcase_demo_order_placed",
       "payload": {
-        "attempt_id": "show_783a401c888de12d9a59a727",
-        "bitget_order_id": "1453***1521",
-        "client_oid": "rl-75c0f84861312470672240a0fe398",
+        "attempt_id": "show_c7e25685348e86f0f89e85c0",
+        "bitget_order_id": "1453***2273",
+        "client_oid": "rl-256dde4557790a58afc761369b4e2",
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:fcf8d7d16937b004be4bca90ddc8f20407e1a62bcd60714fc974491b91d993d3",
+      "previous_entry_hash": "sha256:9b534bf647bf6ce65cdd0f898211f83c04fa293db383a6620017daef1322c74d",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:04Z",
-      "entry_hash": "sha256:15f27759fb5f4ff85609bdd37e649da539498320a3e65c87f14a947f6c8efa8f",
+      "created_at": "2026-06-24T09:36:01Z",
+      "entry_hash": "sha256:18ec66faad4193168aaacb6091cbb0b4ea3301aa56bf5b85583551d989469b48",
       "event_type": "approval_granted",
       "payload": {
         "actor_auth": {
@@ -340,64 +340,64 @@
           "auth_subject": "service-token",
           "principal_id": "service-token"
         },
-        "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+        "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
         "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
         "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
         "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
       },
-      "previous_entry_hash": "sha256:97fe9f4ee68fbb92724455b9414380f546028e99cdd0cdbc5fa7ecca34e9fe23",
+      "previous_entry_hash": "sha256:8f08c768b9820883891ce8e75cd64982ed94c01f8fded98c6cd54daea30d79c2",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:04Z",
-      "entry_hash": "sha256:f26d7faeeaa068915bfa2fc6c9125b285b22854ea9cec7606abf84393007c6bd",
+      "created_at": "2026-06-24T09:36:01Z",
+      "entry_hash": "sha256:c973d1aa5f66995226cb061c741fbb8b3006dcb35be7149f0dbf08768fcb6610",
       "event_type": "showcase_demo_order_requested",
       "payload": {
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:15f27759fb5f4ff85609bdd37e649da539498320a3e65c87f14a947f6c8efa8f",
+      "previous_entry_hash": "sha256:18ec66faad4193168aaacb6091cbb0b4ea3301aa56bf5b85583551d989469b48",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     },
     {
       "actor": "service-token",
-      "created_at": "2026-06-24T06:58:06Z",
-      "entry_hash": "sha256:411b5cc832266a82e853f64fca8a133081127a7603d5a256919169d0c32b1c01",
+      "created_at": "2026-06-24T09:36:06Z",
+      "entry_hash": "sha256:6989eda0599039fab9f4f4d5536273e86c2f290bd356b352282d832523b10441",
       "event_type": "showcase_demo_order_placed",
       "payload": {
-        "attempt_id": "show_e87a0d7c729af81bd63f03a9",
-        "bitget_order_id": "1453***5281",
-        "client_oid": "rl-e5a0876d19b1443b7a9e09db68041",
+        "attempt_id": "show_7c9e609b4bbf873198bebc0e",
+        "bitget_order_id": "1453***0625",
+        "client_oid": "rl-7c5a7007a72681180d437046486cc",
         "risk_policy_decision": {
           "decision": "allow"
         },
-        "run_id": "run_c55be55a42ede4f90437cb74"
+        "run_id": "run_1094a295995fc4cdc7dde24b"
       },
-      "previous_entry_hash": "sha256:f26d7faeeaa068915bfa2fc6c9125b285b22854ea9cec7606abf84393007c6bd",
+      "previous_entry_hash": "sha256:c973d1aa5f66995226cb061c741fbb8b3006dcb35be7149f0dbf08768fcb6610",
       "release_id": "release-demo-good",
       "schema_version": "redline.release.audit.v1"
     }
   ],
   "execution_evidence": {
-    "approval_hash": "sha256:f4dfab3096baae6f3dbf9f75fce952acb8514b0867b5ddd9c12d8cace367950c",
-    "artifact_hash": "sha256:c2a908d7eeae7de077b1bc5050b9c4ceddaf7a6933af4a4d4197d98908f22fa5",
-    "bitget_order_id": "1453571102478598145",
-    "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-    "execution_ledger_entry_hash": "sha256:00f14e59ccd6609ff46c5503a06cdf3bfbd12dde5870b81a0962904bf31924be",
-    "issuance_checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843",
-    "issuance_ledger_entry_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
+    "approval_hash": "sha256:080ab5b6715fd1032480d075594b36d048084411f7b7183625c9b37782312321",
+    "artifact_hash": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c",
+    "bitget_order_id": "1453610833413308417",
+    "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+    "execution_ledger_entry_hash": "sha256:2b565fa99cc3de37f2c53276d96c1c8e2bbe5b4aff6b48997b0f14c133fcf13b",
+    "issuance_checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+    "issuance_ledger_entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
     "order_mode": "demo",
     "paptrading": "1",
-    "placed_at": "2026-06-24T06:57:57Z",
+    "placed_at": "2026-06-24T09:35:50Z",
     "product_type": "USDT-FUTURES",
-    "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-    "response_hash": "sha256:0a1474e94df0f8ebdda29bfc0b68f4298050e76b4b2cd3662eb1f62822842b5c",
-    "run_id": "run_c55be55a42ede4f90437cb74",
+    "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+    "response_hash": "sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2",
+    "run_id": "run_1094a295995fc4cdc7dde24b",
     "symbol": "BTCUSDT",
     "verdict": "pass",
     "version": "redline.execution.evidence.v1"
@@ -1058,7 +1058,7 @@
             "stop_before_final_publish": true,
             "version_id": null
           },
-          "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+          "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
           "report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa",
           "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
           "traces": [
@@ -1976,14 +1976,14 @@
         },
         "kind": "report",
         "path": "report.json",
-        "sha256": "sha256:f5b6469fd165ce740283356be0bb600e46c1e3b16f4939e59d021116fda46be9"
+        "sha256": "sha256:fe033897d6b8b801d193d16665fa25dea83975f6afda7dc4da7e568cc23c89b0"
       },
       {
         "artifact_id": "receipt",
         "bytes": 22383,
         "content": {
           "baseline": {
-            "baseline_receipt_hash": "sha256:206a14a9b881806794d8346aab81b1b0215060009997363d6b987c153d280b6b",
+            "baseline_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
             "baseline_version_id": "fixture:baseline",
             "chain_status": "chained",
             "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
@@ -2099,7 +2099,7 @@
             "identity_lock_path": "fixtures/demo_pack/playbook_identity.lock",
             "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6"
           },
-          "prev_receipt_hash": "sha256:206a14a9b881806794d8346aab81b1b0215060009997363d6b987c153d280b6b",
+          "prev_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
           "proofs": [
             {
               "artifact_hash": "sha256:7bc11572ef15a4a40cdf185639a3c244b225653f56d1d3233b3670042cfd9c1f",
@@ -2538,7 +2538,7 @@
             "stop_before_final_publish": true,
             "version_id": null
           },
-          "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+          "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
           "report": {
             "attribution_report_hash": null,
             "report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa"
@@ -2576,102 +2576,102 @@
         },
         "kind": "receipt",
         "path": "receipt.json",
-        "sha256": "sha256:988370fcc86e311737614c213faa98fa4cf0b598104759a52a13ad8f04967e58"
+        "sha256": "sha256:5761d042df9d5d6eff5ce8b479238b1f9a2a3a549614d5cc4c5a112893772bec"
       },
       {
         "artifact_id": "issuance-ledger",
         "bytes": 365,
         "content": [
           {
-            "entry_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
+            "entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
             "key_hash": "sha256:c12884aed6bff50f4edf3d039b875703b5d94faec30cae4d5abeeab4868df86d",
             "previous_entry_hash": "sha256:genesis",
-            "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+            "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
             "status": "pass",
             "written_at": "1970-01-01T00:00:00Z"
           }
         ],
         "kind": "ledger",
         "path": "issuance-ledger.jsonl",
-        "sha256": "sha256:4451a95a109a63e892e390b488d5d3904f0a6b2881395b73f0c9816c2b18d911"
+        "sha256": "sha256:39110a5636ee9ff1d3b2608084b1780e2fb111a76260580cb6c9f82f0e9735d1"
       },
       {
         "artifact_id": "issuance-ledger-checkpoint",
         "bytes": 757,
         "content": {
           "anchor_kind": "local-artifact",
-          "checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843",
+          "checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
           "ledger_entry_count": 1,
-          "ledger_hash": "sha256:4451a95a109a63e892e390b488d5d3904f0a6b2881395b73f0c9816c2b18d911",
-          "ledger_path": "/Volumes/Remi/\u4ed3\u5e93/bitget/artifacts/release-demo/session-1782284274326/service/runs/run_c55be55a42ede4f90437cb74/issuance-ledger.jsonl",
-          "ledger_tail_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
-          "merkle_root": "sha256:4874e036d8a93db222358f7269e4de81c280a0806d2a71a2ff32533f0db61043",
+          "ledger_hash": "sha256:39110a5636ee9ff1d3b2608084b1780e2fb111a76260580cb6c9f82f0e9735d1",
+          "ledger_path": "/Volumes/Remi/\u4ed3\u5e93/bitget/artifacts/release-demo/session-1782293744852/service/runs/run_1094a295995fc4cdc7dde24b/issuance-ledger.jsonl",
+          "ledger_tail_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
+          "merkle_root": "sha256:3108ba7588eefc0d94ea2247fcf677d9361069653b78c08b5ee2757bcb1711f7",
           "subject_receipt_hashes": [
-            "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6"
+            "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2"
           ],
           "version": "redline.ledger.checkpoint.v1"
         },
         "kind": "ledger-checkpoint",
         "path": "issuance-ledger.checkpoint.json",
-        "sha256": "sha256:d742722944cdda24a5c4314fe8679cf5ff6ce61c07602ba543dc8442ff34fcc6"
+        "sha256": "sha256:1e0999b796dc97a0c927e7b9fc9df9a209d7ccedd1f9eb1a53b77227c1f97744"
       },
       {
         "artifact_id": "execution-evidence",
         "bytes": 1046,
         "content": {
-          "approval_hash": "sha256:f4dfab3096baae6f3dbf9f75fce952acb8514b0867b5ddd9c12d8cace367950c",
-          "artifact_hash": "sha256:c2a908d7eeae7de077b1bc5050b9c4ceddaf7a6933af4a4d4197d98908f22fa5",
-          "bitget_order_id": "1453571102478598145",
-          "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-          "execution_ledger_entry_hash": "sha256:00f14e59ccd6609ff46c5503a06cdf3bfbd12dde5870b81a0962904bf31924be",
-          "issuance_checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843",
-          "issuance_ledger_entry_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
+          "approval_hash": "sha256:080ab5b6715fd1032480d075594b36d048084411f7b7183625c9b37782312321",
+          "artifact_hash": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c",
+          "bitget_order_id": "1453610833413308417",
+          "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+          "execution_ledger_entry_hash": "sha256:2b565fa99cc3de37f2c53276d96c1c8e2bbe5b4aff6b48997b0f14c133fcf13b",
+          "issuance_checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+          "issuance_ledger_entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
           "order_mode": "demo",
           "paptrading": "1",
-          "placed_at": "2026-06-24T06:57:57Z",
+          "placed_at": "2026-06-24T09:35:50Z",
           "product_type": "USDT-FUTURES",
-          "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-          "response_hash": "sha256:0a1474e94df0f8ebdda29bfc0b68f4298050e76b4b2cd3662eb1f62822842b5c",
-          "run_id": "run_c55be55a42ede4f90437cb74",
+          "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+          "response_hash": "sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2",
+          "run_id": "run_1094a295995fc4cdc7dde24b",
           "symbol": "BTCUSDT",
           "verdict": "pass",
           "version": "redline.execution.evidence.v1"
         },
         "kind": "execution-evidence",
         "path": "execution-evidence.json",
-        "sha256": "sha256:a8b0d5932547200c4559209dd8bf0cb3d4c81ede7bf1e72ec5e97f5aa67b205a"
+        "sha256": "sha256:aa8cba2fa122c8b31313ba93a10e6d264d2319a34c8dbc46569a9274b5a7371c"
       },
       {
         "artifact_id": "execution-ledger",
         "bytes": 852,
         "content": [
           {
-            "approval_hash": "sha256:f4dfab3096baae6f3dbf9f75fce952acb8514b0867b5ddd9c12d8cace367950c",
-            "bitget_order_id": "1453571102478598145",
-            "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-            "entry_hash": "sha256:00f14e59ccd6609ff46c5503a06cdf3bfbd12dde5870b81a0962904bf31924be",
-            "issuance_checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843",
-            "issuance_ledger_entry_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
-            "placed_at": "2026-06-24T06:57:57Z",
+            "approval_hash": "sha256:080ab5b6715fd1032480d075594b36d048084411f7b7183625c9b37782312321",
+            "bitget_order_id": "1453610833413308417",
+            "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+            "entry_hash": "sha256:2b565fa99cc3de37f2c53276d96c1c8e2bbe5b4aff6b48997b0f14c133fcf13b",
+            "issuance_checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+            "issuance_ledger_entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
+            "placed_at": "2026-06-24T09:35:50Z",
             "previous_entry_hash": "sha256:genesis",
-            "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-            "response_hash": "sha256:0a1474e94df0f8ebdda29bfc0b68f4298050e76b4b2cd3662eb1f62822842b5c",
-            "run_id": "run_c55be55a42ede4f90437cb74",
+            "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+            "response_hash": "sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2",
+            "run_id": "run_1094a295995fc4cdc7dde24b",
             "verdict": "pass",
             "version": "redline.execution.ledger_entry.v1"
           }
         ],
         "kind": "execution-ledger",
         "path": "execution-ledger.jsonl",
-        "sha256": "sha256:d6fe8e0a972146ff064ab2e75716f3593e55f8541e5350e0135a5aece6a29f5b"
+        "sha256": "sha256:a1529eddebdd75f653918090a2763a055fa11dfc5b77be74b647b2361ff4ebbb"
       },
       {
         "artifact_id": "exchange-preflight-evidence",
         "bytes": 1359,
         "content": {
-          "account_response_hash": "sha256:6381bba358638e314915e8dd5591ec4dfe3289d5556a7aba083ec41b04af65b8",
-          "available": "9981.09310924",
-          "checked_at": "2026-06-24T06:57:56Z",
+          "account_response_hash": "sha256:34f085181b98dcfa358cc2152317157a33e637031eae5fd6be7ddf38829e4d46",
+          "available": "9977.93699852",
+          "checked_at": "2026-06-24T09:35:48Z",
           "checks": [
             {
               "name": "symbol_exists",
@@ -2701,19 +2701,19 @@
               "value": "4"
             }
           ],
-          "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-          "contract_response_hash": "sha256:23311084c5ecd379a2041c14b2b90b9b5c12af38f6c9d09a538c71d62da29c6f",
+          "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+          "contract_response_hash": "sha256:9168258361fcc582f6ec032b682ff148eb97097492d89293c3bb3b0e01a83c07",
           "margin_coin": "USDT",
           "min_trade_num": "0.0001",
           "min_trade_usdt": "5",
           "ok": true,
           "order_mode": "demo",
           "paptrading": "1",
-          "preflight_hash": "sha256:e46041036262594de2af1d0fc844d849a0dc1116fb94d7c6b854898c4a59ff7a",
+          "preflight_hash": "sha256:7e438d4ba4dcf389db9d398b3b3ee21adb74f99d1fe8b998e4b14150fe01591a",
           "price_place": "1",
           "product_type": "USDT-FUTURES",
-          "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-          "run_id": "run_c55be55a42ede4f90437cb74",
+          "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+          "run_id": "run_1094a295995fc4cdc7dde24b",
           "schema_version": "redline.bitget.exchange_preflight.v1",
           "symbol": "BTCUSDT",
           "symbol_status": "normal",
@@ -2721,23 +2721,23 @@
         },
         "kind": "exchange-preflight-evidence",
         "path": "exchange-preflight-evidence.json",
-        "sha256": "sha256:7c44e15dc79392553a521523911daff4ecbea2a73e581fb3c5815fe23bf801a2"
+        "sha256": "sha256:105e5b216af2234b97801bc7eeb42bebeab5b6bf342f30bfc47ec15f92684394"
       },
       {
         "artifact_id": "order-status-evidence",
         "bytes": 690,
         "content": {
-          "bitget_order_id": "1453571102478598145",
-          "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-          "evidence_hash": "sha256:ba9b3db7fc470a2a9fccf9a18ce7991ee6602ab222ee17555c3df19d1f5ccb8c",
+          "bitget_order_id": "1453610833413308417",
+          "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+          "evidence_hash": "sha256:8f0ac00ab5b9d6c7083d1a11d86b81e33424541684ee7e5107b06eddc016e9f3",
           "order_mode": "demo",
           "paptrading": "1",
           "product_type": "USDT-FUTURES",
-          "queried_at": "2026-06-24T06:57:58Z",
+          "queried_at": "2026-06-24T09:35:51Z",
           "raw_status": "filled",
-          "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-          "response_hash": "sha256:97f045e385d0f8c8a52e637ee9ce9dc73ede7b194824373d4109418792495293",
-          "run_id": "run_c55be55a42ede4f90437cb74",
+          "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+          "response_hash": "sha256:b13df4a8d690c9ee3c5b8418198ed08c1f4e5f9a875af45531606bdb39eb230a",
+          "run_id": "run_1094a295995fc4cdc7dde24b",
           "schema_version": "redline.bitget.order_status.v1",
           "status": "filled",
           "status_code": 200,
@@ -2745,7 +2745,7 @@
         },
         "kind": "order-status-evidence",
         "path": "order-status-evidence.json",
-        "sha256": "sha256:bcd4ca14864c897e8902dbf59dbb0dea02e41bae8db1d578825616968da02515"
+        "sha256": "sha256:1daced73d40369ed4cb8764c1d92ead2bf418ddc82b609261e8fb5d0bfdb2c77"
       },
       {
         "artifact_id": "proofs/proof_baseline_calibration_6dbf4d64bed1fe7aa8537e99.json",
@@ -3280,25 +3280,25 @@
       }
     ],
     "reason_code": "PASS",
-    "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+    "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
     "report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa",
-    "run_id": "run_c55be55a42ede4f90437cb74",
+    "run_id": "run_1094a295995fc4cdc7dde24b",
     "state": "pass"
   },
   "release_candidate": {
     "approval": {
-      "approved_at": "2026-06-24T06:57:55Z",
+      "approved_at": "2026-06-24T09:35:45Z",
       "auth_method": "service_token",
       "auth_subject": "service-token",
       "claimed_reviewer_id": "release-reviewer",
       "comment": "hackathon demo approval",
-      "consumed_at": "2026-06-24T06:57:55Z",
+      "consumed_at": "2026-06-24T09:35:45Z",
       "decision": "approve",
       "demo_mode": false,
-      "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
-      "expires_at": "2026-06-24T07:12:55Z",
+      "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
+      "expires_at": "2026-06-24T09:50:45Z",
       "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
-      "nonce": "appr_ff0ec4c2ca7db651f9acf190",
+      "nonce": "appr_1549b6ab6201c6bfd8e8396b",
       "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
       "reviewer_display_name": null,
       "reviewer_email": null,
@@ -3307,30 +3307,30 @@
       "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
       "schema_version": "redline.release.approval.v1"
     },
-    "created_at": "2026-06-24T06:57:54Z",
+    "created_at": "2026-06-24T09:35:45Z",
     "created_by": "strategy-author",
     "evidence_manifest": null,
     "evidence_manifest_hash": null,
     "execution_evidence": {
-      "approval_hash": "sha256:f4dfab3096baae6f3dbf9f75fce952acb8514b0867b5ddd9c12d8cace367950c",
-      "artifact_hash": "sha256:c2a908d7eeae7de077b1bc5050b9c4ceddaf7a6933af4a4d4197d98908f22fa5",
-      "bitget_order_id": "1453571102478598145",
-      "client_oid": "rl-8b23edcc8d0d8cb5953262e5e685d",
-      "execution_ledger_entry_hash": "sha256:00f14e59ccd6609ff46c5503a06cdf3bfbd12dde5870b81a0962904bf31924be",
-      "issuance_checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843",
-      "issuance_ledger_entry_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
+      "approval_hash": "sha256:080ab5b6715fd1032480d075594b36d048084411f7b7183625c9b37782312321",
+      "artifact_hash": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c",
+      "bitget_order_id": "1453610833413308417",
+      "client_oid": "rl-98eb356e754b0eab27b6442f92c29",
+      "execution_ledger_entry_hash": "sha256:2b565fa99cc3de37f2c53276d96c1c8e2bbe5b4aff6b48997b0f14c133fcf13b",
+      "issuance_checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+      "issuance_ledger_entry_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
       "order_mode": "demo",
       "paptrading": "1",
-      "placed_at": "2026-06-24T06:57:57Z",
+      "placed_at": "2026-06-24T09:35:50Z",
       "product_type": "USDT-FUTURES",
-      "receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
-      "response_hash": "sha256:0a1474e94df0f8ebdda29bfc0b68f4298050e76b4b2cd3662eb1f62822842b5c",
-      "run_id": "run_c55be55a42ede4f90437cb74",
+      "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
+      "response_hash": "sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2",
+      "run_id": "run_1094a295995fc4cdc7dde24b",
       "symbol": "BTCUSDT",
       "verdict": "pass",
       "version": "redline.execution.evidence.v1"
     },
-    "execution_run_id": "run_c55be55a42ede4f90437cb74",
+    "execution_run_id": "run_1094a295995fc4cdc7dde24b",
     "killed_at": null,
     "metadata": {
       "claimed_created_by": "strategy-author",
@@ -3350,18 +3350,18 @@
       },
       "hackathon": "bitget-ai-s1",
       "showcase_approval": {
-        "approved_at": "2026-06-24T06:58:04Z",
+        "approved_at": "2026-06-24T09:36:01Z",
         "auth_method": "service_token",
         "auth_subject": "service-token",
         "claimed_reviewer_id": "release-reviewer",
         "comment": "hackathon showcase approval 3",
-        "consumed_at": "2026-06-24T06:58:04Z",
+        "consumed_at": "2026-06-24T09:36:01Z",
         "decision": "approve",
         "demo_mode": false,
-        "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
-        "expires_at": "2026-06-24T07:13:04Z",
+        "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
+        "expires_at": "2026-06-24T09:51:01Z",
         "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
-        "nonce": "appr_bdba19f23227a69739036760",
+        "nonce": "appr_a10e6c66337f873eb7eaa045",
         "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
         "reviewer_display_name": null,
         "reviewer_email": null,
@@ -3372,7 +3372,7 @@
       }
     },
     "redline_reason_code": "PASS",
-    "redline_receipt_hash": "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6",
+    "redline_receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2",
     "redline_report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa",
     "reject_reason": null,
     "release_id": "release-demo-good",
@@ -3386,7 +3386,7 @@
         "ETHUSDT",
         "SOLUSDT"
       ],
-      "bound_at": "2026-06-24T06:57:55Z",
+      "bound_at": "2026-06-24T09:35:45Z",
       "expected_order_notional_usdt": "5",
       "mainnet_enabled": false,
       "max_order_notional_usdt": "20",
@@ -3397,10 +3397,10 @@
       "schema_version": "redline.release.risk_policy.v1"
     },
     "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
-    "run_id": "run_c55be55a42ede4f90437cb74",
+    "run_id": "run_1094a295995fc4cdc7dde24b",
     "simulation_evidence": {
-      "evidence_hash": "sha256:f422a0077da2bc4e3f5d62b7406a8205e1c03e704088894ecd6e2e70f42a0627",
-      "imported_at": "2026-06-24T06:57:55Z",
+      "evidence_hash": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9",
+      "imported_at": "2026-06-24T09:35:45Z",
       "market": "bitget-demo",
       "max_drawdown": "3.20",
       "metadata": {},
@@ -3416,26 +3416,26 @@
       "trade_count": 12,
       "win_rate": "0.58"
     },
-    "simulation_evidence_hash": "sha256:f422a0077da2bc4e3f5d62b7406a8205e1c03e704088894ecd6e2e70f42a0627",
+    "simulation_evidence_hash": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9",
     "state": "release_ready",
     "strategy_id": "release-demo-strategy",
-    "updated_at": "2026-06-24T06:58:04Z",
+    "updated_at": "2026-06-24T09:36:01Z",
     "version_id": "release-demo-v1"
   },
   "release_decision_record": {
     "approval": {
-      "approved_at": "2026-06-24T06:57:55Z",
+      "approved_at": "2026-06-24T09:35:45Z",
       "auth_method": "service_token",
       "auth_subject": "service-token",
       "claimed_reviewer_id": "release-reviewer",
       "comment": "hackathon demo approval",
-      "consumed_at": "2026-06-24T06:57:55Z",
+      "consumed_at": "2026-06-24T09:35:45Z",
       "decision": "approve",
       "demo_mode": false,
-      "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
-      "expires_at": "2026-06-24T07:12:55Z",
+      "evidence_manifest_hash": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
+      "expires_at": "2026-06-24T09:50:45Z",
       "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
-      "nonce": "appr_ff0ec4c2ca7db651f9acf190",
+      "nonce": "appr_1549b6ab6201c6bfd8e8396b",
       "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
       "reviewer_display_name": null,
       "reviewer_email": null,
@@ -3444,8 +3444,8 @@
       "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
       "schema_version": "redline.release.approval.v1"
     },
-    "evidence_fingerprint": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
-    "generated_at": "2026-06-24T06:58:06Z",
+    "evidence_fingerprint": "sha256:1679b028d99273e070021daa1ec454b2bff9c6ac878c146af778dcbfe7720444",
+    "generated_at": "2026-06-24T09:36:06Z",
     "release_id": "release-demo-good",
     "release_tier": "L1",
     "release_tier_reason": "paptrading demo execution evidence is present",
@@ -3470,7 +3470,7 @@
       "ETHUSDT",
       "SOLUSDT"
     ],
-    "bound_at": "2026-06-24T06:57:55Z",
+    "bound_at": "2026-06-24T09:35:45Z",
     "expected_order_notional_usdt": "5",
     "mainnet_enabled": false,
     "max_order_notional_usdt": "20",
@@ -3482,8 +3482,8 @@
   },
   "schema_version": "redline.release.evidence_bundle.v1",
   "simulation_evidence": {
-    "evidence_hash": "sha256:f422a0077da2bc4e3f5d62b7406a8205e1c03e704088894ecd6e2e70f42a0627",
-    "imported_at": "2026-06-24T06:57:55Z",
+    "evidence_hash": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9",
+    "imported_at": "2026-06-24T09:35:45Z",
     "market": "bitget-demo",
     "max_drawdown": "3.20",
     "metadata": {},
@@ -3500,7 +3500,7 @@
     "win_rate": "0.58"
   },
   "strategy_version": {
-    "created_at": "2026-06-24T06:57:54Z",
+    "created_at": "2026-06-24T09:35:45Z",
     "created_by": "strategy-author",
     "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
     "metadata": {
@@ -3512,7 +3512,7 @@
     "package_path": "/Volumes/Remi/\u4ed3\u5e93/bitget/fixtures/demo_pack",
     "source_kind": "fixture",
     "strategy_id": "release-demo-strategy",
-    "updated_at": "2026-06-24T06:57:54Z",
+    "updated_at": "2026-06-24T09:35:45Z",
     "version_id": "release-demo-v1"
   }
 }

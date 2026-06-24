@@ -1,0 +1,20 @@
+{
+  "version": "redline.ledger.attestation.v1",
+  "checkpoint_hash": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079",
+  "ledger_hash": "sha256:39110a5636ee9ff1d3b2608084b1780e2fb111a76260580cb6c9f82f0e9735d1",
+  "ledger_tail_hash": "sha256:c42f41752a482b8f5c38868db86cac318d965c2acfb91aba0d0ae6f366e1a6ba",
+  "ledger_entry_count": 1,
+  "subject_receipt_hashes": [
+    "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2"
+  ],
+  "trust_policy_id": "release-demo-policy",
+  "key_id": "release-demo-key",
+  "issuer": "redline-release-demo",
+  "audience": "redline.publish",
+  "signer": "redline-release-demo",
+  "public_key": "ed25519-public:b4ce925e77d05c98785e3f74ff3cec039de3b5775b6fda51bdd2ceeb77af73ac",
+  "signed_at": "2026-06-24T09:35:45Z",
+  "expires_at": null,
+  "signature": "ed25519-signature:a21094a66b252a39860878831e701d6d75120305a56265b38a7969c559d1b0f1c697a922d6763bf7ad6ff884892e15aa8fa545232bbad319d177d0bf21647b02",
+  "attestation_hash": "sha256:337d0d010c8b3177b6e2dd59a020dc04cda8b73320f4d99f3a19aadb4cd3322d"
+}

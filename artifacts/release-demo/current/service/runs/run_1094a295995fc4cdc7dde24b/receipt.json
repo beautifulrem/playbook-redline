@@ -1,6 +1,6 @@
 {
   "version": "redline.receipt.v3.3",
-  "prev_receipt_hash": "sha256:genesis",
+  "prev_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
   "package": {
     "identity_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
     "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
@@ -18,10 +18,10 @@
   },
   "baseline": {
     "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
-    "baseline_receipt_hash": null,
+    "baseline_receipt_hash": "sha256:f3fb1de64cfa0fc4618570953e329bc8c6c03f1d05748ea38931e29df2503c21",
     "baseline_version_id": "fixture:baseline",
     "package_name": "baseline",
-    "chain_status": "genesis"
+    "chain_status": "chained"
   },
   "candidate": {
     "package_hash": "sha256:c175c24b00d705a0be6db12fd67b29db5795451de6baa73908e57fc7f784f670",
@@ -88,7 +88,7 @@
     "missing": []
   },
   "decision": {
-    "reason_code": "BASELINE_GENESIS",
+    "reason_code": "PASS",
     "verdict_tier": "ALLOW",
     "adjusted_size_cap": null,
     "required_proof_ids_source": "REQUIRED_PROOFS[status]",
@@ -96,7 +96,7 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:5f1ad76159c62e782c528b48",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7d7847e39bdde47458bb1ca4",
+      "proof:decision:fd53e496d96889498509386a",
       "proof:package_canonical:7bc11572ef15a4a40cdf1856",
       "proof:probe:0b22c22a0727d2c30c2de30e",
       "proof:probe:10142a4c4d62b0f91a288df0",
@@ -112,7 +112,7 @@
       "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
       "proof:candidate_absolute:5f1ad76159c62e782c528b48",
       "proof:coverage:07629775749a0c50afc55033",
-      "proof:decision:7d7847e39bdde47458bb1ca4",
+      "proof:decision:fd53e496d96889498509386a",
       "proof:package_canonical:7bc11572ef15a4a40cdf1856",
       "proof:probe:0b22c22a0727d2c30c2de30e",
       "proof:probe:10142a4c4d62b0f91a288df0",
@@ -136,7 +136,7 @@
       "inputs_hash": "sha256:92dd7dbdc1876eb27a3f83f03f31a6a78e37c51d84c92ae4e5b2660d363c1fbf",
       "artifact_hash": "sha256:7bc11572ef15a4a40cdf185639a3c244b225653f56d1d3233b3670042cfd9c1f",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -150,7 +150,7 @@
       "inputs_hash": "sha256:b95ce165fd002a1a08acaf02b04ec419e7ab89022ef6f581ef353cf7c51c403a",
       "artifact_hash": "sha256:39c8b96527a92f5c79df6d372737d5a9a19e86a1fe762ac43384111e23588471",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:39c8b96527a92f5c79df6d37 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:39c8b96527a92f5c79df6d37 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -167,7 +167,7 @@
       "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
       "artifact_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -187,7 +187,7 @@
       "inputs_hash": "sha256:174631ac69ba417be9e19a30fff5f9ae4eb32a929c6e47bf7d013c9bd8705142",
       "artifact_hash": "sha256:bbfdbde5518b151be3dd273e6005076eefc09aff92e2bfa98dbe90d4b9bc4883",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:bbfdbde5518b151be3dd273e --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:bbfdbde5518b151be3dd273e --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": "next_bar_open",
       "lookahead_guard": "structural_next_bar",
       "fees_modeled": true,
@@ -238,7 +238,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -262,7 +262,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:0b22c22a0727d2c30c2de30e --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:0b22c22a0727d2c30c2de30e --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -289,7 +289,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:10142a4c4d62b0f91a288df0 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:10142a4c4d62b0f91a288df0 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -316,7 +316,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -343,7 +343,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ddc081ebb0b52ee1d938eb9 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:1ddc081ebb0b52ee1d938eb9 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -370,7 +370,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -397,7 +397,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -414,7 +414,7 @@
       "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
       "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -483,7 +483,7 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -534,21 +534,21 @@
           "holds": true
         }
       ],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:5f1ad76159c62e782c528b48 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:5f1ad76159c62e782c528b48 --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
       "meta": {}
     },
     {
-      "proof_id": "proof:decision:7d7847e39bdde47458bb1ca4",
+      "proof_id": "proof:decision:fd53e496d96889498509386a",
       "phase": "decide",
       "kind": "decision",
       "verdict_bearing": true,
-      "inputs_hash": "sha256:2eb4c7d99d9a761c93721813b59309f7c361c6acadd6cb44c944f5668a3b8a8c",
-      "artifact_hash": "sha256:9b36c3e2e9ac274fa2e1dd6273fbd5f8526e2a6923054ce9993bb46ea2e3e9ca",
+      "inputs_hash": "sha256:0184180578b8f0ddf51ab3bf8051538528f709151a9208ee87605ea9c061d469",
+      "artifact_hash": "sha256:e446efd971c4e565e4b4022e4e64cc3dc5f0a01a066cf127bd4fab27a4b73af9",
       "assertions": [],
-      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:7d7847e39bdde47458bb1ca4 --package <package> --suite <suite> --spec <spec>",
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:fd53e496d96889498509386a --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
       "fill_model": null,
       "lookahead_guard": null,
       "fees_modeled": null,
@@ -576,7 +576,7 @@
   },
   "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
   "report": {
-    "report_hash": "sha256:1a0101eed3f6933575ff23387f011dadb09bf5df605be6d384bf9a78d9b2e6d9",
+    "report_hash": "sha256:2a21b02a5c7f5374cabaf75c9055277e4722d65642563b246a0bed41b70beeaa",
     "attribution_report_hash": null
   },
   "publish": {
@@ -589,5 +589,5 @@
     "readback_hash": null,
     "note": "run_id is platform execution evidence, not local-equivalence proof"
   },
-  "receipt_hash": "sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6"
+  "receipt_hash": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2"
 }
