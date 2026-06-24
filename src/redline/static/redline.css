@@ -100,6 +100,9 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rl-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rl-grid--2, .rl-grid--3 { grid-template-columns: 1fr; } }
+/* spaced two-column layout (evidence comparison: good vs withheld) */
+.rl-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rl-6); }
+@media (max-width: 760px) { .rl-cols-2 { grid-template-columns: 1fr; } }
 
 .rl-box { border: var(--rl-border); padding: var(--rl-4); background: var(--rl-surface); }
 .rl-box__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; margin-bottom: var(--rl-2); }

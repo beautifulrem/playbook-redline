@@ -7267,6 +7267,9 @@ def test_evidence_html_golden_regenerated_from_code() -> None:
     assert "Bitget 未被调用" in regenerated_html
     assert "passphrase" not in regenerated_html.lower()
     assert "access key" not in regenerated_html.lower()
+    assert "secret" not in regenerated_html.lower()
+    assert "private key" not in regenerated_html.lower()
+    assert "-----begin" not in regenerated_html.lower()
     for run_dir in [good_run_dir, bad_run_dir]:
         receipt_path = run_dir / "receipt.json"
         receipt = load_receipt(receipt_path)

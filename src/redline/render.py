@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -231,115 +233,110 @@ def _infer_run_dir(release_dir: Path, run_id: str) -> Path | None:
     return candidate if candidate.exists() else None
 
 
+@lru_cache(maxsize=1)
+def _inline_css() -> str:
+    """The shared design system, inlined so evidence pages stay self-contained and offline.
+    Comments are stripped (smaller payload + keeps words like 'secret' out of the evidence HTML)."""
+    css = (Path(__file__).resolve().parent / "static" / "redline.css").read_text(encoding="utf-8")
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.S).strip()
+
+
 def _render_document(*, title: str, panels: list[EvidencePanel], comparison: bool) -> str:
-    grid_class = " comparison" if comparison else ""
-    rendered = "\n".join(_render_panel(panel) for panel in panels)
+    rendered = "\n".join(_render_panel(panel, with_title=comparison) for panel in panels)
+    inner = f'    <div class="rl-cols-2">\n{rendered}\n    </div>' if comparison else rendered
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{_esc(title)}</title>
-  <style>
-    :root {{ --paper: #f6f7f9; --ink: #15171a; --muted: #5f6875; --line: #c9d1dc; --pass: #147a4d; --blocked: #9a5b00; --bad: #b3261e; --blue: #1f5f99; }}
-    * {{ box-sizing: border-box; }}
-    body {{ margin: 0; background: var(--paper); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
-    main {{ max-width: 1180px; margin: 0 auto; padding: 28px; }}
-    h1 {{ font-size: 28px; line-height: 1.2; margin: 0 0 18px; letter-spacing: 0; }}
-    h2 {{ font-size: 18px; line-height: 1.25; margin: 16px 0 10px; letter-spacing: 0; }}
-    .grid {{ display: grid; grid-template-columns: 1fr; gap: 18px; }}
-    .grid.comparison {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    .panel {{ background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }}
-    .panel.pass {{ border-top: 6px solid var(--pass); }}
-    .panel.blocked {{ border-top: 6px solid var(--blocked); }}
-    .panel.invalid {{ border-top: 6px solid var(--bad); }}
-    .stamp {{ display: inline-block; border: 2px solid currentColor; padding: 6px 9px; transform: rotate(-2deg); font-weight: 800; font-size: 13px; line-height: 1.25; color: var(--blue); }}
-    .pass .stamp {{ color: var(--pass); }}
-    .blocked .stamp {{ color: var(--blocked); }}
-    .invalid .stamp {{ color: var(--bad); }}
-    dl {{ display: grid; grid-template-columns: minmax(148px, 220px) minmax(0, 1fr); gap: 8px 14px; margin: 10px 0 18px; }}
-    dt {{ color: var(--muted); }}
-    dd {{ margin: 0; overflow-wrap: anywhere; }}
-    .callout {{ margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 5px solid var(--blocked); background: #fffaf0; }}
-    .invalid .callout {{ border-left-color: var(--bad); background: #fff5f3; }}
-    .note {{ border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.45; }}
-    @media (max-width: 860px) {{ main {{ padding: 18px; }} .grid.comparison {{ grid-template-columns: 1fr; }} dl {{ grid-template-columns: 1fr; }} }}
-  </style>
+  <style>{_inline_css()}</style>
 </head>
 <body>
-  <main>
-    <h1>{_esc(title)}</h1>
-    <div class="grid{grid_class}">
-{rendered}
-    </div>
-    <p class="note">{_esc(HONEST_STATEMENT)}</p>
+  <main class="rl-main">
+    <h1 class="rl-macro">{_esc(title)}</h1>
+{inner}
+    <hr>
+    <p class="rl-muted">{_esc(HONEST_STATEMENT)}</p>
   </main>
 </body>
 </html>
 """
 
 
-def _render_panel(panel: EvidencePanel) -> str:
-    state_class = "invalid" if panel.invalid_reason_code else "pass" if panel.evidence else "blocked"
-    return f"""      <section class="panel {state_class}">
-        <p class="stamp">{_esc(_stamp(panel))}</p>
-        <h2>{_esc(panel.title)}</h2>
-        {_render_redline(panel)}
-        {_render_execution(panel)}
-        {_render_block(panel)}
+def _render_panel(panel: EvidencePanel, *, with_title: bool = False) -> str:
+    band_mod = "rl-band--pass" if (panel.evidence is not None and panel.invalid_reason_code is None) else ""
+    title_html = f'        <p class="rl-label">{_esc(panel.title)}</p>\n' if with_title else ""
+    return f"""      <section>
+{title_html}        <div class="rl-band {band_mod}">
+          <span class="rl-band__verdict">{_esc(panel.verdict)}</span>
+          <span class="rl-band__meta">{_esc(_band_meta(panel))}</span>
+        </div>
+{_render_redline(panel)}
+{_render_execution(panel)}
+{_render_block(panel)}
       </section>"""
 
 
 def _render_redline(panel: EvidencePanel) -> str:
-    return f"""<h2>Redline 侧</h2>
-        <dl>
+    return f"""        <p class="rl-sec">redline 侧</p>
+        <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>{_esc(panel.verdict)}</dd>
           <dt>reason_code</dt><dd>{_esc(panel.reason_code)}</dd>
           <dt>chain_status</dt><dd>{_esc(panel.chain_status)}</dd>
-          <dt>receipt_hash</dt><dd>{_esc(panel.receipt_hash or "missing")}</dd>
-          <dt>strength_summary</dt><dd>{_esc(panel.strength_summary or "not provided")}</dd>
-        </dl>"""
+          <dt>receipt_hash</dt><dd class="rl-mono">{_esc(panel.receipt_hash or "missing")}</dd>
+          <dt>strength_summary</dt><dd>{_render_summary(panel.strength_summary)}</dd>
+        </dl></div>"""
 
 
 def _render_execution(panel: EvidencePanel) -> str:
     if panel.evidence is None or panel.invalid_reason_code is not None:
         return ""
     evidence = panel.evidence
-    return f"""<h2>执行侧</h2>
-        <dl>
-          <dt>bitget_order_id</dt><dd>{_esc(evidence.bitget_order_id)}</dd>
-          <dt>client_oid</dt><dd>{_esc(evidence.client_oid)}</dd>
+    return f"""        <p class="rl-sec">执行侧</p>
+        <div class="rl-box"><dl class="rl-dl">
+          <dt>bitget_order_id</dt><dd class="rl-mono">{_esc(evidence.bitget_order_id)}</dd>
+          <dt>client_oid</dt><dd class="rl-mono">{_esc(evidence.client_oid)}</dd>
           <dt>placed_at</dt><dd>{_esc(evidence.placed_at)}</dd>
           <dt>symbol</dt><dd>{_esc(evidence.symbol)}</dd>
           <dt>product_type</dt><dd>{_esc(evidence.product_type)}</dd>
           <dt>order_mode</dt><dd>{_esc(evidence.order_mode)}</dd>
           <dt>paptrading</dt><dd>{_esc(evidence.paptrading or "0")}</dd>
-          <dt>receipt_hash</dt><dd>{_esc(evidence.receipt_hash)}</dd>
-          <dt>response_hash</dt><dd>{_esc(evidence.response_hash)}</dd>
-        </dl>"""
+          <dt>receipt_hash</dt><dd class="rl-mono">{_esc(evidence.receipt_hash)}</dd>
+          <dt>response_hash</dt><dd class="rl-mono">{_esc(evidence.response_hash)}</dd>
+        </dl></div>"""
 
 
 def _render_block(panel: EvidencePanel) -> str:
     if panel.evidence is not None and panel.invalid_reason_code is None:
         return ""
     if panel.invalid_reason_code:
-        return f"""<div class="callout"><strong>EVIDENCE INVALID</strong><br>{_esc(_invalid_message(panel.invalid_reason_code))}</div>"""
+        return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ EVIDENCE INVALID · {_esc(_invalid_message(panel.invalid_reason_code))}</span></div>"""
     reason = panel.block_reason_code or panel.reason_code
-    return f"""<h2>拦截侧</h2>
-        <dl>
-          <dt>block reason_code</dt><dd>{_esc(reason)}</dd>
+    return f"""        <p class="rl-sec">拦截侧</p>
+        <div class="rl-box"><dl class="rl-dl">
+          <dt>block reason_code</dt><dd class="rl-mono">{_esc(reason)}</dd>
           <dt>exchange call</dt><dd>Bitget 未被调用</dd>
-        </dl>"""
+        </dl></div>"""
 
 
-def _stamp(panel: EvidencePanel) -> str:
-    suffix = "DEMO · paptrading:1 · 非 mainnet"
+def _render_summary(summary: str | None) -> str:
+    """Render the strength summary as scannable one-invariant-per-line rows (split on ';')."""
+    if not summary:
+        return _esc("not provided")
+    parts = [part.strip() for part in summary.split(";") if part.strip()]
+    return "<br>".join(_esc(part) for part in parts) if parts else _esc(summary)
+
+
+def _band_meta(panel: EvidencePanel) -> str:
+    suffix = "DEMO · paptrading:1 · 非 MAINNET"
     if panel.invalid_reason_code:
-        return f"EVIDENCE INVALID · {_invalid_message(panel.invalid_reason_code)} · {suffix}"
+        return f"INTEGRITY FAIL · {suffix}"
     if panel.evidence is not None and panel.verdict == "PASS":
-        return f"PASS · REPLAYED + chained + signed · {suffix}"
+        return f"REPLAYED · CHAINED · SIGNED · {suffix}"
     if panel.verdict == "WITHHELD":
-        return f"WITHHELD · BLOCKED · {suffix}"
-    return f"UNVERIFIED · BLOCKED · {suffix}"
+        return f"BLOCKED · BITGET 未被调用 · {suffix}"
+    return f"BLOCKED · {suffix}"
 
 
 def _invalid_panel(title: str, reason_code: str) -> EvidencePanel:

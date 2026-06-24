@@ -2,82 +2,263 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Redline Evidence Comparison</title>
-  <style>
-    :root { --paper: #f6f7f9; --ink: #15171a; --muted: #5f6875; --line: #c9d1dc; --pass: #147a4d; --blocked: #9a5b00; --bad: #b3261e; --blue: #1f5f99; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--paper); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
-    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 18px; letter-spacing: 0; }
-    h2 { font-size: 18px; line-height: 1.25; margin: 16px 0 10px; letter-spacing: 0; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
-    .grid.comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
-    .panel.pass { border-top: 6px solid var(--pass); }
-    .panel.blocked { border-top: 6px solid var(--blocked); }
-    .panel.invalid { border-top: 6px solid var(--bad); }
-    .stamp { display: inline-block; border: 2px solid currentColor; padding: 6px 9px; transform: rotate(-2deg); font-weight: 800; font-size: 13px; line-height: 1.25; color: var(--blue); }
-    .pass .stamp { color: var(--pass); }
-    .blocked .stamp { color: var(--blocked); }
-    .invalid .stamp { color: var(--bad); }
-    dl { display: grid; grid-template-columns: minmax(148px, 220px) minmax(0, 1fr); gap: 8px 14px; margin: 10px 0 18px; }
-    dt { color: var(--muted); }
-    dd { margin: 0; overflow-wrap: anywhere; }
-    .callout { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 5px solid var(--blocked); background: #fffaf0; }
-    .invalid .callout { border-left-color: var(--bad); background: #fff5f3; }
-    .note { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.45; }
-    @media (max-width: 860px) { main { padding: 18px; } .grid.comparison { grid-template-columns: 1fr; } dl { grid-template-columns: 1fr; } }
-  </style>
+  <style>:root {
+  color-scheme: dark;
+
+  
+  --rl-bg:          #0B0B0C;
+  --rl-surface:     #121214;
+  --rl-surface-2:   #17171A;
+  --rl-line:        #2A2A2E;
+  --rl-line-strong: #3A3A40;
+
+  
+  --rl-fg:    #EAEAEA;
+  --rl-muted: #8A8A92;
+  --rl-faint: #7E7F87;
+
+  
+  --rl-hazard:     #FF2A2A;
+  --rl-hazard-ink: #1A0606;
+
+  
+  --rl-pass: #4AF626;
+
+  
+  --rl-mono:    ui-monospace, "JetBrains Mono", "IBM Plex Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --rl-grotesk: "Archivo Black", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rl-tele:    0.8125rem;   
+  --rl-track:   0.06em;
+
+  
+  --rl-1: 4px;  --rl-2: 8px;  --rl-3: 12px;  --rl-4: 16px;  --rl-6: 24px;  --rl-10: 40px;  --rl-16: 64px;
+
+  
+  --rl-radius:        0;
+  --rl-border:        1px solid var(--rl-line);
+  --rl-border-strong: 1px solid var(--rl-line-strong);
+  --rl-maxw:          1240px;
+}
+
+*, *::before, *::after { box-sizing: border-box; border-radius: var(--rl-radius); }
+
+html { background: var(--rl-bg); }
+
+body {
+  margin: 0;
+  background: var(--rl-bg);
+  color: var(--rl-fg);
+  font-family: var(--rl-mono);
+  font-size: var(--rl-tele);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: var(--rl-track);
+}
+
+
+.rl-macro {
+  font-family: var(--rl-grotesk);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  font-size: clamp(2.25rem, 6vw, 6.5rem);
+  margin: 0;
+}
+
+
+.rl-label { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); }
+.rl-mono  { font-family: var(--rl-mono); overflow-wrap: anywhere; }
+.rl-muted { color: var(--rl-muted); }
+.rl-faint { color: var(--rl-faint); }   
+
+a { color: var(--rl-fg); text-underline-offset: 3px; }
+
+
+.rl-main { max-width: var(--rl-maxw); margin: 0 auto; padding: var(--rl-6); }
+hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+
+.rl-c-hazard { color: var(--rl-hazard); }
+.rl-c-pass   { color: var(--rl-pass); }
+
+.rl-scroll-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--rl-line-strong) var(--rl-surface); }
+.rl-scroll-x::-webkit-scrollbar { height: 7px; }
+.rl-scroll-x::-webkit-scrollbar-track { background: var(--rl-surface); }
+.rl-scroll-x::-webkit-scrollbar-thumb { background: var(--rl-line-strong); }
+
+
+
+
+.rl-grid { display: grid; gap: 1px; background: var(--rl-line); border: var(--rl-border); }
+.rl-grid > * { background: var(--rl-bg); }
+.rl-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rl-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .rl-grid--2, .rl-grid--3 { grid-template-columns: 1fr; } }
+
+.rl-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rl-6); }
+@media (max-width: 760px) { .rl-cols-2 { grid-template-columns: 1fr; } }
+
+.rl-box { border: var(--rl-border); padding: var(--rl-4); background: var(--rl-surface); }
+.rl-box__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; margin-bottom: var(--rl-2); }
+
+
+.rl-sec { text-transform: uppercase; letter-spacing: var(--rl-track); color: var(--rl-muted); font-size: 12px; margin: var(--rl-6) 0 var(--rl-3); }
+.rl-sec::before { content: "[ "; }
+.rl-sec::after  { content: " ]"; }
+
+
+.rl-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rl-3) var(--rl-6); padding: var(--rl-4) var(--rl-6); border: var(--rl-border-strong); border-left-width: 6px; border-left-color: var(--rl-hazard); background: var(--rl-surface); }
+.rl-band + .rl-band { margin-top: var(--rl-3); }
+.rl-band--pass { border-left-color: var(--rl-pass); }
+.rl-band__verdict { font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: -0.03em; line-height: 1; font-size: clamp(1.75rem, 4vw, 3rem); color: var(--rl-hazard); }
+.rl-band--pass .rl-band__verdict { color: var(--rl-pass); }
+.rl-band__meta { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); }
+
+
+.rl-dl { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: var(--rl-2) var(--rl-4); margin: var(--rl-3) 0; }
+.rl-dl dt { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-dl dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .rl-dl { grid-template-columns: 1fr; } .rl-dl dd { margin-bottom: var(--rl-2); } }
+
+
+.rl-badge { display: inline-block; padding: 2px 7px; border: var(--rl-border); color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; white-space: nowrap; }
+.rl-badge--ok   { color: var(--rl-pass); border-color: var(--rl-pass); }
+.rl-badge--fail { color: var(--rl-hazard); border-color: var(--rl-hazard); }
+
+
+.rl-table { width: 100%; border-collapse: collapse; }
+.rl-table th, .rl-table td { padding: var(--rl-2) var(--rl-3); border-top: var(--rl-border); text-align: left; vertical-align: top; white-space: nowrap; }
+.rl-table th { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-weight: 600; font-size: 11px; }
+.rl-table tbody tr:hover { background: var(--rl-surface); }
+
+
+@media (max-width: 560px) { .rl-band { flex-direction: column; align-items: flex-start; gap: var(--rl-2); } }
+
+
+
+
+.rl-btn { display: inline-flex; align-items: center; gap: var(--rl-2); font-family: var(--rl-mono); font-size: var(--rl-tele); text-transform: uppercase; letter-spacing: var(--rl-track); color: var(--rl-fg); background: var(--rl-surface-2); border: var(--rl-border-strong); padding: var(--rl-2) var(--rl-4); cursor: pointer; }
+.rl-btn:hover { background: var(--rl-surface); border-color: var(--rl-fg); }
+.rl-btn--hazard { color: var(--rl-hazard); border-color: var(--rl-hazard); }
+.rl-btn:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 2px; }
+
+
+.rl-chain { display: flex; flex-wrap: wrap; border: var(--rl-border); }
+.rl-chain__node { flex: 1 1 0; min-width: 150px; padding: var(--rl-3) var(--rl-4); border-right: var(--rl-border); position: relative; }
+.rl-chain__node:last-child { border-right: 0; }
+.rl-chain__node:not(:last-child)::after { content: "+"; position: absolute; top: 50%; right: -8px; transform: translateY(-50%); z-index: 1; color: var(--rl-line-strong); background: var(--rl-bg); font-size: 15px; line-height: 1; padding: 0 1px; }
+.rl-chain__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-chain__hash { display: block; color: var(--rl-fg); font-size: 11px; margin: var(--rl-1) 0; overflow-wrap: anywhere; }
+.rl-chain__st--ok { color: var(--rl-pass); }
+.rl-chain__st--bad { color: var(--rl-hazard); font-weight: 700; }
+.rl-chain__st--skip { color: var(--rl-muted); }   
+.rl-chain__flag { display: inline-block; margin-top: var(--rl-1); padding: 0 5px; border: 1px solid var(--rl-hazard); color: var(--rl-hazard); font-size: 10px; text-transform: uppercase; letter-spacing: var(--rl-track); }
+.rl-chain__node--fail { background: var(--rl-hazard-ink); border-color: var(--rl-hazard); }
+@media (max-width: 620px) {
+  .rl-chain { flex-direction: column; }
+  .rl-chain__node { border-right: 0; border-bottom: var(--rl-border); }
+  .rl-chain__node:last-child { border-bottom: 0; }
+  .rl-chain__node:not(:last-child)::after { top: auto; bottom: -8px; left: 50%; right: auto; transform: translateX(-50%); }
+}
+
+
+.rl-proofbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--rl-line); border: var(--rl-border); }
+.rl-proofbar > * { background: var(--rl-surface); padding: var(--rl-4); }
+.rl-proof__num { font-family: var(--rl-grotesk); font-weight: 800; font-size: clamp(1.5rem, 3.5vw, 2.5rem); line-height: 0.95; color: var(--rl-fg); }
+.rl-proof__num--ok { color: var(--rl-pass); }
+.rl-proof__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; margin-top: var(--rl-2); }
+
+
+.rl-tier { display: flex; border: var(--rl-border); }
+.rl-tier__seg { flex: 1; padding: var(--rl-2) var(--rl-3); border-right: var(--rl-border); color: var(--rl-faint); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; text-align: center; }
+.rl-tier__seg:last-child { border-right: 0; }
+.rl-tier__seg b { display: block; font-family: var(--rl-grotesk); font-weight: 800; font-size: 1.25rem; color: inherit; }
+.rl-tier__seg--reached { color: var(--rl-fg); }
+.rl-tier__seg--on { color: var(--rl-pass); background: var(--rl-surface); }
+
+
+.rl-cmd { border: var(--rl-border); background: var(--rl-bg); }
+.rl-cmd__head { display: flex; justify-content: space-between; align-items: center; gap: var(--rl-3); padding: var(--rl-2) var(--rl-3); border-bottom: var(--rl-border); color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-cmd__body { margin: 0; padding: var(--rl-3); overflow-x: auto; }
+.rl-cmd samp { display: block; font-family: var(--rl-mono); color: var(--rl-fg); white-space: pre-wrap; overflow-wrap: anywhere; padding-left: 1.4em; text-indent: -1.4em; }
+.rl-cmd samp::before { content: "$ "; color: var(--rl-pass); }
+.rl-cmd samp.rl-cmd__cmt { color: var(--rl-muted); }
+.rl-cmd samp.rl-cmd__cmt::before { content: "# "; color: var(--rl-muted); }
+
+
+.rl-tamper { border: var(--rl-border); padding: var(--rl-4); }
+.rl-tamper__row { display: flex; flex-wrap: wrap; gap: var(--rl-3); align-items: center; }
+.rl-tamper__k { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-input { font-family: var(--rl-mono); font-size: var(--rl-tele); color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-2) var(--rl-3); min-width: 0; flex: 1 1 240px; }
+.rl-input:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 1px; }
+.rl-tamper__val { flex: 1 1 240px; min-width: 0; font-family: var(--rl-mono); font-size: var(--rl-tele); color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-2) var(--rl-3); overflow-wrap: anywhere; }
+
+
+.rl-stripe { display: flex; align-items: stretch; border: var(--rl-border-strong); border-color: var(--rl-hazard); background: var(--rl-hazard-ink); }
+.rl-stripe::before, .rl-stripe::after { content: ""; flex: 0 0 32px; background: repeating-linear-gradient(45deg, var(--rl-hazard) 0 7px, var(--rl-hazard-ink) 7px 14px); }
+.rl-stripe__msg { flex: 1; display: flex; align-items: center; gap: var(--rl-2); padding: var(--rl-3) var(--rl-4); color: var(--rl-hazard); text-transform: uppercase; letter-spacing: var(--rl-track); font-weight: 700; }</style>
 </head>
 <body>
-  <main>
-    <h1>Redline Evidence Comparison</h1>
-    <div class="grid comparison">
-      <section class="panel pass">
-        <p class="stamp">PASS · REPLAYED + chained + signed · DEMO · paptrading:1 · 非 mainnet</p>
-        <h2>PASS -&gt; Bitget demo order</h2>
-        <h2>Redline 侧</h2>
-        <dl>
+  <main class="rl-main">
+    <h1 class="rl-macro">Redline Evidence Comparison</h1>
+    <div class="rl-cols-2">
+      <section>
+        <p class="rl-label">PASS -&gt; Bitget demo order</p>
+        <div class="rl-band rl-band--pass">
+          <span class="rl-band__verdict">PASS</span>
+          <span class="rl-band__meta">REPLAYED · CHAINED · SIGNED · DEMO · paptrading:1 · 非 MAINNET</span>
+        </div>
+        <p class="rl-sec">redline 侧</p>
+        <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>PASS</dd>
           <dt>reason_code</dt><dd>PASS</dd>
           <dt>chain_status</dt><dd>chained</dd>
-          <dt>receipt_hash</dt><dd>sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
-          <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0; max_drawdown &lt;= 0.08000000 observed 0.00498134; no_entry_when &lt;= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget &lt;= 20.00000000 observed 1.00000000; 2 anchored scenarios</dd>
-        </dl>
-        <h2>执行侧</h2>
-        <dl>
-          <dt>bitget_order_id</dt><dd>1453610833413308417</dd>
-          <dt>client_oid</dt><dd>rl-98eb356e754b0eab27b6442f92c29</dd>
+          <dt>receipt_hash</dt><dd class="rl-mono">sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
+          <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0<br>max_drawdown &lt;= 0.08000000 observed 0.00498134<br>no_entry_when &lt;= 0 observed 0<br>replay_wellformed == 24 observed 24<br>trade_budget &lt;= 20.00000000 observed 1.00000000<br>2 anchored scenarios</dd>
+        </dl></div>
+        <p class="rl-sec">执行侧</p>
+        <div class="rl-box"><dl class="rl-dl">
+          <dt>bitget_order_id</dt><dd class="rl-mono">1453610833413308417</dd>
+          <dt>client_oid</dt><dd class="rl-mono">rl-98eb356e754b0eab27b6442f92c29</dd>
           <dt>placed_at</dt><dd>2026-06-24T09:35:50Z</dd>
           <dt>symbol</dt><dd>BTCUSDT</dd>
           <dt>product_type</dt><dd>USDT-FUTURES</dd>
           <dt>order_mode</dt><dd>demo</dd>
           <dt>paptrading</dt><dd>1</dd>
-          <dt>receipt_hash</dt><dd>sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
-          <dt>response_hash</dt><dd>sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2</dd>
-        </dl>
-        
+          <dt>receipt_hash</dt><dd class="rl-mono">sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
+          <dt>response_hash</dt><dd class="rl-mono">sha256:8f42c64e115784b1a00cc7306a775ee6a8bb8d4dcd6c9e4e2fa96234a9153fc2</dd>
+        </dl></div>
+
       </section>
-      <section class="panel blocked">
-        <p class="stamp">WITHHELD · BLOCKED · DEMO · paptrading:1 · 非 mainnet</p>
-        <h2>WITHHELD -&gt; blocked before Bitget</h2>
-        <h2>Redline 侧</h2>
-        <dl>
+      <section>
+        <p class="rl-label">WITHHELD -&gt; blocked before Bitget</p>
+        <div class="rl-band ">
+          <span class="rl-band__verdict">WITHHELD</span>
+          <span class="rl-band__meta">BLOCKED · BITGET 未被调用 · DEMO · paptrading:1 · 非 MAINNET</span>
+        </div>
+        <p class="rl-sec">redline 侧</p>
+        <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>WITHHELD</dd>
           <dt>reason_code</dt><dd>NEW_BLOCK_BREACH</dd>
           <dt>chain_status</dt><dd>chained</dd>
-          <dt>receipt_hash</dt><dd>sha256:289405d2f8dd0460bc2778d5ed5a7d941ea1c1f4d8e166b14dd17fb821bd7dcf</dd>
-          <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0; max_drawdown &lt;= 0.08000000 observed 0.00498134; max_drawdown &lt;= 0.08000000 observed 0.02029149; max_drawdown &lt;= 0.08000000 observed 0.17663366; no_entry_when &lt;= 0 observed 0; no_entry_when &lt;= 0 observed 2.00000000; replay_wellformed == 24 observed 24; trade_budget &lt;= 20.00000000 observed 1.00000000; 2 anchored scenarios</dd>
-        </dl>
-        
-        <h2>拦截侧</h2>
-        <dl>
-          <dt>block reason_code</dt><dd>NEW_BLOCK_BREACH</dd>
+          <dt>receipt_hash</dt><dd class="rl-mono">sha256:289405d2f8dd0460bc2778d5ed5a7d941ea1c1f4d8e166b14dd17fb821bd7dcf</dd>
+          <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0<br>max_drawdown &lt;= 0.08000000 observed 0.00498134<br>max_drawdown &lt;= 0.08000000 observed 0.02029149<br>max_drawdown &lt;= 0.08000000 observed 0.17663366<br>no_entry_when &lt;= 0 observed 0<br>no_entry_when &lt;= 0 observed 2.00000000<br>replay_wellformed == 24 observed 24<br>trade_budget &lt;= 20.00000000 observed 1.00000000<br>2 anchored scenarios</dd>
+        </dl></div>
+
+        <p class="rl-sec">拦截侧</p>
+        <div class="rl-box"><dl class="rl-dl">
+          <dt>block reason_code</dt><dd class="rl-mono">NEW_BLOCK_BREACH</dd>
           <dt>exchange call</dt><dd>Bitget 未被调用</dd>
-        </dl>
+        </dl></div>
       </section>
     </div>
-    <p class="note">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布</p>
+    <hr>
+    <p class="rl-muted">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布</p>
   </main>
 </body>
 </html>
