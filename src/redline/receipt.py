@@ -103,7 +103,10 @@ def compute_receipt_hash(receipt: Receipt) -> str:
 
 
 def compute_ledger_checkpoint_hash(checkpoint: LedgerCheckpoint) -> str:
-    payload = checkpoint.model_copy(update={"checkpoint_hash": ""}).model_dump(mode="python")
+    # exclude_none to share one canonical rule with compute_receipt_hash (None == absent).
+    # Verified inert on existing checkpoints (they carry no None fields), so this changes
+    # no current hash; it keeps the two hashers consistent for any future optional field.
+    payload = checkpoint.model_copy(update={"checkpoint_hash": ""}).model_dump(mode="python", exclude_none=True)
     if "merkle_root" not in checkpoint.model_fields_set:
         payload.pop("merkle_root", None)
     return hash_obj(payload)
@@ -254,7 +257,7 @@ def create_ledger_checkpoint(
 ) -> LedgerCheckpoint:
     entries = _read_ledger_entries(ledger_path)
     ledger_tail_hash = entries[-1]["entry_hash"] if entries else "sha256:genesis"
-    ledger_receipt_hashes = [entry["receipt_hash"] for entry in entries if isinstance(entry.get("receipt_hash"), str)]
+    ledger_receipt_hashes = [str(entry["receipt_hash"]) for entry in entries if isinstance(entry.get("receipt_hash"), str)]
     subjects = _unique_sorted([*(subject_receipt_hashes or []), *ledger_receipt_hashes])
     checkpoint = LedgerCheckpoint(
         ledger_path=ledger_path_label or str(ledger_path),
@@ -326,7 +329,7 @@ def _last_ledger_entry_hash(path: Path) -> str:
     if not path.exists():
         return previous
     for entry in _read_ledger_entries(path):
-        previous = entry["entry_hash"]
+        previous = str(entry["entry_hash"])
     return previous
 
 
