@@ -195,7 +195,7 @@ def _chain_payload(
     checks: list[dict[str, Any]],
 ) -> dict[str, Any]:
     ok = all(bool(item.get("ok")) for item in checks) and bundle_result is not None and attestation_result is not None
-    ok = bool(ok and bundle_result.get("ok") and attestation_result.get("ok"))
+    ok = bool(ok and (bundle_result or {}).get("ok") and (attestation_result or {}).get("ok"))
     return {
         "schema_version": "redline.chain.verify.v1",
         "ok": ok,

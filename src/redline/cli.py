@@ -5,7 +5,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 import typer
 from pydantic import ValidationError
@@ -837,18 +837,21 @@ def verify_ledger_attestation_cmd(
             from redline.models import TrustPolicy
 
             policy = TrustPolicy.model_validate(json.loads(trust_policy.read_text(encoding="utf-8")))
-        ok = verify_checkpoint_attestation(
-            checkpoint=checkpoint_obj,
-            attestation=attestation_obj,
-            trusted_public_key_text=trusted_public_key,
-            trust_policy=policy,
-        )
     except FileNotFoundError as exc:
         _exit_bad_input(ReasonCode.FILE_NOT_FOUND, json_out, f"file not found: {exc.filename}", checkpoint)
     except (OSError, json.JSONDecodeError):
         _exit_bad_input(ReasonCode.PARSE_ERROR, json_out, "ledger attestation input is not valid JSON", attestation)
     except ValidationError:
         _exit_bad_input(ReasonCode.SCHEMA_INVALID, json_out, "ledger attestation input failed schema validation", attestation)
+    # Parsing is fully resolved above (every error path exits); a verification failure is a
+    # reported ok=False, not a crash — and checkpoint_obj/attestation_obj are now bound.
+    try:
+        ok = verify_checkpoint_attestation(
+            checkpoint=checkpoint_obj,
+            attestation=attestation_obj,
+            trusted_public_key_text=trusted_public_key,
+            trust_policy=policy,
+        )
     except ValueError:
         ok = False
     result = {
@@ -929,7 +932,7 @@ def verify_sponsor_run_cmd(
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     shape = validate_sponsor_evidence_shape(evidence)
-    if shape.reason_code in {ReasonCode.SCHEMA_INVALID, ReasonCode.SPONSOR_READBACK_MISMATCH}:
+    if shape.reason_code is not None and shape.reason_code in {ReasonCode.SCHEMA_INVALID, ReasonCode.SPONSOR_READBACK_MISMATCH}:
         result = {
             "ok": False,
             "state": shape.state.value,
@@ -1262,7 +1265,7 @@ def _print_json_or_table(result: dict[str, object], json_out: bool, target: obje
         _print_envelope(str(result.get("state", "blocked")), str(result.get("reason_code", "")), target)
 
 
-def _exit_bad_input(reason_code: ReasonCode, json_out: bool, message: str, target: object) -> None:
+def _exit_bad_input(reason_code: ReasonCode, json_out: bool, message: str, target: object) -> NoReturn:
     result = {
         "schema_version": "redline.cli.error.v1",
         "ok": False,
