@@ -17,6 +17,9 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {
     "scenario_id": "btc-chop-2024-08",
     "probe_id": "trade_budget"

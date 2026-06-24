@@ -1,0 +1,87 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attestation_hash": {
+      "title": "Attestation Hash",
+      "type": "string"
+    },
+    "attestation_provider": {
+      "default": "local_signed",
+      "enum": [
+        "local_signed",
+        "evm_tx",
+        "hedera_hcs"
+      ],
+      "title": "Attestation Provider",
+      "type": "string"
+    },
+    "attested_at": {
+      "title": "Attested At",
+      "type": "string"
+    },
+    "attester_principal": {
+      "title": "Attester Principal",
+      "type": "string"
+    },
+    "bundle_hash": {
+      "title": "Bundle Hash",
+      "type": "string"
+    },
+    "evidence_merkle_root": {
+      "default": "sha256:genesis",
+      "title": "Evidence Merkle Root",
+      "type": "string"
+    },
+    "external_reference": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "External Reference",
+      "type": "object"
+    },
+    "issuer": {
+      "default": "redline",
+      "title": "Issuer",
+      "type": "string"
+    },
+    "key_id": {
+      "default": "local",
+      "title": "Key Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "public_key": {
+      "title": "Public Key",
+      "type": "string"
+    },
+    "release_id": {
+      "title": "Release Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "redline.attestation.v1",
+      "default": "redline.attestation.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signature": {
+      "title": "Signature",
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_id",
+    "bundle_hash",
+    "manifest_hash",
+    "attested_at",
+    "attester_principal",
+    "public_key",
+    "signature",
+    "attestation_hash"
+  ],
+  "title": "ReleaseBundleAttestation",
+  "type": "object"
+}

@@ -1,0 +1,17 @@
+{
+  "proof_id": "proof:edit_provenance:4a8fabe7a38b2010d0b16efa",
+  "phase": "capture-edit",
+  "kind": "edit_provenance",
+  "verdict_bearing": false,
+  "inputs_hash": "sha256:75cb94ab83dd6379e2af7a6661d96b8511a5f8bfdaf59f9265bbdb6b431ad653",
+  "artifact_hash": "sha256:4a8fabe7a38b2010d0b16efa250a6c7dc77eb786938b39466374e1e8398df382",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:4a8fabe7a38b2010d0b16efa --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
+  "meta": {
+    "expected_diff_hash": "sha256:9d77d5d121a529acfd5a86361d102bc177f0b369c0d9caab9955ae0860a5fcb1",
+    "binding": "package_pair"
+  }
+}

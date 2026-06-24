@@ -1,0 +1,892 @@
+{
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "title": "Bar",
+          "type": "integer"
+        },
+        "holds": {
+          "title": "Holds",
+          "type": "boolean"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "observed": {
+          "title": "Observed",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "<=",
+            "<",
+            ">=",
+            ">",
+            "=="
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "threshold": {
+          "title": "Threshold",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "op",
+        "threshold",
+        "observed",
+        "scenario_id",
+        "bar",
+        "holds"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "BaselineInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_receipt_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Receipt Hash"
+        },
+        "baseline_version_id": {
+          "default": "fixture:baseline",
+          "title": "Baseline Version Id",
+          "type": "string"
+        },
+        "chain_status": {
+          "$ref": "#/$defs/ChainStatus",
+          "default": "genesis"
+        },
+        "package_hash": {
+          "title": "Package Hash",
+          "type": "string"
+        },
+        "package_name": {
+          "default": "baseline",
+          "title": "Package Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_hash"
+      ],
+      "title": "BaselineInfo",
+      "type": "object"
+    },
+    "CandidateInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_version_id": {
+          "default": "fixture:candidate",
+          "title": "Candidate Version Id",
+          "type": "string"
+        },
+        "package_hash": {
+          "title": "Package Hash",
+          "type": "string"
+        },
+        "package_name": {
+          "default": "candidate",
+          "title": "Package Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_hash"
+      ],
+      "title": "CandidateInfo",
+      "type": "object"
+    },
+    "Capabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "$ref": "#/$defs/Capability"
+        },
+        "llm_in_verdict": {
+          "default": false,
+          "title": "Llm In Verdict",
+          "type": "boolean"
+        },
+        "qwen_compile": {
+          "$ref": "#/$defs/Capability"
+        },
+        "scenario_count": {
+          "default": 0,
+          "title": "Scenario Count",
+          "type": "integer"
+        },
+        "sponsor_readback": {
+          "$ref": "#/$defs/Capability"
+        }
+      },
+      "title": "Capabilities",
+      "type": "object"
+    },
+    "Capability": {
+      "additionalProperties": false,
+      "properties": {
+        "degraded": {
+          "default": false,
+          "title": "Degraded",
+          "type": "boolean"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "Capability",
+      "type": "object"
+    },
+    "ChainStatus": {
+      "enum": [
+        "chained",
+        "genesis",
+        "unchained"
+      ],
+      "title": "ChainStatus",
+      "type": "string"
+    },
+    "CoverageManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "manifest": {
+          "default": "suite.scenarios\u00d7spec.block_probes",
+          "title": "Manifest",
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
+        }
+      },
+      "required": [
+        "cells",
+        "complete"
+      ],
+      "title": "CoverageManifest",
+      "type": "object"
+    },
+    "EditProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "title": "Captured At",
+          "type": "string"
+        },
+        "diff_hash": {
+          "title": "Diff Hash",
+          "type": "string"
+        },
+        "locked_by": {
+          "default": "author",
+          "title": "Locked By",
+          "type": "string"
+        },
+        "prompt_digest": {
+          "title": "Prompt Digest",
+          "type": "string"
+        },
+        "tool": {
+          "default": "fixture",
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt_digest",
+        "diff_hash",
+        "captured_at"
+      ],
+      "title": "EditProvenance",
+      "type": "object"
+    },
+    "PackageInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_id": {
+          "const": "python_strategy_sandbox",
+          "default": "python_strategy_sandbox",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "canonical_tar_rules": {
+          "const": "redline.v9.canonical-tree",
+          "default": "redline.v9.canonical-tree",
+          "title": "Canonical Tar Rules",
+          "type": "string"
+        },
+        "identity_hash": {
+          "title": "Identity Hash",
+          "type": "string"
+        },
+        "identity_lock_hash": {
+          "title": "Identity Lock Hash",
+          "type": "string"
+        },
+        "identity_lock_path": {
+          "title": "Identity Lock Path",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "title": "Manifest Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity_hash",
+        "manifest_hash",
+        "identity_lock_hash",
+        "identity_lock_path"
+      ],
+      "title": "PackageInfo",
+      "type": "object"
+    },
+    "Proof": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_hash": {
+          "title": "Artifact Hash",
+          "type": "string"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "title": "Assertions",
+          "type": "array"
+        },
+        "fees_modeled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fees Modeled"
+        },
+        "fill_model": {
+          "anyOf": [
+            {
+              "const": "next_bar_open",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fill Model"
+        },
+        "inputs_hash": {
+          "title": "Inputs Hash",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProofKind"
+        },
+        "lookahead_guard": {
+          "anyOf": [
+            {
+              "const": "structural_next_bar",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lookahead Guard"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "title": "Meta",
+          "type": "object"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "proof_id": {
+          "title": "Proof Id",
+          "type": "string"
+        },
+        "reproduce": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reproduce"
+        },
+        "verdict_bearing": {
+          "title": "Verdict Bearing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "proof_id",
+        "phase",
+        "kind",
+        "verdict_bearing",
+        "inputs_hash",
+        "artifact_hash"
+      ],
+      "title": "Proof",
+      "type": "object"
+    },
+    "ProofKind": {
+      "enum": [
+        "package_canonical",
+        "edit_provenance",
+        "spec_compile",
+        "baseline_calibration",
+        "replay",
+        "replay_wellformed",
+        "probe",
+        "coverage",
+        "candidate_absolute",
+        "decision",
+        "sponsor_readback",
+        "verification"
+      ],
+      "title": "ProofKind",
+      "type": "string"
+    },
+    "PublishInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "attempted": {
+          "default": false,
+          "title": "Attempted",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "run_id is platform execution evidence, not local-equivalence proof",
+          "title": "Note",
+          "type": "string"
+        },
+        "readback_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Readback Hash"
+        },
+        "run_evidence_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Evidence Hash"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "sponsor_status": {
+          "default": "not_attempted",
+          "title": "Sponsor Status",
+          "type": "string"
+        },
+        "stop_before_final_publish": {
+          "default": true,
+          "title": "Stop Before Final Publish",
+          "type": "boolean"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Id"
+        }
+      },
+      "title": "PublishInfo",
+      "type": "object"
+    },
+    "ReasonCode": {
+      "enum": [
+        "PASS",
+        "NEW_BLOCK_BREACH",
+        "RECEIPT_MISMATCH",
+        "PROOF_HASH_MISMATCH",
+        "LEDGER_CHAIN_BROKEN",
+        "CHECKPOINT_MISMATCH",
+        "EXECUTION_LEDGER_BROKEN",
+        "MERKLE_INCLUSION_FAILED",
+        "APPROVAL_LINK_MISMATCH",
+        "APPROVAL_CONSUMED",
+        "APPROVAL_EXPIRED",
+        "CHAIN_LINK_MISMATCH",
+        "BASELINE_UNCHAINED",
+        "BASELINE_GENESIS",
+        "COVERAGE_INCOMPLETE",
+        "PROBE_ERROR",
+        "ENGINE_FAILURE",
+        "DATA_MISSING",
+        "CALIBRATION_FAILED",
+        "BASELINE_BREACHES",
+        "BASELINE_UNRUNNABLE",
+        "NONFINITE_VALUE",
+        "ENGINE_IDENTITY_MISMATCH",
+        "CANDIDATE_SANDBOX_VIOLATION",
+        "VERDICT_PATH_VIOLATION",
+        "RECEIPT_BINDING_FAILED",
+        "SPONSOR_READBACK_MISMATCH",
+        "SPONSOR_EVIDENCE_UNVERIFIED",
+        "UNVERIFIED_NO_VERDICT",
+        "FILE_NOT_FOUND",
+        "PARSE_ERROR",
+        "SCHEMA_INVALID",
+        "VERSION_UNSUPPORTED",
+        "OUT_OF_SCOPE"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "ReceiptDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "adjusted_size_cap": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjusted Size Cap"
+        },
+        "llm_used_for_verdict": {
+          "default": false,
+          "title": "Llm Used For Verdict",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "required_proof_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Proof Ids",
+          "type": "array"
+        },
+        "required_proof_ids_source": {
+          "default": "REQUIRED_PROOFS[status]",
+          "title": "Required Proof Ids Source",
+          "type": "string"
+        },
+        "satisfied_proof_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Satisfied Proof Ids",
+          "type": "array"
+        },
+        "verdict_source": {
+          "default": "deterministic_probe",
+          "title": "Verdict Source",
+          "type": "string"
+        },
+        "verdict_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerdictTier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "reason_code",
+        "required_proof_ids",
+        "satisfied_proof_ids"
+      ],
+      "title": "ReceiptDecision",
+      "type": "object"
+    },
+    "ReportInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution_report_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attribution Report Hash"
+        },
+        "report_hash": {
+          "title": "Report Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_hash"
+      ],
+      "title": "ReportInfo",
+      "type": "object"
+    },
+    "ResultInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "new_breaches": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "title": "New Breaches",
+          "type": "array"
+        },
+        "result_hash": {
+          "title": "Result Hash",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "status",
+        "new_breaches",
+        "result_hash"
+      ],
+      "title": "ResultInfo",
+      "type": "object"
+    },
+    "RunnerInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "default": "deterministic",
+          "enum": [
+            "deterministic",
+            "nautilus"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "engine_source_tree_hash": {
+          "title": "Engine Source Tree Hash",
+          "type": "string"
+        },
+        "env_lock": {
+          "default": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C",
+          "title": "Env Lock",
+          "type": "string"
+        },
+        "runner_lock_hash": {
+          "title": "Runner Lock Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine_source_tree_hash",
+        "runner_lock_hash"
+      ],
+      "title": "RunnerInfo",
+      "type": "object"
+    },
+    "SpecInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "compiler": {
+          "default": "json",
+          "title": "Compiler",
+          "type": "string"
+        },
+        "degraded_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degraded Reason"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "source_path": {
+          "default": "",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "spec_hash": {
+          "title": "Spec Hash",
+          "type": "string"
+        },
+        "tool_schema_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Schema Hash"
+        }
+      },
+      "required": [
+        "spec_hash"
+      ],
+      "title": "SpecInfo",
+      "type": "object"
+    },
+    "Status": {
+      "enum": [
+        "pass",
+        "withheld",
+        "reduce_size",
+        "reject",
+        "unverified_no_verdict"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "SuiteInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "scenarios": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scenarios",
+          "type": "array"
+        },
+        "source_path": {
+          "default": "",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "suite_id": {
+          "title": "Suite Id",
+          "type": "string"
+        },
+        "suite_lock_hash": {
+          "title": "Suite Lock Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "suite_id",
+        "scenarios",
+        "suite_lock_hash"
+      ],
+      "title": "SuiteInfo",
+      "type": "object"
+    },
+    "VerdictTier": {
+      "enum": [
+        "ALLOW",
+        "REDUCE_SIZE",
+        "HUMAN_REVIEW",
+        "BLOCK"
+      ],
+      "title": "VerdictTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baseline": {
+      "$ref": "#/$defs/BaselineInfo"
+    },
+    "candidate": {
+      "$ref": "#/$defs/CandidateInfo"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/Capabilities"
+    },
+    "coverage": {
+      "$ref": "#/$defs/CoverageManifest"
+    },
+    "decision": {
+      "$ref": "#/$defs/ReceiptDecision"
+    },
+    "edit_provenance": {
+      "$ref": "#/$defs/EditProvenance"
+    },
+    "package": {
+      "$ref": "#/$defs/PackageInfo"
+    },
+    "prev_receipt_hash": {
+      "default": "sha256:genesis",
+      "title": "Prev Receipt Hash",
+      "type": "string"
+    },
+    "proofs": {
+      "items": {
+        "$ref": "#/$defs/Proof"
+      },
+      "title": "Proofs",
+      "type": "array"
+    },
+    "publish": {
+      "$ref": "#/$defs/PublishInfo"
+    },
+    "receipt_hash": {
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "report": {
+      "$ref": "#/$defs/ReportInfo"
+    },
+    "result": {
+      "$ref": "#/$defs/ResultInfo"
+    },
+    "runner": {
+      "$ref": "#/$defs/RunnerInfo"
+    },
+    "spec": {
+      "$ref": "#/$defs/SpecInfo"
+    },
+    "strength_summary": {
+      "title": "Strength Summary",
+      "type": "string"
+    },
+    "suite": {
+      "$ref": "#/$defs/SuiteInfo"
+    },
+    "version": {
+      "default": "redline.receipt.v3.3",
+      "enum": [
+        "redline.receipt.v3.2",
+        "redline.receipt.v3.3"
+      ],
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "package",
+    "edit_provenance",
+    "baseline",
+    "candidate",
+    "spec",
+    "suite",
+    "runner",
+    "result",
+    "coverage",
+    "decision",
+    "proofs",
+    "capabilities",
+    "strength_summary",
+    "report",
+    "receipt_hash"
+  ],
+  "title": "Receipt",
+  "type": "object"
+}

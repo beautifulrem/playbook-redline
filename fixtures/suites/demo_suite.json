@@ -1,7 +1,7 @@
 {
   "version": "redline.suite.v2",
   "suite_id": "anchored-crash-v2",
-  "suite_lock_hash": "sha256:5c0432d264e2cbb89177467c9cd712a8c63bf2c1f22cd207cef683228342e12d",
+  "suite_lock_hash": "sha256:c5736486c05dbea7c3a235ca442d4d9363a812198777336fe496e3bb5b1dcdf1",
   "scenarios": [
     {
       "id": "btc-crash-2024-03-05",

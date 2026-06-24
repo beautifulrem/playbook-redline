@@ -1,0 +1,39 @@
+{
+  "approval": {
+    "approved_at": "2026-06-24T06:57:55Z",
+    "auth_method": "service_token",
+    "auth_subject": "service-token",
+    "claimed_reviewer_id": "release-reviewer",
+    "comment": "hackathon demo approval",
+    "consumed_at": "2026-06-24T06:57:55Z",
+    "decision": "approve",
+    "demo_mode": false,
+    "evidence_manifest_hash": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+    "expires_at": "2026-06-24T07:12:55Z",
+    "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
+    "nonce": "appr_ff0ec4c2ca7db651f9acf190",
+    "package_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
+    "reviewer_display_name": null,
+    "reviewer_email": null,
+    "reviewer_id": "service-token",
+    "reviewer_role": "admin",
+    "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
+    "schema_version": "redline.release.approval.v1"
+  },
+  "evidence_fingerprint": "sha256:658375763ee9e3ba9ccce8c12ef0f31d449e3fa1cace67815d0231088082fed2",
+  "generated_at": "2026-06-24T06:58:06Z",
+  "release_id": "release-demo-good",
+  "release_tier": "L1",
+  "release_tier_reason": "paptrading demo execution evidence is present",
+  "release_tier_signals": {
+    "approval": true,
+    "demo_execution": true,
+    "live_gate_controls": false,
+    "redline_passed": true,
+    "risk_policy": true,
+    "simulation_evidence": true
+  },
+  "risk_policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
+  "schema_version": "redline.release.decision.v1",
+  "state": "release_ready"
+}

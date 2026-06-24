@@ -6,6 +6,9 @@ __pycache__/
 *.py[cod]
 *.pyo
 .DS_Store
+.env
+.env.local
+.env.*.local
 
 docs/
 proofs/
@@ -13,6 +16,11 @@ proofs/
 artifacts/*
 !artifacts/demo/
 !artifacts/demo/**
+!artifacts/release-demo/
+artifacts/release-demo/*
+!artifacts/release-demo/current/
+!artifacts/release-demo/current/**
+artifacts/release-demo/current/**/*.sqlite3
 artifacts/demo/.redline-demo-output
 artifacts/demo/envelope.json
 artifacts/demo/report.json

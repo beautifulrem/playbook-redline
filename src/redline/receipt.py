@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from redline.canonical import hash_file, hash_obj
 from redline.io_safety import append_text, atomic_write_text, ensure_safe_output_dir, reject_unsafe_output_file
+from redline.merkle import merkle_root
 from redline.models import (
     Assertion,
     BaselineInfo,
@@ -32,6 +32,10 @@ from redline.proof_kernel import decision_proof_id
 
 class IssuanceLedgerConflict(RuntimeError):
     pass
+
+
+DEFAULT_LEDGER_WRITTEN_AT = "1970-01-01T00:00:00Z"
+DEFAULT_EDIT_PROVENANCE_CAPTURED_AT = "2026-06-10T00:00:00Z"
 
 
 def make_verify_proof_reproduce(
@@ -66,6 +70,8 @@ def make_decision_proof(
         reason_code=envelope.reason_code,
         proof_ids=proof_ids,
         coverage=envelope.coverage,
+        verdict_tier=envelope.verdict_tier,
+        adjusted_size_cap=envelope.adjusted_size_cap,
     )
     return Proof(
         proof_id=proof_id,
@@ -85,7 +91,17 @@ def make_decision_proof(
 
 
 def compute_receipt_hash(receipt: Receipt) -> str:
-    return hash_obj(receipt.model_copy(update={"receipt_hash": ""}))
+    payload = receipt.model_copy(update={"receipt_hash": ""}).model_dump(mode="python")
+    if "prev_receipt_hash" not in receipt.model_fields_set:
+        payload.pop("prev_receipt_hash", None)
+    return hash_obj(payload)
+
+
+def compute_ledger_checkpoint_hash(checkpoint: LedgerCheckpoint) -> str:
+    payload = checkpoint.model_copy(update={"checkpoint_hash": ""}).model_dump(mode="python")
+    if "merkle_root" not in checkpoint.model_fields_set:
+        payload.pop("merkle_root", None)
+    return hash_obj(payload)
 
 
 def issue_receipt(
@@ -94,6 +110,7 @@ def issue_receipt(
     proofs: list[Proof],
     coverage: CoverageManifest,
     package_hash: str,
+    prev_receipt_hash: str = "sha256:genesis",
     baseline_name: str,
     baseline_hash: str,
     baseline_receipt_hash: str | None = None,
@@ -121,7 +138,7 @@ def issue_receipt(
     include_baseline_receipt: bool = False,
     include_trust_policy: bool = False,
 ) -> Receipt | None:
-    if envelope.status not in {Status.PASS, Status.WITHHELD}:
+    if envelope.status not in (Status.PASS, Status.WITHHELD, Status.REDUCE_SIZE):
         return None
     all_proofs = [*proofs]
     decision_proof = make_decision_proof(
@@ -130,13 +147,14 @@ def issue_receipt(
         include_baseline_receipt=include_baseline_receipt,
         include_trust_policy=include_trust_policy,
     )
-    if decision_proof.proof_id not in {proof.proof_id for proof in all_proofs}:
+    if decision_proof.proof_id not in [proof.proof_id for proof in all_proofs]:
         all_proofs.append(decision_proof)
     breaches: list[Assertion] = [
         assertion for proof in all_proofs if proof.kind == ProofKind.PROBE for assertion in proof.assertions if not assertion.holds
     ]
-    result_status = "pass" if envelope.status == Status.PASS else "withheld"
+    result_status = envelope.status
     receipt = Receipt(
+        prev_receipt_hash=prev_receipt_hash,
         package=PackageInfo(
             identity_hash=package_hash,
             manifest_hash=package_hash,
@@ -145,11 +163,11 @@ def issue_receipt(
             identity_lock_path=package_identity_lock_path,
         ),
         edit_provenance=edit_provenance
-        or EditProvenance(
-            prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
-            diff_hash=hash_obj({"baseline": baseline_hash, "candidate": candidate_hash}),
-            captured_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        ),
+            or EditProvenance(
+                prompt_digest=hash_obj({"prompt": "fixture make it more responsive"}),
+                diff_hash=hash_obj({"baseline": baseline_hash, "candidate": candidate_hash}),
+                captured_at=DEFAULT_EDIT_PROVENANCE_CAPTURED_AT,
+            ),
         baseline=BaselineInfo(
             package_hash=baseline_hash,
             baseline_receipt_hash=baseline_receipt_hash,
@@ -179,6 +197,8 @@ def issue_receipt(
         coverage=coverage,
         decision=ReceiptDecision(
             reason_code=envelope.reason_code,
+            verdict_tier=envelope.verdict_tier,
+            adjusted_size_cap=envelope.adjusted_size_cap,
             required_proof_ids=envelope.required_proof_ids,
             satisfied_proof_ids=envelope.satisfied_proof_ids,
         ),
@@ -230,16 +250,18 @@ def create_ledger_checkpoint(
     entries = _read_ledger_entries(ledger_path)
     ledger_tail_hash = entries[-1]["entry_hash"] if entries else "sha256:genesis"
     ledger_receipt_hashes = [entry["receipt_hash"] for entry in entries if isinstance(entry.get("receipt_hash"), str)]
+    subjects = _unique_sorted([*(subject_receipt_hashes or []), *ledger_receipt_hashes])
     checkpoint = LedgerCheckpoint(
         ledger_path=ledger_path_label or str(ledger_path),
         ledger_hash=hash_file(ledger_path),
         ledger_tail_hash=ledger_tail_hash,
         ledger_entry_count=len(entries),
-        subject_receipt_hashes=sorted(set([*(subject_receipt_hashes or []), *ledger_receipt_hashes])),
+        subject_receipt_hashes=subjects,
+        merkle_root=merkle_root(subjects),
         anchor_kind=anchor_kind,
         checkpoint_hash="",
     )
-    checkpoint = checkpoint.model_copy(update={"checkpoint_hash": hash_obj(checkpoint)})
+    checkpoint = checkpoint.model_copy(update={"checkpoint_hash": compute_ledger_checkpoint_hash(checkpoint)})
     if checkpoint_path is not None:
         atomic_write_text(checkpoint_path, checkpoint.model_dump_json(indent=2) + "\n")
     return checkpoint
@@ -258,7 +280,7 @@ def _append_ledger(path: Path, receipt: Receipt, *, written_at: str | None = Non
         "status": receipt.result.status,
         "receipt_hash": receipt.receipt_hash,
         "previous_entry_hash": previous_entry_hash,
-        "written_at": written_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "written_at": written_at or DEFAULT_LEDGER_WRITTEN_AT,
     }
     entry["entry_hash"] = hash_obj(entry)
     append_text(path, json.dumps(entry, sort_keys=True) + "\n")
@@ -327,4 +349,12 @@ def _strength_summary(proofs: list[Proof], scenario_count: int) -> str:
     for proof in proofs:
         for assertion in proof.assertions:
             items.append(f"{assertion.metric} {assertion.op} {assertion.threshold} observed {assertion.observed}")
-    return f"tested: {'; '.join(sorted(set(items)))}; {scenario_count} anchored scenarios"
+    return f"tested: {'; '.join(_unique_sorted(items))}; {scenario_count} anchored scenarios"
+
+
+def _unique_sorted(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return sorted(unique)

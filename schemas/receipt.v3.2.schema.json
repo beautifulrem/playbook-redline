@@ -314,12 +314,50 @@
           "title": "Assertions",
           "type": "array"
         },
+        "fees_modeled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fees Modeled"
+        },
+        "fill_model": {
+          "anyOf": [
+            {
+              "const": "next_bar_open",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fill Model"
+        },
         "inputs_hash": {
           "title": "Inputs Hash",
           "type": "string"
         },
         "kind": {
           "$ref": "#/$defs/ProofKind"
+        },
+        "lookahead_guard": {
+          "anyOf": [
+            {
+              "const": "structural_next_bar",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lookahead Guard"
         },
         "meta": {
           "additionalProperties": true,
@@ -460,6 +498,15 @@
         "PASS",
         "NEW_BLOCK_BREACH",
         "RECEIPT_MISMATCH",
+        "PROOF_HASH_MISMATCH",
+        "LEDGER_CHAIN_BROKEN",
+        "CHECKPOINT_MISMATCH",
+        "EXECUTION_LEDGER_BROKEN",
+        "MERKLE_INCLUSION_FAILED",
+        "APPROVAL_LINK_MISMATCH",
+        "APPROVAL_CONSUMED",
+        "APPROVAL_EXPIRED",
+        "CHAIN_LINK_MISMATCH",
         "BASELINE_UNCHAINED",
         "BASELINE_GENESIS",
         "COVERAGE_INCOMPLETE",
@@ -735,6 +782,11 @@
     },
     "package": {
       "$ref": "#/$defs/PackageInfo"
+    },
+    "prev_receipt_hash": {
+      "default": "sha256:genesis",
+      "title": "Prev Receipt Hash",
+      "type": "string"
     },
     "proofs": {
       "items": {

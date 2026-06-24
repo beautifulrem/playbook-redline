@@ -59,6 +59,18 @@
           "default": null,
           "title": "Period Start"
         },
+        "source_file_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source File Hash"
+        },
         "timeframe": {
           "default": "1h",
           "title": "Timeframe",

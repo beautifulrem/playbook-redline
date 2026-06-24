@@ -1,0 +1,13 @@
+{
+  "version": "redline.ledger.checkpoint.v1",
+  "ledger_path": "/Volumes/Remi/仓库/bitget/artifacts/release-demo/session-1782284274326/service/runs/run_c55be55a42ede4f90437cb74/issuance-ledger.jsonl",
+  "ledger_hash": "sha256:4451a95a109a63e892e390b488d5d3904f0a6b2881395b73f0c9816c2b18d911",
+  "ledger_tail_hash": "sha256:dbe2cbe54e8b5e398a47259b4fc0b778bae28561e7567f71772b27d326f6d836",
+  "ledger_entry_count": 1,
+  "subject_receipt_hashes": [
+    "sha256:64f6ef8daeac15e08e699a124ccc899ba5582f0c6597b97cb46d6710af33d3a6"
+  ],
+  "merkle_root": "sha256:4874e036d8a93db222358f7269e4de81c280a0806d2a71a2ff32533f0db61043",
+  "anchor_kind": "local-artifact",
+  "checkpoint_hash": "sha256:7053cf4f3b2f424e670c1291847393e54a416e1cd2dd5c723858d6ca057dc843"
+}

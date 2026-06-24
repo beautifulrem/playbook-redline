@@ -7,6 +7,9 @@
   "artifact_hash": "sha256:c2202c44cdf225234b1555897e372567ca91dc2d389cee9da8e31b0420969daa",
   "assertions": [],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:c2202c44cdf225234b155589 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {
     "expected_diff_hash": "sha256:1c422614cd1e21a48921cca5d31b9fa0e71c8d9dd94571d1ed51a605ae49c8a2",
     "binding": "package_pair"
