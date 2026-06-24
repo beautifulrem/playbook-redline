@@ -1,0 +1,90 @@
+{
+  "envelope_version": "redline.decision.v1",
+  "status": "pass",
+  "verdict_tier": "ALLOW",
+  "adjusted_size_cap": null,
+  "reason_code": "PASS",
+  "chain_status": "chained",
+  "required_proof_ids": [
+    "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+    "proof:candidate_absolute:5f1ad76159c62e782c528b48",
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:fd53e496d96889498509386a",
+    "proof:package_canonical:7bc11572ef15a4a40cdf1856",
+    "proof:probe:0b22c22a0727d2c30c2de30e",
+    "proof:probe:10142a4c4d62b0f91a288df0",
+    "proof:probe:1ddc081ebb0b52ee1d938eb9",
+    "proof:probe:a13bf024e0d494f47d38b48f",
+    "proof:probe:b3e8d95ec8b37d9651c0dde7",
+    "proof:probe:c3ad8af9ce3ea6a163703aee",
+    "proof:replay:bbfdbde5518b151be3dd273e",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:8079e8531c379ae14c25e313"
+  ],
+  "satisfied_proof_ids": [
+    "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+    "proof:candidate_absolute:5f1ad76159c62e782c528b48",
+    "proof:coverage:07629775749a0c50afc55033",
+    "proof:decision:fd53e496d96889498509386a",
+    "proof:package_canonical:7bc11572ef15a4a40cdf1856",
+    "proof:probe:0b22c22a0727d2c30c2de30e",
+    "proof:probe:10142a4c4d62b0f91a288df0",
+    "proof:probe:1ddc081ebb0b52ee1d938eb9",
+    "proof:probe:a13bf024e0d494f47d38b48f",
+    "proof:probe:b3e8d95ec8b37d9651c0dde7",
+    "proof:probe:c3ad8af9ce3ea6a163703aee",
+    "proof:replay:bbfdbde5518b151be3dd273e",
+    "proof:replay_wellformed:6c1df9b834122230a053526f",
+    "proof:spec_compile:8079e8531c379ae14c25e313"
+  ],
+  "coverage": {
+    "manifest": "suite.scenarios×spec.block_probes",
+    "cells": [
+      [
+        "btc-crash-2024-03-05",
+        "drawdown_limit"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "trade_budget"
+      ],
+      [
+        "btc-chop-2024-08",
+        "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-chop-2024-08",
+        "trade_budget"
+      ]
+    ],
+    "complete": true,
+    "missing": []
+  },
+  "capabilities": {
+    "engine": {
+      "mode": "deterministic",
+      "degraded": false,
+      "reason": null
+    },
+    "scenario_count": 2,
+    "qwen_compile": {
+      "mode": "json",
+      "degraded": true,
+      "reason": "qwen_not_used"
+    },
+    "sponsor_readback": {
+      "mode": "unavailable",
+      "degraded": true,
+      "reason": null
+    },
+    "llm_in_verdict": false
+  }
+}

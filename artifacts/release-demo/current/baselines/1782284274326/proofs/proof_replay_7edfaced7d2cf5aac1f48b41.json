@@ -1,0 +1,14 @@
+{
+  "proof_id": "proof:replay:7edfaced7d2cf5aac1f48b41",
+  "phase": "run",
+  "kind": "replay",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:4778cc5bb9c4c26207cb4e896917508519e911f84d4a00fa509c1c4e54984864",
+  "artifact_hash": "sha256:7edfaced7d2cf5aac1f48b41bf61230b839d4204a42d99bbe58f07c4b0a59b42",
+  "assertions": [],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:7edfaced7d2cf5aac1f48b41 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": "next_bar_open",
+  "lookahead_guard": "structural_next_bar",
+  "fees_modeled": true,
+  "meta": {}
+}

@@ -1,0 +1,27 @@
+{
+  "proof_id": "proof:probe:76fbdbbb653d83b4540c6f8b",
+  "phase": "probe",
+  "kind": "probe",
+  "verdict_bearing": true,
+  "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
+  "artifact_hash": "sha256:76fbdbbb653d83b4540c6f8b712fc2c5bc3338ed0e33e302018a036b25931917",
+  "assertions": [
+    {
+      "metric": "max_drawdown",
+      "op": "<=",
+      "threshold": "0.08000000",
+      "observed": "0.02029149",
+      "scenario_id": "btc-chop-2024-08",
+      "bar": 21,
+      "holds": true
+    }
+  ],
+  "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:76fbdbbb653d83b4540c6f8b --package <package> --suite <suite> --spec <spec> --baseline-receipt <baseline-receipt> --trust-policy <trust-policy>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
+  "meta": {
+    "scenario_id": "btc-chop-2024-08",
+    "probe_id": "drawdown_limit"
+  }
+}

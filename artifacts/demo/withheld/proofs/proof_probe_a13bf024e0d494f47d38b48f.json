@@ -17,6 +17,9 @@
     }
   ],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {
     "scenario_id": "btc-chop-2024-08",
     "probe_id": "no_entry_when_crash"

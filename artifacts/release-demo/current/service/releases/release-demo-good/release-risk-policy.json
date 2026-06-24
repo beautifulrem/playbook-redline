@@ -1,0 +1,19 @@
+{
+  "allowed_product_types": [
+    "USDT-FUTURES"
+  ],
+  "allowed_symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "bound_at": "2026-06-24T06:57:55Z",
+  "expected_order_notional_usdt": "5",
+  "mainnet_enabled": false,
+  "max_order_notional_usdt": "20",
+  "policy_hash": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96",
+  "require_demo_execution": true,
+  "require_human_approval": true,
+  "require_simulation_evidence": true,
+  "schema_version": "redline.release.risk_policy.v1"
+}

@@ -1,0 +1,593 @@
+{
+  "version": "redline.receipt.v3.3",
+  "prev_receipt_hash": "sha256:genesis",
+  "package": {
+    "identity_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
+    "manifest_hash": "sha256:f0d62f9eba4325984d32f45d1b2ad03227127275aebb53bcb6a7f2dabd120ca6",
+    "canonical_tar_rules": "redline.v9.canonical-tree",
+    "adapter_id": "python_strategy_sandbox",
+    "identity_lock_hash": "sha256:f11c2d123ce6f90e41532cda93e3e7c46cf7850238b193c1d03676e646a90514",
+    "identity_lock_path": "fixtures/demo_pack/playbook_identity.lock"
+  },
+  "edit_provenance": {
+    "tool": "fixture",
+    "prompt_digest": "sha256:4853573e1c2587e28f34fb33522762c1030c61d2fcf5202103fca4282c98eba6",
+    "diff_hash": "sha256:9d77d5d121a529acfd5a86361d102bc177f0b369c0d9caab9955ae0860a5fcb1",
+    "locked_by": "author",
+    "captured_at": "2026-06-10T00:00:00Z"
+  },
+  "baseline": {
+    "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
+    "baseline_receipt_hash": null,
+    "baseline_version_id": "fixture:baseline",
+    "package_name": "baseline",
+    "chain_status": "genesis"
+  },
+  "candidate": {
+    "package_hash": "sha256:7524cc8797efceb1b73b4712008b89ff51691c65c4b4ff8b6f5cb881a9519a43",
+    "candidate_version_id": "fixture:baseline",
+    "package_name": "baseline"
+  },
+  "spec": {
+    "spec_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
+    "source_path": "fixtures/specs/redline_spec.json",
+    "compiler": "json",
+    "model": null,
+    "tool_schema_hash": null,
+    "degraded_reason": null
+  },
+  "suite": {
+    "suite_id": "anchored-crash-v2",
+    "scenarios": [
+      "btc-crash-2024-03-05",
+      "btc-chop-2024-08"
+    ],
+    "suite_lock_hash": "sha256:c5736486c05dbea7c3a235ca442d4d9363a812198777336fe496e3bb5b1dcdf1",
+    "source_path": "fixtures/suites/demo_suite.json"
+  },
+  "runner": {
+    "engine": "deterministic",
+    "engine_source_tree_hash": "sha256:da6ec922a1ad403847df468f53543f335109dcd9c9b99f51b81bba0478445670",
+    "runner_lock_hash": "sha256:d65e1a9744367d4bcde4c2448f96a28dc59938b82d3d54f2323d76c8b133e69d",
+    "env_lock": "TZ=UTC;PYTHONHASHSEED-independent;LC_ALL=C"
+  },
+  "result": {
+    "status": "pass",
+    "new_breaches": [],
+    "result_hash": "sha256:83e6f1f573095856bb31b74de81bb7309612e4acf712e7024546a0d02892c53b"
+  },
+  "coverage": {
+    "manifest": "suite.scenarios×spec.block_probes",
+    "cells": [
+      [
+        "btc-crash-2024-03-05",
+        "drawdown_limit"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-crash-2024-03-05",
+        "trade_budget"
+      ],
+      [
+        "btc-chop-2024-08",
+        "drawdown_limit"
+      ],
+      [
+        "btc-chop-2024-08",
+        "no_entry_when_crash"
+      ],
+      [
+        "btc-chop-2024-08",
+        "trade_budget"
+      ]
+    ],
+    "complete": true,
+    "missing": []
+  },
+  "decision": {
+    "reason_code": "BASELINE_GENESIS",
+    "verdict_tier": "ALLOW",
+    "adjusted_size_cap": null,
+    "required_proof_ids_source": "REQUIRED_PROOFS[status]",
+    "required_proof_ids": [
+      "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+      "proof:candidate_absolute:b167a6a1858d3072be55d2dc",
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:f15ae64a06540a614b286813",
+      "proof:package_canonical:2a6cbc3b8d461b7d67a737ac",
+      "proof:probe:0b22c22a0727d2c30c2de30e",
+      "proof:probe:10142a4c4d62b0f91a288df0",
+      "proof:probe:5621fd37c72c228728a9fa40",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:7edfaced7d2cf5aac1f48b41",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:8079e8531c379ae14c25e313"
+    ],
+    "satisfied_proof_ids": [
+      "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+      "proof:candidate_absolute:b167a6a1858d3072be55d2dc",
+      "proof:coverage:07629775749a0c50afc55033",
+      "proof:decision:f15ae64a06540a614b286813",
+      "proof:package_canonical:2a6cbc3b8d461b7d67a737ac",
+      "proof:probe:0b22c22a0727d2c30c2de30e",
+      "proof:probe:10142a4c4d62b0f91a288df0",
+      "proof:probe:5621fd37c72c228728a9fa40",
+      "proof:probe:a13bf024e0d494f47d38b48f",
+      "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "proof:replay:7edfaced7d2cf5aac1f48b41",
+      "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "proof:spec_compile:8079e8531c379ae14c25e313"
+    ],
+    "verdict_source": "deterministic_probe",
+    "llm_used_for_verdict": false
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:package_canonical:2a6cbc3b8d461b7d67a737ac",
+      "phase": "import",
+      "kind": "package_canonical",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:84a370c6594c8d9a553df05ff2162b6f9a200aa842f17debe969983c895673f9",
+      "artifact_hash": "sha256:2a6cbc3b8d461b7d67a737aca60540729244c241949c1833e8a008e796f635f0",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:package_canonical:2a6cbc3b8d461b7d67a737ac --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:edit_provenance:4a8fabe7a38b2010d0b16efa",
+      "phase": "capture-edit",
+      "kind": "edit_provenance",
+      "verdict_bearing": false,
+      "inputs_hash": "sha256:75cb94ab83dd6379e2af7a6661d96b8511a5f8bfdaf59f9265bbdb6b431ad653",
+      "artifact_hash": "sha256:4a8fabe7a38b2010d0b16efa250a6c7dc77eb786938b39466374e1e8398df382",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:edit_provenance:4a8fabe7a38b2010d0b16efa --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "expected_diff_hash": "sha256:9d77d5d121a529acfd5a86361d102bc177f0b369c0d9caab9955ae0860a5fcb1",
+        "binding": "package_pair"
+      }
+    },
+    {
+      "proof_id": "proof:spec_compile:8079e8531c379ae14c25e313",
+      "phase": "compile",
+      "kind": "spec_compile",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:af54ade9cad81afc16ab822f8dc855a322a1dccb9dbd4a87898ebb9b69cedc25",
+      "artifact_hash": "sha256:8079e8531c379ae14c25e31362ce878a98e5e1b07540ffdfc70944afd408b6b7",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:spec_compile:8079e8531c379ae14c25e313 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "compiler": "json",
+        "model": "",
+        "tool_schema_hash": "",
+        "degraded": "true",
+        "degraded_reason": ""
+      }
+    },
+    {
+      "proof_id": "proof:replay:7edfaced7d2cf5aac1f48b41",
+      "phase": "run",
+      "kind": "replay",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:4778cc5bb9c4c26207cb4e896917508519e911f84d4a00fa509c1c4e54984864",
+      "artifact_hash": "sha256:7edfaced7d2cf5aac1f48b41bf61230b839d4204a42d99bbe58f07c4b0a59b42",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay:7edfaced7d2cf5aac1f48b41 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": "next_bar_open",
+      "lookahead_guard": "structural_next_bar",
+      "fees_modeled": true,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:replay_wellformed:6c1df9b834122230a053526f",
+      "phase": "run",
+      "kind": "replay_wellformed",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:8c4cf3cbe0bc13deaab6f78614faf5294f6d68556de3d20527248cc68ba4802e",
+      "artifact_hash": "sha256:6c1df9b834122230a053526fe6cc45179a7cab042a3f953a1f3ca6b31d6d7cd7",
+      "assertions": [
+        {
+          "metric": "replay_wellformed",
+          "op": "==",
+          "threshold": "24",
+          "observed": "24",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "replay_wellformed",
+          "op": "==",
+          "threshold": "24",
+          "observed": "24",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "replay_wellformed",
+          "op": "==",
+          "threshold": "24",
+          "observed": "24",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "replay_wellformed",
+          "op": "==",
+          "threshold": "24",
+          "observed": "24",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:replay_wellformed:6c1df9b834122230a053526f --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:probe:0b22c22a0727d2c30c2de30e",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:c283af1b8e073f2c5cacb7b4452a27e794e7ebb134ff2344eb63728f6411489a",
+      "artifact_hash": "sha256:0b22c22a0727d2c30c2de30ee1d17e304d912f57873c2f9031e2a5568ceeeee7",
+      "assertions": [
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:0b22c22a0727d2c30c2de30e --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "drawdown_limit"
+      }
+    },
+    {
+      "proof_id": "proof:probe:10142a4c4d62b0f91a288df0",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:dcdeec437b1eb4dac77c12a6a22759f297a97d531ba67f8ecb4145d0781f236b",
+      "artifact_hash": "sha256:10142a4c4d62b0f91a288df035673ef369716943a1bdbdd836f1c322f8d57bb9",
+      "assertions": [
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:10142a4c4d62b0f91a288df0 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "no_entry_when_crash"
+      }
+    },
+    {
+      "proof_id": "proof:probe:b3e8d95ec8b37d9651c0dde7",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:cbb0ac11c03eb69951c8a01f550a31939b2fbb8d4678ebe8025be0a0fe5b2982",
+      "artifact_hash": "sha256:b3e8d95ec8b37d9651c0dde76a346dbb84fb8d254d027d1b8e8a2f810ed3fe25",
+      "assertions": [
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 23,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:b3e8d95ec8b37d9651c0dde7 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-crash-2024-03-05",
+        "probe_id": "trade_budget"
+      }
+    },
+    {
+      "proof_id": "proof:probe:5621fd37c72c228728a9fa40",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:b8ee83c6677138c21e9b58fc241b847a7ac663fcdf34d92aa72b610381bc48c2",
+      "artifact_hash": "sha256:5621fd37c72c228728a9fa40be70cab879f6ac26099719ad2020b41d0ee5d708",
+      "assertions": [
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0.00498134",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 17,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:5621fd37c72c228728a9fa40 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "drawdown_limit"
+      }
+    },
+    {
+      "proof_id": "proof:probe:a13bf024e0d494f47d38b48f",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:f64b2947296784cd46902d3d0716d8e9e2b0505bc5b7e43ae113512958902a35",
+      "artifact_hash": "sha256:a13bf024e0d494f47d38b48fac208e01d294596e45abe6ee90dc13c77cade633",
+      "assertions": [
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 0,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:a13bf024e0d494f47d38b48f --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "no_entry_when_crash"
+      }
+    },
+    {
+      "proof_id": "proof:probe:c3ad8af9ce3ea6a163703aee",
+      "phase": "probe",
+      "kind": "probe",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:c549f70424b2bdc144ae5416b387cb50d50e28651b19e571e6a72a6c34d3b89c",
+      "artifact_hash": "sha256:c3ad8af9ce3ea6a163703aee9be209e0daa44981ecc32f8144052ccd67b82d88",
+      "assertions": [
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:probe:c3ad8af9ce3ea6a163703aee --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {
+        "scenario_id": "btc-chop-2024-08",
+        "probe_id": "trade_budget"
+      }
+    },
+    {
+      "proof_id": "proof:coverage:07629775749a0c50afc55033",
+      "phase": "decide",
+      "kind": "coverage",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:a55c1470dd483a14ab4cb05e5a48e8746f51f7493f2a6ba21fcb024aed46f359",
+      "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99",
+      "phase": "calibrate",
+      "kind": "baseline_calibration",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:c1c2f85d90c548db38461d421e2bafe1ac4703b62b2aae088009c0ebc2b79033",
+      "artifact_hash": "sha256:6dbf4d64bed1fe7aa8537e993317cf215c8079df048367775063ed51983855a3",
+      "assertions": [
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0.00498134",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 17,
+          "holds": true
+        },
+        {
+          "metric": "no_entry_when",
+          "op": "<=",
+          "threshold": "0",
+          "observed": "0",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:baseline_calibration:6dbf4d64bed1fe7aa8537e99 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:candidate_absolute:b167a6a1858d3072be55d2dc",
+      "phase": "probe",
+      "kind": "candidate_absolute",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:ed7dff4b04a5a30d908382a196cf3d5e44a5eb2f3797fdcecf04f2a84a1102f5",
+      "artifact_hash": "sha256:b167a6a1858d3072be55d2dcacb4c65e2d56186855a68600251bb4028ae56c00",
+      "assertions": [
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 0,
+          "holds": true
+        },
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-crash-2024-03-05",
+          "bar": 23,
+          "holds": true
+        },
+        {
+          "metric": "max_drawdown",
+          "op": "<=",
+          "threshold": "0.08000000",
+          "observed": "0.00498134",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 17,
+          "holds": true
+        },
+        {
+          "metric": "trade_budget",
+          "op": "<=",
+          "threshold": "20.00000000",
+          "observed": "1.00000000",
+          "scenario_id": "btc-chop-2024-08",
+          "bar": 23,
+          "holds": true
+        }
+      ],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:candidate_absolute:b167a6a1858d3072be55d2dc --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    },
+    {
+      "proof_id": "proof:decision:f15ae64a06540a614b286813",
+      "phase": "decide",
+      "kind": "decision",
+      "verdict_bearing": true,
+      "inputs_hash": "sha256:187dd8de2e3a038c5db539d6de395314d622c7fd29a7c180aae69f2a0bfd3dcf",
+      "artifact_hash": "sha256:7bbbdceddfd51b4f967e57f0569a650ffa31894426ec22b9c13ea34987ac5aa3",
+      "assertions": [],
+      "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:decision:f15ae64a06540a614b286813 --package <package> --suite <suite> --spec <spec>",
+      "fill_model": null,
+      "lookahead_guard": null,
+      "fees_modeled": null,
+      "meta": {}
+    }
+  ],
+  "capabilities": {
+    "engine": {
+      "mode": "deterministic",
+      "degraded": false,
+      "reason": null
+    },
+    "scenario_count": 2,
+    "qwen_compile": {
+      "mode": "json",
+      "degraded": true,
+      "reason": "qwen_not_used"
+    },
+    "sponsor_readback": {
+      "mode": "unavailable",
+      "degraded": true,
+      "reason": null
+    },
+    "llm_in_verdict": false
+  },
+  "strength_summary": "tested: max_drawdown <= 0.08000000 observed 0; max_drawdown <= 0.08000000 observed 0.00498134; no_entry_when <= 0 observed 0; replay_wellformed == 24 observed 24; trade_budget <= 20.00000000 observed 1.00000000; 2 anchored scenarios",
+  "report": {
+    "report_hash": "sha256:5300a2f482ec8cbbd675f963cf014227847ddab39b0c371d234bd5a4808fe3d2",
+    "attribution_report_hash": null
+  },
+  "publish": {
+    "attempted": false,
+    "stop_before_final_publish": true,
+    "sponsor_status": "not_attempted",
+    "version_id": null,
+    "run_id": null,
+    "run_evidence_hash": null,
+    "readback_hash": null,
+    "note": "run_id is platform execution evidence, not local-equivalence proof"
+  },
+  "receipt_hash": "sha256:206a14a9b881806794d8346aab81b1b0215060009997363d6b987c153d280b6b"
+}

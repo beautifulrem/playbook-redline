@@ -7,5 +7,8 @@
   "artifact_hash": "sha256:07629775749a0c50afc55033afd068a9b294e215fab6a182ac2fadefe04c6256",
   "assertions": [],
   "reproduce": "uv run redline verify-proof receipt.json --proof-id proof:coverage:07629775749a0c50afc55033 --package <package> --suite <suite> --spec <spec>",
+  "fill_model": null,
+  "lookahead_guard": null,
+  "fees_modeled": null,
   "meta": {}
 }
