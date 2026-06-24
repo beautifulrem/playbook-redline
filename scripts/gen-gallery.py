@@ -66,6 +66,61 @@ BODY = """
   </table>
   </div>
 
+  <h2 class="rl-sec">Chain walk — verifiable chain</h2>
+  <div class="rl-chain">
+    <div class="rl-chain__node"><span class="rl-chain__label">edit</span><span class="rl-chain__hash">sha256:0a91…7e2c</span><span class="rl-chain__st--ok">✔ provenance</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">verdict</span><span class="rl-chain__hash">sha256:4263…645d6</span><span class="rl-chain__st--ok">✔ replayed</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">approval</span><span class="rl-chain__hash">sha256:b8e1…09af</span><span class="rl-chain__st--ok">✔ digest burn</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">execution</span><span class="rl-chain__hash">1453***8417</span><span class="rl-chain__st--ok">✔ bitget</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">attestation</span><span class="rl-chain__hash">merkle 9d7d…8d5c</span><span class="rl-chain__st--ok">✔ ed25519</span></div>
+  </div>
+  <p class="rl-label">任一节点 ✗ → 该隔间翻红 + 定位 first failed link：</p>
+  <div class="rl-chain">
+    <div class="rl-chain__node"><span class="rl-chain__label">edit</span><span class="rl-chain__hash">sha256:0a91…7e2c</span><span class="rl-chain__st--ok">✔ provenance</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">verdict</span><span class="rl-chain__hash">sha256:4263…645d6</span><span class="rl-chain__st--ok">✔ replayed</span></div>
+    <div class="rl-chain__node rl-chain__node--fail"><span class="rl-chain__label">approval</span><span class="rl-chain__hash">sha256:dead…beef</span><span class="rl-chain__st--bad">✗ digest mismatch</span><span class="rl-chain__flag">first failed</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">execution</span><span class="rl-chain__hash">— halted —</span><span class="rl-chain__st--skip">not reached</span></div>
+    <div class="rl-chain__node"><span class="rl-chain__label">attestation</span><span class="rl-chain__hash">— none —</span><span class="rl-chain__st--skip">not reached</span></div>
+  </div>
+
+  <h2 class="rl-sec">Proofbar</h2>
+  <div class="rl-proofbar">
+    <div><span class="rl-proof__num">06</span><span class="rl-proof__label">crash tapes replayed</span></div>
+    <div><span class="rl-proof__num rl-proof__num--ok">00</span><span class="rl-proof__label">live funds at risk</span></div>
+    <div><span class="rl-proof__num">L1</span><span class="rl-proof__label">assurance tier</span></div>
+    <div><span class="rl-proof__num">256</span><span class="rl-proof__label">bit hash-chained</span></div>
+  </div>
+
+  <h2 class="rl-sec">Tier meter</h2>
+  <div class="rl-tier">
+    <div class="rl-tier__seg rl-tier__seg--reached"><b>L0</b>sim-only</div>
+    <div class="rl-tier__seg rl-tier__seg--on"><b>L1</b>demo-executed</div>
+    <div class="rl-tier__seg"><b>L2</b>live-gated</div>
+  </div>
+
+  <h2 class="rl-sec">Command block — zero-secret verify</h2>
+  <div class="rl-cmd">
+    <div class="rl-cmd__head"><span>verify on a clean machine</span><span>no secrets · offline</span></div>
+    <div class="rl-cmd__body">
+      <samp class="rl-cmd__cmt">改一字节 → 非零退出 + 精确 violation code</samp>
+      <samp>uv run redline verify-chain &lt;release_dir&gt; --json</samp>
+      <samp>uv run redline verify-release-attestation &lt;attestation&gt; --bundle &lt;bundle&gt; --trusted-public-key &lt;ed25519-public:…&gt;</samp>
+      <samp>scripts/tamper-demo.sh</samp>
+    </div>
+  </div>
+
+  <h2 class="rl-sec">Tamper control</h2>
+  <div class="rl-tamper">
+    <div class="rl-tamper__row">
+      <span class="rl-tamper__k">receipt_hash</span>
+      <samp class="rl-tamper__val">sha256:426312eeddd82c552a747df781bf12e2573280fcb7b9ab442f277a2fb76645d6</samp>
+      <button class="rl-btn rl-btn--hazard" type="button">flip byte</button>
+    </div>
+  </div>
+
+  <h2 class="rl-sec">Warning stripe</h2>
+  <div class="rl-stripe"><span class="rl-stripe__msg">⚠ execution freeze active · demo execution disabled</span></div>
+
   <hr>
   <p class="rl-muted">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布。 <span class="rl-faint">REV 2.6 · UNIT RL-01</span></p>
 </main>

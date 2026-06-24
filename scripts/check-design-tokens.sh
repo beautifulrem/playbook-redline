@@ -27,8 +27,11 @@ printf '%s' "$ROOT" | grep -qiE -- '--rl-radius:[[:space:]]*0([^0-9]|;|$)' || no
 # B) no non-zero radius anywhere (any *radius property whose value contains a non-zero digit)
 if grep -nE '[a-zA-Z-]*radius:[^;{}]*[1-9]' "$CSS" >/dev/null 2>&1; then note "non-zero border-radius (90 degrees only)"; fi
 
-# C) no gradients
-if grep -nEi '(linear|radial|conic)-gradient' "$CSS" >/dev/null 2>&1; then note "gradient (flat fills only)"; fi
+# C) gradients: allow ONLY hard-stop repeating-linear-gradient (hazard stripes / CRT scanlines, design §5.4/§5.5.9);
+#    ban all smooth shading gradients (linear/radial/conic, repeating-radial/conic).
+if grep -oEi '(repeating-)?(linear|radial|conic)-gradient' "$CSS" | grep -viE '^repeating-linear-gradient$' | grep -q .; then note "smooth/forbidden gradient (only hard-stop repeating-linear-gradient allowed)"; fi
+# C2) a repeating-linear-gradient must carry explicit length stops (px/%/em); a stop-less one is a smooth gradient in disguise.
+if grep -iE 'repeating-linear-gradient' "$CSS" | grep -viE 'repeating-linear-gradient\([^;{}]*[0-9]+(px|%|rem|em)' | grep -q .; then note "repeating-linear-gradient without hard length stops (smooth-gradient abuse)"; fi
 
 # D) no shadows at all (soft or hard) and no drop-shadow filter
 if grep -nE 'box-shadow:[[:space:]]*[^;}]+' "$CSS" | grep -viE 'box-shadow:[[:space:]]*none[[:space:]]*(;|\}|!important|$)' >/dev/null 2>&1; then note "box-shadow (no shadows; use 1px solid lines)"; fi

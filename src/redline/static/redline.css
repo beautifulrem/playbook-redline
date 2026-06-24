@@ -136,3 +136,67 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 
 /* narrow viewports: stack the band so the verdict meta never clips off-screen */
 @media (max-width: 560px) { .rl-band { flex-direction: column; align-items: flex-start; gap: var(--rl-2); } }
+
+/* ===================== signature components (WS-A.3) ===================== */
+
+/* BUTTON — square, mono, 1px */
+.rl-btn { display: inline-flex; align-items: center; gap: var(--rl-2); font-family: var(--rl-mono); font-size: var(--rl-tele); text-transform: uppercase; letter-spacing: var(--rl-track); color: var(--rl-fg); background: var(--rl-surface-2); border: var(--rl-border-strong); padding: var(--rl-2) var(--rl-4); cursor: pointer; }
+.rl-btn:hover { background: var(--rl-surface); border-color: var(--rl-fg); }
+.rl-btn--hazard { color: var(--rl-hazard); border-color: var(--rl-hazard); }
+.rl-btn:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 2px; }
+
+/* CHAIN WALK — verifiable chain, crosshair joints, fail-closed hazard node */
+.rl-chain { display: flex; flex-wrap: wrap; border: var(--rl-border); }
+.rl-chain__node { flex: 1 1 0; min-width: 150px; padding: var(--rl-3) var(--rl-4); border-right: var(--rl-border); position: relative; }
+.rl-chain__node:last-child { border-right: 0; }
+.rl-chain__node:not(:last-child)::after { content: "+"; position: absolute; top: 50%; right: -8px; transform: translateY(-50%); z-index: 1; color: var(--rl-line-strong); background: var(--rl-bg); font-size: 15px; line-height: 1; padding: 0 1px; }
+.rl-chain__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-chain__hash { display: block; color: var(--rl-fg); font-size: 11px; margin: var(--rl-1) 0; overflow-wrap: anywhere; }
+.rl-chain__st--ok { color: var(--rl-pass); }
+.rl-chain__st--bad { color: var(--rl-hazard); font-weight: 700; }
+.rl-chain__st--skip { color: var(--rl-muted); }   /* downstream "not reached" — downweighted so only the root cause carries hazard weight */
+.rl-chain__flag { display: inline-block; margin-top: var(--rl-1); padding: 0 5px; border: 1px solid var(--rl-hazard); color: var(--rl-hazard); font-size: 10px; text-transform: uppercase; letter-spacing: var(--rl-track); }
+.rl-chain__node--fail { background: var(--rl-hazard-ink); border-color: var(--rl-hazard); }
+@media (max-width: 620px) {
+  .rl-chain { flex-direction: column; }
+  .rl-chain__node { border-right: 0; border-bottom: var(--rl-border); }
+  .rl-chain__node:last-child { border-bottom: 0; }
+  .rl-chain__node:not(:last-child)::after { top: auto; bottom: -8px; left: 50%; right: auto; transform: translateX(-50%); }
+}
+
+/* PROOFBAR — hard metrics, macro numerals */
+.rl-proofbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--rl-line); border: var(--rl-border); }
+.rl-proofbar > * { background: var(--rl-surface); padding: var(--rl-4); }
+.rl-proof__num { font-family: var(--rl-grotesk); font-weight: 800; font-size: clamp(1.5rem, 3.5vw, 2.5rem); line-height: 0.95; color: var(--rl-fg); }
+.rl-proof__num--ok { color: var(--rl-pass); }
+.rl-proof__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; margin-top: var(--rl-2); }
+
+/* TIER METER — L0/L1/L2 clearance readout */
+.rl-tier { display: flex; border: var(--rl-border); }
+.rl-tier__seg { flex: 1; padding: var(--rl-2) var(--rl-3); border-right: var(--rl-border); color: var(--rl-faint); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; text-align: center; }
+.rl-tier__seg:last-child { border-right: 0; }
+.rl-tier__seg b { display: block; font-family: var(--rl-grotesk); font-weight: 800; font-size: 1.25rem; color: inherit; }
+.rl-tier__seg--reached { color: var(--rl-fg); }
+.rl-tier__seg--on { color: var(--rl-pass); background: var(--rl-surface); }
+
+/* COMMAND BLOCK — zero-secret verify, copyable */
+.rl-cmd { border: var(--rl-border); background: var(--rl-bg); }
+.rl-cmd__head { display: flex; justify-content: space-between; align-items: center; gap: var(--rl-3); padding: var(--rl-2) var(--rl-3); border-bottom: var(--rl-border); color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-cmd__body { margin: 0; padding: var(--rl-3); overflow-x: auto; }
+.rl-cmd samp { display: block; font-family: var(--rl-mono); color: var(--rl-fg); white-space: pre-wrap; overflow-wrap: anywhere; padding-left: 1.4em; text-indent: -1.4em; }
+.rl-cmd samp::before { content: "$ "; color: var(--rl-pass); }
+.rl-cmd samp.rl-cmd__cmt { color: var(--rl-muted); }
+.rl-cmd samp.rl-cmd__cmt::before { content: "# "; color: var(--rl-muted); }
+
+/* TAMPER CONTROL — editable field + flip-byte action (interactive wiring in WS-E) */
+.rl-tamper { border: var(--rl-border); padding: var(--rl-4); }
+.rl-tamper__row { display: flex; flex-wrap: wrap; gap: var(--rl-3); align-items: center; }
+.rl-tamper__k { color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
+.rl-input { font-family: var(--rl-mono); font-size: var(--rl-tele); color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-2) var(--rl-3); min-width: 0; flex: 1 1 240px; }
+.rl-input:focus-visible { outline: 2px solid var(--rl-fg); outline-offset: 1px; }
+.rl-tamper__val { flex: 1 1 240px; min-width: 0; font-family: var(--rl-mono); font-size: var(--rl-tele); color: var(--rl-fg); background: var(--rl-bg); border: var(--rl-border); padding: var(--rl-2) var(--rl-3); overflow-wrap: anywhere; }
+
+/* WARNING STRIPE — diagonal hazard caps framing the message (freeze / block) */
+.rl-stripe { display: flex; align-items: stretch; border: var(--rl-border-strong); border-color: var(--rl-hazard); background: var(--rl-hazard-ink); }
+.rl-stripe::before, .rl-stripe::after { content: ""; flex: 0 0 32px; background: repeating-linear-gradient(45deg, var(--rl-hazard) 0 7px, var(--rl-hazard-ink) 7px 14px); }
+.rl-stripe__msg { flex: 1; display: flex; align-items: center; gap: var(--rl-2); padding: var(--rl-3) var(--rl-4); color: var(--rl-hazard); text-transform: uppercase; letter-spacing: var(--rl-track); font-weight: 700; }
