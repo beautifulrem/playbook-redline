@@ -17,6 +17,7 @@ _BAD = {"failed", "invalid", "missing", "blocked", "blocked_withheld", "withheld
 def render_judge_console_html(*, principal: str, safety: dict[str, Any], releases: list[dict[str, Any]]) -> str:
     rows = "\n".join(
         "<tr>"
+        f'<td>{_row_seal(item.get("canonical_order_id") or item["release_id"], _is_ok(item["state"]))}</td>'
         f'<td><a href="/v1/judge/releases/{_e(item["release_id"])}">{_e(item["release_id"])}</a></td>'
         f"<td>{_badge(item['state'])}</td>"
         f"<td>{_id(item.get('canonical_order_id'))}</td>"
@@ -27,7 +28,7 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
         for item in releases
     )
     if not rows:
-        rows = '<tr><td colspan="6">No release candidates</td></tr>'
+        rows = '<tr><td colspan="7">No release candidates</td></tr>'
     body = f"""
     <h1 class="rl-macro">Judge Console</h1>
     <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
@@ -41,7 +42,7 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
     </div>
     <h2 class="rl-sec">Release candidates</h2>
     <div class="rl-scroll-x"><table class="rl-table">
-      <thead><tr><th scope="col">release</th><th scope="col">state</th><th scope="col">canonical order</th><th scope="col">showcase</th><th scope="col">attestation</th><th scope="col">latest job</th></tr></thead>
+      <thead><tr><th scope="col">seal</th><th scope="col">release</th><th scope="col">state</th><th scope="col">canonical order</th><th scope="col">showcase</th><th scope="col">attestation</th><th scope="col">latest job</th></tr></thead>
       <tbody>{rows}</tbody>
     </table></div>
     {_chrome()}
@@ -115,7 +116,7 @@ def render_judge_release_html(
     </div>
     <div class="rl-grid rl-grid--3">
       {_metric("symbol", _symbol_link(execution.get("symbol")))}
-      {_metric("simulation hash", _id(release.get("simulation_evidence_hash")))}
+      {_metric("simulation hash", _hash_field(release.get("simulation_evidence_hash")))}
       {_metric("approval", _e((release.get("approval") or {}).get("reviewer_id") or "missing"))}
     </div>
     <div class="rl-grid rl-grid--3">
@@ -182,13 +183,15 @@ def _document(*, title: str, body: str) -> str:
 
 def _session_bar() -> str:
     return """    <div class="rl-box">
-      <p class="rl-live" id="rl-session">checking session&hellip;</p>
-      <div class="rl-row">
-        <button type="button" class="rl-btn" data-action="dev-login">Dev login</button>
-        <button type="button" class="rl-btn" data-action="logout">Log out</button>
-        <details class="rl-adv"><summary class="rl-label">token auth (advanced)</summary>
-          <div class="rl-row"><input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="X-Redline-Token (optional)" /><button type="button" class="rl-btn" data-action="save-token">Save token</button></div>
-        </details>
+      <div class="rl-row rl-row--between">
+        <span class="rl-live" id="rl-session">checking session&hellip;</span>
+        <span class="rl-row">
+          <button type="button" class="rl-btn" data-action="dev-login">Dev login</button>
+          <button type="button" class="rl-btn" data-action="logout">Log out</button>
+          <details class="rl-adv"><summary class="rl-label">token</summary>
+            <div class="rl-row"><input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="X-Redline-Token (optional)" /><button type="button" class="rl-btn" data-action="save-token">Save token</button></div>
+          </details>
+        </span>
       </div>
     </div>"""
 
@@ -223,6 +226,14 @@ def _release_seal(release: dict[str, Any], state: str) -> str:
     )
 
 
+def _row_seal(seed: object, passed: bool) -> str:
+    s = str(seed or "")
+    if not s:
+        return ""
+    mod = " rl-seal-mini--pass" if passed else ""
+    return f'<span class="rl-seal-mini{mod}" title="release fingerprint">{randomart_svg(s)}</span>'
+
+
 def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestation_status: dict[str, Any]) -> str:
     execution = release.get("execution_evidence") or {}
     approval = release.get("approval") or {}
@@ -235,7 +246,8 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
     ]
     nodes = []
     failed = False
-    for label, detail, ok in steps:
+    total = len(steps)
+    for idx, (label, detail, ok) in enumerate(steps, 1):
         if failed:
             status = '<span class="rl-chain__st--skip">not reached</span>'
             node_cls = ""
@@ -248,7 +260,8 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
             node_cls = " rl-chain__node--fail"
             failed = True
         nodes.append(
-            f'<div class="rl-chain__node{node_cls}"><span class="rl-chain__label">{_e(label)}</span>'
+            f'<div class="rl-chain__node{node_cls}"><span class="rl-chain__idx">LINK {idx:02d}/{total:02d}</span>'
+            f'<span class="rl-chain__label">{_e(label)}</span>'
             f'<span class="rl-chain__hash">{_e(detail)}</span>{status}</div>'
         )
     return f'    <div class="rl-chain">{"".join(nodes)}</div>'
@@ -460,6 +473,17 @@ def _id(value: object) -> str:
     return (
         f'<span class="rl-idcopy"><span class="rl-mono">{_e(raw)}</span>'
         f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy {_e(raw)}">copy</button></span>'
+    )
+
+
+def _hash_field(value: object) -> str:
+    raw = str(value or "")
+    if not raw or raw in {"none", "missing"}:
+        return _e(raw or "none")
+    short = raw if len(raw) <= 22 else raw[:12] + "…" + raw[-6:]
+    return (
+        f'<span class="rl-idcopy"><span class="rl-mono" title="{_e(raw)}">{_e(short)}</span>'
+        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy full hash">copy</button></span>'
     )
 
 

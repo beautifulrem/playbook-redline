@@ -181,6 +181,7 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-chain__node { flex: 1 1 0; min-width: 150px; padding: var(--rl-3) var(--rl-4); border-right: var(--rl-border); position: relative; }
 .rl-chain__node:last-child { border-right: 0; }
 .rl-chain__node:not(:last-child)::after { content: "+"; position: absolute; top: 50%; right: -8px; transform: translateY(-50%); z-index: 1; color: var(--rl-line-strong); background: var(--rl-bg); font-size: 15px; line-height: 1; padding: 0 1px; }
+.rl-chain__idx { display: block; font-family: var(--rl-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--rl-faint); margin-bottom: var(--rl-1); }   
 .rl-chain__label { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 11px; }
 .rl-chain__hash { display: block; color: var(--rl-fg); font-family: var(--rl-mono); font-size: 11px; margin: var(--rl-1) 0; overflow-wrap: anywhere; }
 .rl-chain__st--ok { color: var(--rl-pass); }
@@ -301,7 +302,12 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-seal--void .rl-seal__stamp, .rl-seal--void .rl-seal__art { color: var(--rl-hazard); }
 .rl-seal__algo { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 10px; margin-top: var(--rl-1); }
 .rl-seal__hash { display: block; font-family: var(--rl-mono); color: var(--rl-faint); font-size: 11px; margin-top: var(--rl-2); overflow-wrap: anywhere; }
-.rl-seal__edge { display: block; font-family: var(--rl-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--rl-faint); margin-top: var(--rl-3); padding-top: var(--rl-2); border-top: var(--rl-border); }</style>
+.rl-seal__edge { display: block; font-family: var(--rl-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--rl-faint); margin-top: var(--rl-3); padding-top: var(--rl-2); border-top: var(--rl-border); }   
+
+.rl-seal-mini { display: inline-block; width: 40px; border: var(--rl-border); background: var(--rl-bg); padding: 2px; vertical-align: middle; color: var(--rl-faint); }
+.rl-seal-mini svg { display: block; width: 100%; height: auto; }
+.rl-seal-mini--pass { color: var(--rl-pass); border-color: var(--rl-pass); }
+.rl-row--between { justify-content: space-between; width: 100%; }</style>
 </head>
 <body>
   <main class="rl-main">
