@@ -1,0 +1,58 @@
+$ redline verify-release-attestation <attestation> --bundle <bundle>
+{
+  "schema_version": "redline.release_attestation.verify.v1",
+  "ok": true,
+  "attestation_path": "artifacts/release-demo/current/service/releases/release-demo-good/release-attestation.json",
+  "bundle_path": "artifacts/release-demo/current/service/releases/release-demo-good/release-evidence-bundle.json",
+  "checks": [
+    {
+      "name": "attestation-json",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "bundle-verification",
+      "ok": true,
+      "detail": "sha256:262b05e12124492f77e609e277006728d7f7acc887ed0b534acf226af39d35cd"
+    },
+    {
+      "name": "release-id",
+      "ok": true,
+      "detail": "release-demo-good"
+    },
+    {
+      "name": "bundle-hash",
+      "ok": true,
+      "detail": "sha256:262b05e12124492f77e609e277006728d7f7acc887ed0b534acf226af39d35cd"
+    },
+    {
+      "name": "manifest-hash",
+      "ok": true,
+      "detail": "sha256:9d7da0b24514ee1724d80ba8383514781265f59678bcfacea63e1030e46e8d5c"
+    },
+    {
+      "name": "evidence-merkle-root",
+      "ok": true,
+      "detail": "sha256:3cb18dc48aef67b2005c3f2b736894a28082c2ca3285df03b4932ea1ded80cc1"
+    },
+    {
+      "name": "attestation-hash",
+      "ok": true,
+      "detail": "sha256:7d6fcf68c8873c8f35d121160ab0d83d98221229d345f0646d5dfba0db934b01"
+    },
+    {
+      "name": "signature",
+      "ok": true,
+      "detail": "ed25519-public:eb1e49fb90db35ac91683c37113a8418bec3446792c4a9e9c08c734beccdcba7"
+    }
+  ],
+  "attestation_hash": "sha256:7d6fcf68c8873c8f35d121160ab0d83d98221229d345f0646d5dfba0db934b01",
+  "bundle_hash": "sha256:262b05e12124492f77e609e277006728d7f7acc887ed0b534acf226af39d35cd",
+  "evidence_merkle_root": "sha256:3cb18dc48aef67b2005c3f2b736894a28082c2ca3285df03b4932ea1ded80cc1",
+  "provider": "local_signed",
+  "external_reference": {
+    "kind": "local-signed"
+  }
+}
+
+exit=0

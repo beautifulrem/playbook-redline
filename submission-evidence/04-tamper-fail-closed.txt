@@ -1,0 +1,200 @@
+$ bash scripts/tamper-demo.sh   # flips one byte in the evidence bundle
+SOURCE_RELEASE_DIR=/Volumes/Remi/仓库/bitget/artifacts/release-demo/current/service/releases/release-demo-good
+TAMPER_COPY_DIR=/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T//redline-tamper-demo.ixiNUD/service/releases/release-demo-good
+TAMPERED_FILE=/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-evidence-bundle.json
+TAMPERED_FIELD=release_candidate.approval.reviewer_id
+TAMPER_DETECTED
+first_failed_check=chain-approval-link
+reason_code=RECEIPT_MISMATCH
+detail=RECEIPT_MISMATCH: approval link mismatch
+{
+  "schema_version": "redline.chain.verify.v1",
+  "ok": false,
+  "reason_code": "RECEIPT_MISMATCH",
+  "input_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good",
+  "release_dir": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good",
+  "bundle_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-evidence-bundle.json",
+  "attestation_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-attestation.json",
+  "bundle": {
+    "schema_version": "redline.release_bundle.verify.v1",
+    "ok": false,
+    "bundle_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-evidence-bundle.json",
+    "bundle_hash": "sha256:6f57716e8aff3265901820ced9f9401ef9009fd8de04ad4f4c470ad3dbcde20c",
+    "checks": [
+      {
+        "name": "bundle-json",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "manifest-files",
+        "ok": true,
+        "detail": "29"
+      },
+      {
+        "name": "audit-ledger-chain",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "simulation-evidence",
+        "ok": true,
+        "detail": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9"
+      },
+      {
+        "name": "risk-policy",
+        "ok": true,
+        "detail": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
+      },
+      {
+        "name": "execution-evidence",
+        "ok": true,
+        "detail": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c"
+      },
+      {
+        "name": "exchange-preflight-evidence",
+        "ok": true,
+        "detail": "sha256:7e438d4ba4dcf389db9d398b3b3ee21adb74f99d1fe8b998e4b14150fe01591a"
+      },
+      {
+        "name": "order-status-evidence",
+        "ok": true,
+        "detail": "sha256:8f0ac00ab5b9d6c7083d1a11d86b81e33424541684ee7e5107b06eddc016e9f3"
+      },
+      {
+        "name": "chain-receipt-link",
+        "ok": true,
+        "detail": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2"
+      },
+      {
+        "name": "chain-approval-link",
+        "ok": false,
+        "detail": "RECEIPT_MISMATCH: approval link mismatch"
+      },
+      {
+        "name": "chain-execution-link",
+        "ok": true,
+        "detail": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c"
+      },
+      {
+        "name": "chain-checkpoint-link",
+        "ok": true,
+        "detail": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079"
+      }
+    ]
+  },
+  "attestation": {
+    "schema_version": "redline.release_attestation.verify.v1",
+    "ok": false,
+    "attestation_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-attestation.json",
+    "bundle_path": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-evidence-bundle.json",
+    "checks": [
+      {
+        "name": "attestation-json",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "bundle-verification",
+        "ok": false,
+        "detail": "sha256:6f57716e8aff3265901820ced9f9401ef9009fd8de04ad4f4c470ad3dbcde20c"
+      },
+      {
+        "name": "attestation-verification",
+        "ok": false,
+        "detail": "release evidence bundle is not valid"
+      }
+    ],
+    "attestation_hash": "sha256:7d6fcf68c8873c8f35d121160ab0d83d98221229d345f0646d5dfba0db934b01",
+    "bundle_hash": "sha256:262b05e12124492f77e609e277006728d7f7acc887ed0b534acf226af39d35cd",
+    "evidence_merkle_root": "sha256:3cb18dc48aef67b2005c3f2b736894a28082c2ca3285df03b4932ea1ded80cc1",
+    "provider": "local_signed",
+    "external_reference": {
+      "kind": "local-signed"
+    }
+  },
+  "checks": [
+    {
+      "name": "input",
+      "ok": true,
+      "detail": "/var/folders/x4/zwh1mb5j79b995kzjrhkwyhh0000gn/T/redline-tamper-demo.ixiNUD/service/releases/release-demo-good/release-evidence-bundle.json"
+    },
+    {
+      "name": "bundle-json",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "manifest-files",
+      "ok": true,
+      "detail": "29"
+    },
+    {
+      "name": "audit-ledger-chain",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "simulation-evidence",
+      "ok": true,
+      "detail": "sha256:0436cb6897f238ebde1058ac39ee03cc6cf3ebf8a9b4f463a26c6f22006e00d9"
+    },
+    {
+      "name": "risk-policy",
+      "ok": true,
+      "detail": "sha256:be4e21b5549f1b49b90c90f3f2ceace547192bdd16b2f4ee0feb81a4c78bff96"
+    },
+    {
+      "name": "execution-evidence",
+      "ok": true,
+      "detail": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c"
+    },
+    {
+      "name": "exchange-preflight-evidence",
+      "ok": true,
+      "detail": "sha256:7e438d4ba4dcf389db9d398b3b3ee21adb74f99d1fe8b998e4b14150fe01591a"
+    },
+    {
+      "name": "order-status-evidence",
+      "ok": true,
+      "detail": "sha256:8f0ac00ab5b9d6c7083d1a11d86b81e33424541684ee7e5107b06eddc016e9f3"
+    },
+    {
+      "name": "chain-receipt-link",
+      "ok": true,
+      "detail": "sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2"
+    },
+    {
+      "name": "chain-approval-link",
+      "ok": false,
+      "detail": "RECEIPT_MISMATCH: approval link mismatch"
+    },
+    {
+      "name": "chain-execution-link",
+      "ok": true,
+      "detail": "sha256:475c6a272074fd8c43552bfb267e1a64b1af1cc66ede711f47dc9b8a9079421c"
+    },
+    {
+      "name": "chain-checkpoint-link",
+      "ok": true,
+      "detail": "sha256:41789b47047f9db8d859f935697a2a450b62ee93fbc5e2b30d8e4414c1adc079"
+    },
+    {
+      "name": "attestation-json",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "bundle-verification",
+      "ok": false,
+      "detail": "sha256:6f57716e8aff3265901820ced9f9401ef9009fd8de04ad4f4c470ad3dbcde20c"
+    },
+    {
+      "name": "attestation-verification",
+      "ok": false,
+      "detail": "release evidence bundle is not valid"
+    }
+  ]
+}
+
+exit=0 (4 = INTEGRITY FAIL: 'release evidence bundle is not valid')

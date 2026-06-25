@@ -1,8 +1,38 @@
 # Playbook Redline
 
-Crash-test receipts for AI-edited Bitget Playbooks.
+**Pre-release control gate for AI-edited trading strategies.**
 
-Playbook Redline is a backend proof kernel and verifier for checking whether an edited trading playbook still passes a fixed crash-test suite before it is trusted or published. The core rule is simple: no proof, no verdict.
+When an AI changes a trading playbook, Redline does not trust the diff. It runs a **fixed crash-test suite** against the edited strategy, signs the verdict into a **hash-chained ed25519 receipt**, and **only then allows a real Bitget demo order**. Failing edits are **withheld before they can ever trade**. The core rule is simple: no proof, no verdict.
+
+## Why this is different (not another audit log)
+
+| System | Proves past record | **Gates the AI edit before release** | **Real Bitget demo execution** | Offline tamper verify |
+|---|:--:|:--:|:--:|:--:|
+| TrackProof | ✅ (on-chain, stronger) | ❌ | ❌ | ✅ |
+| VEIL / Sentinel | partial | ❌ | ❌ | ❌ |
+| **Playbook Redline** | ✅ | **✅ only here** | **✅ only here** | ✅ |
+
+- **Not a track-record notary:** Redline gates a strategy *before* it trades, instead of certifying trades after the fact.
+- **Not a per-trade firewall:** Redline evaluates the *edited release candidate*, not one order at a time.
+- **Not a backtest toy:** PASS can trigger a real Bitget demo/paper order; FAIL withholds execution.
+- The crash-test suite is **fixed** so the AI cannot move the goalposts after editing its own strategy.
+
+## Judge this by running (offline, ~2 min, no server, no secrets)
+
+See **[`submission-evidence/`](submission-evidence/)** — every step below is captured and re-runnable from a fresh clone:
+
+```bash
+B=artifacts/release-demo/current/service/releases/release-demo-good/release-evidence-bundle.json
+A=artifacts/release-demo/current/service/releases/release-demo-good/release-attestation.json
+
+make verify-demo                                                  # 1. gate: bad AI edit WITHHELD, good one PASSES  -> exit 0
+uv run redline verify-release-bundle      "$B" --json             # 2. hash-chained receipt                         -> exit 0
+uv run redline verify-release-attestation "$A" --bundle "$B" --json  # 3. ed25519 signature                        -> exit 0
+bash scripts/tamper-demo.sh                                       # 5. flip one byte -> integrity fails closed      -> exit 4
+open artifacts/evidence-tamper-check.html                         # interactive: edit the JSON, watch the seal break
+```
+
+The real demo order `1453610833413308417` is `paptrading:1`, demo-only — no mainnet, no secrets ([`submission-evidence/05-real-bitget-order.json`](submission-evidence/05-real-bitget-order.json)).
 
 ## Why Now
 
