@@ -15,6 +15,7 @@ from redline.io_safety import atomic_write_text, reject_unsafe_output_file
 from redline.merkle import merkle_root
 from redline.models import ReleaseBundleAttestation
 from redline.service.release import MANIFEST_NAME, verify_release_evidence_bundle
+from redline.render import t
 from redline.trust import SIGNATURE_PREFIX, _parse_private_key, _parse_public_key, _parse_signature, generate_trust_keypair, public_key_from_private
 
 
@@ -138,17 +139,12 @@ def verify_release_attestation(*, attestation_path: Path, bundle_path: Path, tru
     return payload
 
 
-def _t(en: str, zh: str) -> str:
-    """Bilingual inline text (matches render.t and the .i18n CSS toggle)."""
-    return f'<span class="i18n"><span lang="en">{html.escape(en)}</span><span lang="zh">{html.escape(zh)}</span></span>'
-
-
 def render_attestation_status_html(*, verification: dict[str, Any]) -> str:
     """Attestation status as a design-system section (status band + telemetry DL). No own
     <style> — it inherits the page's inlined redline.css (offline evidence page or the
     standalone attestation.html shell)."""
     ok = bool(verification.get("ok"))
-    status = _t("ATTESTED", "已认证") if ok else _t("ATTESTATION INVALID", "认证无效")
+    status = t("ATTESTED", "已认证") if ok else t("ATTESTATION INVALID", "认证无效")
     band = "rl-band--pass" if ok else ""
     rows = [
         ("bundle_hash", str(verification.get("bundle_hash") or "")),
@@ -163,9 +159,9 @@ def render_attestation_status_html(*, verification: dict[str, Any]) -> str:
         if value
     )
     return (
-        f'<p class="rl-sec">{_t("attestation", "认证")}</p>\n'
+        f'<p class="rl-sec">{t("attestation", "认证")}</p>\n'
         f'<div class="rl-band {band}"><span class="rl-band__verdict">{status}</span>'
-        f'<span class="rl-band__meta">{_t("ed25519 release attestation", "ed25519 发布认证")}</span></div>\n'
+        f'<span class="rl-band__meta">{t("ed25519 release attestation", "ed25519 发布认证")}</span></div>\n'
         f'<div class="rl-box"><dl class="rl-dl">{dl}</dl></div>'
     )
 

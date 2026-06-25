@@ -55,6 +55,8 @@ _I18N_SCRIPT = """
   function apply(l) {
     if (l === "zh") { h.setAttribute("data-lang", "zh"); h.setAttribute("lang", "zh-Hans"); }
     else { h.removeAttribute("data-lang"); h.setAttribute("lang", "en"); }
+    var bs = document.querySelectorAll("[data-lang-set]");
+    for (var i = 0; i < bs.length; i++) { bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-lang-set") === l ? "true" : "false"); }
     try { window.dispatchEvent(new CustomEvent("rl-lang", { detail: l })); } catch (e) {}
   }
   var s = "en"; try { if (localStorage.getItem(KEY) === "zh") s = "zh"; } catch (e) {}
@@ -117,7 +119,7 @@ _VERIFY_SCRIPT = """
     var sx = cols >> 1, sy = rows >> 1;
     var frame = '<rect x="0.5" y="0.5" width="' + (cols*cell-1) + '" height="' + (rows*cell-1) + '" fill="none" stroke="currentColor" stroke-opacity=".3"/>';
     var marks = '<rect x="' + (sx*cell) + '" y="' + (sy*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/><rect x="' + (x*cell) + '" y="' + (y*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/>';
-    return '<svg viewBox="0 0 ' + (cols*cell) + ' ' + (rows*cell) + '" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart fingerprint">' + frame + fills + marks + '</svg>';
+    return '<svg viewBox="0 0 ' + (cols*cell) + ' ' + (rows*cell) + '" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="cryptographic fingerprint">' + frame + fills + marks + '</svg>';
   }
   var root = document.getElementById("vf-root");
   var expected = root.getAttribute("data-expected");
@@ -559,7 +561,7 @@ def _render_block(panel: EvidencePanel) -> str:
     if panel.evidence is not None and panel.invalid_reason_code is None:
         return ""
     if panel.invalid_reason_code:
-        return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ EVIDENCE INVALID · {_esc(_invalid_message(panel.invalid_reason_code))}</span></div>"""
+        return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ {t("EVIDENCE INVALID", "证据无效")} · {_esc(_invalid_message(panel.invalid_reason_code))}</span></div>"""
     reason = panel.block_reason_code or panel.reason_code
     return f"""        <p class="rl-sec">{t("block side", "拦截侧")}</p>
         <div class="rl-box"><dl class="rl-dl">
@@ -571,7 +573,7 @@ def _render_block(panel: EvidencePanel) -> str:
 def _render_summary(summary: str | None) -> str:
     """Render the strength summary as scannable one-invariant-per-line rows (split on ';')."""
     if not summary:
-        return _esc("not provided")
+        return t("not provided", "未提供")
     parts = [part.strip() for part in summary.split(";") if part.strip()]
     return "<br>".join(_esc(part) for part in parts) if parts else _esc(summary)
 
@@ -608,7 +610,7 @@ def randomart_svg(seed: str, cell: int = 9) -> str:
         f'<rect x="{x*cell}" y="{y*cell}" width="{cell}" height="{cell}" fill="none" stroke="currentColor" stroke-opacity=".85"/>'
     )
     return (
-        f'<svg viewBox="0 0 {cols*cell} {rows*cell}" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart hash fingerprint of the receipt">'
+        f'<svg viewBox="0 0 {cols*cell} {rows*cell}" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="cryptographic fingerprint">'
         + frame + fills + marks + "</svg>"
     )
 
@@ -619,12 +621,12 @@ def _render_seal(panel: EvidencePanel) -> str:
         return ""
     passed = panel.evidence is not None and panel.invalid_reason_code is None
     mod = "rl-seal--pass" if passed else "rl-seal--void"
-    stamp = "VERIFIED" if passed else "VOID"
+    stamp = t("VERIFIED", "已验证") if passed else t("VOID", "作废")
     short = seed if len(seed) <= 26 else seed[:26] + "…"
     return (
         f'        <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
-        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_esc(stamp)}</span>'
-        f'<span class="rl-seal__algo">SSH randomart · receipt fingerprint</span>'
+        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{stamp}</span>'
+        f'<span class="rl-seal__algo">{t("SSH randomart · receipt fingerprint", "SSH randomart · 收据指纹")}</span>'
         f'<span class="rl-seal__hash">{_esc(short)}</span>'
         f'<span class="rl-seal__edge">ED25519 · PLAYBOOK REDLINE</span></span></div>'
     )
