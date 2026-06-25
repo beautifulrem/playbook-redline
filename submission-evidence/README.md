@@ -13,7 +13,13 @@
 | 3. Signature | The bundle is **ed25519-signed** with a merkle root over the evidence | `redline verify-release-attestation <att> --bundle <bundle>` | exit `0` | [`03-verify-release-attestation.txt`](03-verify-release-attestation.txt) |
 | 4. Real order | A **real Bitget demo/paptrading order** was placed **only after** PASS, bound by hash to the receipt | see file | `order_mode: demo`, `reason_code: PASS` | [`05-real-bitget-order.json`](05-real-bitget-order.json) |
 | 5. Tamper | Flip one byte → the seal **fails closed** | `bash scripts/tamper-demo.sh` | exit `4`, `release evidence bundle is not valid` | [`04-tamper-fail-closed.txt`](04-tamper-fail-closed.txt) |
-| 5b. Tamper (in-browser) | Same, interactively: edit the JSON → randomart seal deforms → `INTEGRITY FAIL` | open `artifacts/evidence-tamper-check.html` and change one character | seal turns red | — |
+| 5b. Tamper (in-browser) | Same, interactively: edit the JSON → randomart seal deforms → `INTEGRITY FAIL` | open the offline verify page and change one character | seal turns red | [before](screenshots/tamper-1-intact.png) · [after](screenshots/tamper-2-fail.png) |
+
+**Visual proof — the seal breaking when one byte is flipped (offline, pure-JS):**
+
+![INTACT — green seal, SHA256 matches, fingerprint verified](screenshots/tamper-1-intact.png)
+
+![INTEGRITY FAIL — one byte flipped, seal voids red, "BITGET NEVER CALLED"](screenshots/tamper-2-fail.png)
 
 ## Copy-paste reproduce (fresh clone)
 
