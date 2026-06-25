@@ -2269,7 +2269,7 @@ def test_verify_release_bundle_cli_checks_generated_evidence(tmp_path: Path, mon
     assert html_endpoint.headers["content-type"].startswith("text/html")
     assert "demo-order-bundle" in html_endpoint.text
     assert "DEMO" in html_endpoint.text
-    assert "Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布" in html_endpoint.text
+    assert "这不是 Bitget Playbook 正式发布" in html_endpoint.text
     endpoint_lower = html_endpoint.text.lower()
     assert "secret" not in endpoint_lower
     assert "passphrase" not in endpoint_lower
@@ -2280,7 +2280,7 @@ def test_verify_release_bundle_cli_checks_generated_evidence(tmp_path: Path, mon
     assert "NEW_BLOCK_BREACH" in comparison_html
     assert "Bitget 未被调用" in comparison_html
     assert "DEMO" in comparison_html
-    assert "Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布" in comparison_html
+    assert "这不是 Bitget Playbook 正式发布" in comparison_html
     assert "secret" not in comparison_html.lower()
     assert "passphrase" not in comparison_html.lower()
     assert "access key" not in comparison_html.lower()
@@ -2367,7 +2367,7 @@ def test_release_showcase_orders_place_multiple_demo_orders_after_release_ready(
     assert html.status_code == 200
     assert "demo-order-showcase-2" in html.text
     assert "DEMO" in html.text
-    assert "Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布" in html.text
+    assert "这不是 Bitget Playbook 正式发布" in html.text
     assert "secret" not in html.text.lower()
     assert "passphrase" not in html.text.lower()
     assert "access key" not in html.text.lower()

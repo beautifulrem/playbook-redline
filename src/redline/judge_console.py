@@ -4,7 +4,7 @@ import html
 import json
 from typing import Any
 
-from redline.render import _inline_css, randomart_svg
+from redline.render import _I18N_SCRIPT, _inline_css, _lang_toggle, randomart_svg, t
 
 REPO_URL = "https://github.com/beautifulrem/playbook-redline"
 BITGET_DOCS_URL = "https://www.bitget.com/api-doc/contract/intro"
@@ -28,21 +28,21 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
         for item in releases
     )
     if not rows:
-        rows = '<tr><td colspan="7">No release candidates</td></tr>'
+        rows = f'<tr><td colspan="7">{t("No release candidates", "暂无候选发布")}</td></tr>'
     body = f"""
-    <h1 class="rl-macro">Judge Console</h1>
-    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
+    <h1 class="rl-macro rl-caret">{t("Judge Console", "判官控制台")}</h1>
+    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; {t("principal", "主体")} {_e(principal)}</p>
     <hr>
 {_session_bar()}
-    <h2 class="rl-sec">Safety</h2>
+    <h2 class="rl-sec">{t("Safety", "安全")}</h2>
     <div class="rl-grid rl-grid--3">
-      {_metric("release freeze", _flag(safety.get("release_freeze")))}
-      {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
-      {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
+      {_metric(t("release freeze", "发布冻结"), _flag(safety.get("release_freeze")))}
+      {_metric(t("execution freeze", "执行冻结"), _flag(safety.get("execution_freeze")))}
+      {_metric(t("mainnet enabled", "主网已启用"), _flag(safety.get("mainnet_orders_enabled")))}
     </div>
-    <h2 class="rl-sec">Release candidates</h2>
+    <h2 class="rl-sec">{t("Release candidates", "候选发布")}</h2>
     <div class="rl-scroll-x"><table class="rl-table">
-      <thead><tr><th scope="col">seal</th><th scope="col">release</th><th scope="col">state</th><th scope="col">canonical order</th><th scope="col">showcase</th><th scope="col">attestation</th><th scope="col">latest job</th></tr></thead>
+      <thead><tr><th scope="col">{t("seal", "印章")}</th><th scope="col">{t("release", "发布")}</th><th scope="col">{t("state", "状态")}</th><th scope="col">{t("canonical order", "规范订单")}</th><th scope="col">{t("showcase", "展示")}</th><th scope="col">{t("attestation", "认证")}</th><th scope="col">{t("latest job", "最新任务")}</th></tr></thead>
       <tbody>{rows}</tbody>
     </table></div>
     {_chrome()}
@@ -72,89 +72,89 @@ def render_judge_release_html(
         f"<td>{_badge('ok' if item.get('ok') else item.get('reason_code') or 'invalid')}</td>"
         f"<td>{_id(item.get('bitget_order_id'))}</td>"
         f"<td>{_id(item.get('client_oid'))}</td>"
-        f'<td><a href="{_e(item.get("evidence_html_url") or "#")}">evidence</a></td>'
+        f'<td><a href="{_e(item.get("evidence_html_url") or "#")}">{t("evidence", "证据")}</a></td>'
         "</tr>"
         for item in showcase_orders
     )
     if not showcase_rows:
-        showcase_rows = '<tr><td colspan="5">No showcase orders</td></tr>'
+        showcase_rows = f'<tr><td colspan="5">{t("No showcase orders", "暂无展示订单")}</td></tr>'
     job_rows = "\n".join(
         "<tr>"
         f"<td>{_e(item.get('job_id'))}</td>"
         f"<td>{_badge(item.get('status') or 'unknown')}</td>"
         f"<td>{_e(item.get('job_type'))}</td>"
         f"<td>{_e(item.get('requested_by'))}</td>"
-        f'<td><a href="/v1/release-candidates/{_e(release_id)}/jobs/{_e(item.get("job_id"))}/events.ndjson">events</a></td>'
+        f'<td><a href="/v1/release-candidates/{_e(release_id)}/jobs/{_e(item.get("job_id"))}/events.ndjson">{t("events", "事件")}</a></td>'
         "</tr>"
         for item in jobs
     )
     if not job_rows:
-        job_rows = '<tr><td colspan="5">No jobs</td></tr>'
-    event_lines = "\n".join(_e(_event_line(item)) for item in latest_events) or "No job events"
-    audit_lines = "\n".join(_e(_audit_line(item)) for item in audit_entries[-12:]) or "No audit entries"
+        job_rows = f'<tr><td colspan="5">{t("No jobs", "暂无任务")}</td></tr>'
+    event_lines = "\n".join(_e(_event_line(item)) for item in latest_events) or t("No job events", "暂无任务事件")
+    audit_lines = "\n".join(_e(_audit_line(item)) for item in audit_entries[-12:]) or t("No audit entries", "暂无审计条目")
     body = f"""
-    <p class="rl-label"><a href="/v1/judge/console">&larr; Judge Console</a></p>
-    <h1 class="rl-macro">Release</h1>
-    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; <span class="rl-mono">{_e(release_id)}</span> &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
+    <p class="rl-label"><a href="/v1/judge/console">&larr; {t("Judge Console", "判官控制台")}</a></p>
+    <h1 class="rl-macro rl-caret">{t("Release", "发布")}</h1>
+    <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; <span class="rl-mono">{_e(release_id)}</span> &nbsp;&middot;&nbsp; {t("principal", "主体")} {_e(principal)}</p>
     <div class="rl-band {band_mod}">
       <span class="rl-band__verdict">{_e((state or "unknown").upper().replace("_", " "))}</span>
-      <span class="rl-band__meta">verdict {_e(release.get("redline_reason_code") or "missing")}</span>
+      <span class="rl-band__meta">{t("verdict", "裁决")} {_e(release.get("redline_reason_code") or "missing")}</span>
     </div>
     {_release_seal(release, state)}
-    <h2 class="rl-sec">Verifiable chain</h2>
+    <h2 class="rl-sec">{t("Verifiable chain", "可验证链")}</h2>
     {_proofbar(release, showcase_orders)}
     {_chain_walk(release, bundle_status, attestation_status)}
-    <h2 class="rl-sec">Assurance tier</h2>
+    <h2 class="rl-sec">{t("Assurance tier", "保障层级")}</h2>
     {_tier_meter(release)}
-    <h2 class="rl-sec">Verdict reason</h2>
+    <h2 class="rl-sec">{t("Verdict reason", "裁决理由")}</h2>
     {_violation_telemetry(release.get("redline_reason_code"))}
-    <h2 class="rl-sec">Release</h2>
+    <h2 class="rl-sec">{t("Release", "发布")}</h2>
     <div class="rl-grid rl-grid--3">
-      {_metric("state", _badge(release.get("state")))}
-      {_metric("verdict", _e(release.get("redline_reason_code") or "missing"))}
-      {_metric("canonical order", _id(execution.get("bitget_order_id")))}
+      {_metric(t("state", "状态"), _badge(release.get("state")))}
+      {_metric(t("verdict", "裁决"), _e(release.get("redline_reason_code") or "missing"))}
+      {_metric(t("canonical order", "规范订单"), _id(execution.get("bitget_order_id")))}
     </div>
     <div class="rl-grid rl-grid--3">
-      {_metric("symbol", _symbol_link(execution.get("symbol")))}
-      {_metric("simulation hash", _hash_field(release.get("simulation_evidence_hash")))}
-      {_metric("approval", _e((release.get("approval") or {}).get("reviewer_id") or "missing"))}
+      {_metric(t("symbol", "交易对"), _symbol_link(execution.get("symbol")))}
+      {_metric(t("simulation hash", "模拟哈希"), _hash_field(release.get("simulation_evidence_hash")))}
+      {_metric(t("approval", "审批"), _e((release.get("approval") or {}).get("reviewer_id") or "missing"))}
     </div>
     <div class="rl-grid rl-grid--3">
-      {_metric("release freeze", _flag(safety.get("release_freeze")))}
-      {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
-      {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
+      {_metric(t("release freeze", "发布冻结"), _flag(safety.get("release_freeze")))}
+      {_metric(t("execution freeze", "执行冻结"), _flag(safety.get("execution_freeze")))}
+      {_metric(t("mainnet enabled", "主网已启用"), _flag(safety.get("mainnet_orders_enabled")))}
     </div>
-    <h2 class="rl-sec">Session</h2>
+    <h2 class="rl-sec">{t("Session", "会话")}</h2>
 {_session_bar()}
-    <h2 class="rl-sec">Actions</h2>
+    <h2 class="rl-sec">{t("Actions", "操作")}</h2>
     <div class="rl-box">
       <div class="rl-row">
-        <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">Run live Bitget demo showcase order</button>
-        <button type="button" class="rl-btn" data-action="attest" data-release-id="{_e(release_id)}">Attest bundle</button>
-        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence">Download bundle</a>
-        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence.html">Open evidence.html</a>
-        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/attestation.html">Open attestation.html</a>
+        <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">{t("Run live Bitget demo showcase order", "运行实时 Bitget 模拟展示订单")}</button>
+        <button type="button" class="rl-btn" data-action="attest" data-release-id="{_e(release_id)}">{t("Attest bundle", "认证打包")}</button>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence">{t("Download bundle", "下载打包")}</a>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence.html">{t("Open evidence.html", "打开 evidence.html")}</a>
+        <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/attestation.html">{t("Open attestation.html", "打开 attestation.html")}</a>
       </div>
       <p class="rl-live" id="rl-job-status" aria-live="polite"></p>
     </div>
-    <h2 class="rl-sec">Verification</h2>
+    <h2 class="rl-sec">{t("Verification", "校验")}</h2>
     <div class="rl-cols-2">
-      {_metric("bundle verify", _status_block(bundle_status))}
-      {_metric("attestation", _status_block(attestation_status))}
+      {_metric(t("bundle verify", "打包校验"), _status_block(bundle_status))}
+      {_metric(t("attestation", "认证"), _status_block(attestation_status))}
     </div>
-    <h2 class="rl-sec">Showcase orders</h2>
+    <h2 class="rl-sec">{t("Showcase orders", "展示订单")}</h2>
     <div class="rl-scroll-x"><table class="rl-table">
-      <thead><tr><th scope="col">attempt</th><th scope="col">status</th><th scope="col">order id</th><th scope="col">client oid</th><th scope="col">evidence</th></tr></thead>
+      <thead><tr><th scope="col">{t("attempt", "尝试")}</th><th scope="col">{t("status", "状态")}</th><th scope="col">{t("order id", "订单号")}</th><th scope="col">{t("client oid", "客户端 oid")}</th><th scope="col">{t("evidence", "证据")}</th></tr></thead>
       <tbody>{showcase_rows}</tbody>
     </table></div>
-    <h2 class="rl-sec">Jobs</h2>
+    <h2 class="rl-sec">{t("Jobs", "任务")}</h2>
     <div class="rl-scroll-x"><table class="rl-table">
-      <thead><tr><th scope="col">job</th><th scope="col">status</th><th scope="col">type</th><th scope="col">requested by</th><th scope="col">events</th></tr></thead>
+      <thead><tr><th scope="col">{t("job", "任务")}</th><th scope="col">{t("status", "状态")}</th><th scope="col">{t("type", "类型")}</th><th scope="col">{t("requested by", "请求者")}</th><th scope="col">{t("events", "事件")}</th></tr></thead>
       <tbody>{job_rows}</tbody>
     </table></div>
-    <h2 class="rl-sec">Latest job events</h2>
+    <h2 class="rl-sec">{t("Latest job events", "最新任务事件")}</h2>
     <pre class="rl-pre" id="job-events">{event_lines}</pre>
-    <h2 class="rl-sec">Audit ledger</h2>
+    <h2 class="rl-sec">{t("Audit ledger", "审计账本")}</h2>
     <pre class="rl-pre">{audit_lines}</pre>
     {_chrome()}
 """
@@ -172,24 +172,26 @@ def _document(*, title: str, body: str) -> str:
 </head>
 <body>
   <main class="rl-main">
+{_lang_toggle()}
 {body}
   </main>
   <div class="rl-toast" id="rl-toast" role="status" aria-live="polite"></div>
 {_script()}
+{_I18N_SCRIPT}
 </body>
 </html>
 """
 
 
 def _session_bar() -> str:
-    return """    <div class="rl-box">
+    return f"""    <div class="rl-box">
       <div class="rl-row rl-row--between">
-        <span class="rl-live" id="rl-session">checking session&hellip;</span>
+        <span class="rl-live" id="rl-session">{t("checking session", "正在检查会话")}&hellip;</span>
         <span class="rl-row">
-          <button type="button" class="rl-btn" data-action="dev-login">Dev login</button>
-          <button type="button" class="rl-btn" data-action="logout">Log out</button>
-          <details class="rl-adv"><summary class="rl-label">token</summary>
-            <div class="rl-row"><input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="X-Redline-Token (optional)" /><button type="button" class="rl-btn" data-action="save-token">Save token</button></div>
+          <button type="button" class="rl-btn" data-action="dev-login">{t("Dev login", "开发登录")}</button>
+          <button type="button" class="rl-btn" data-action="logout">{t("Log out", "登出")}</button>
+          <details class="rl-adv"><summary class="rl-label">{t("token", "令牌")}</summary>
+            <div class="rl-row"><input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="X-Redline-Token (optional)" /><button type="button" class="rl-btn" data-action="save-token">{t("Save token", "保存令牌")}</button></div>
           </details>
         </span>
       </div>
@@ -199,7 +201,7 @@ def _session_bar() -> str:
 def _chrome() -> str:
     return (
         f'    <hr>\n    <p class="rl-muted">Playbook Redline &nbsp;&middot;&nbsp; '
-        f'<a href="{REPO_URL}" target="_blank" rel="noopener">source &nearr;</a> &nbsp;&middot;&nbsp; '
+        f'<a href="{REPO_URL}" target="_blank" rel="noopener">{t("source", "源码")} &nearr;</a> &nbsp;&middot;&nbsp; '
         f'<a href="{BITGET_DOCS_URL}" target="_blank" rel="noopener">Bitget API &nearr;</a></p>'
     )
 
@@ -215,12 +217,12 @@ def _release_seal(release: dict[str, Any], state: str) -> str:
     seed = str(seed)
     passed = _is_ok(state)
     mod = "rl-seal--pass" if passed else "rl-seal--void"
-    stamp = "VERIFIED" if passed else "REVIEW"
+    stamp = t("VERIFIED", "已验证") if passed else t("REVIEW", "待复核")
     short = seed if len(seed) <= 26 else seed[:26] + "…"
     return (
         f'    <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
-        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_e(stamp)}</span>'
-        f'<span class="rl-seal__algo">SSH randomart &middot; release fingerprint</span>'
+        f'<span class="rl-seal__body"><span class="rl-seal__stamp">{stamp}</span>'
+        f'<span class="rl-seal__algo">{t("SSH randomart · release fingerprint", "SSH randomart · 发布指纹")}</span>'
         f'<span class="rl-seal__hash">{_e(short)}</span>'
         f'<span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span></div>'
     )
@@ -249,14 +251,14 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
     total = len(steps)
     for idx, (label, detail, ok) in enumerate(steps, 1):
         if failed:
-            status = '<span class="rl-chain__st--skip">not reached</span>'
+            status = f'<span class="rl-chain__st--skip">{t("not reached", "未触及")}</span>'
             node_cls = ""
             detail = "-"
         elif ok:
-            status = '<span class="rl-chain__st--ok">&#10004; verified</span>'
+            status = f'<span class="rl-chain__st--ok">&#10004; {t("verified", "已验证")}</span>'
             node_cls = ""
         else:
-            status = '<span class="rl-chain__st--bad">&#10008; failed</span><span class="rl-chain__flag">first failed</span>'
+            status = f'<span class="rl-chain__st--bad">&#10008; {t("failed", "失败")}</span><span class="rl-chain__flag">{t("first failed", "首个失败")}</span>'
             node_cls = " rl-chain__node--fail"
             failed = True
         nodes.append(
@@ -272,14 +274,14 @@ def _proofbar(release: dict[str, Any], showcase_orders: list[dict[str, Any]]) ->
     verified = sum(1 for order in showcase_orders if order.get("ok"))
     tier = "L1" if execution.get("bitget_order_id") else "L0"
     items = [
-        (str(verified).zfill(2), "verified orders", False),
-        ("00", "live funds at risk", True),
-        (tier, "assurance tier", False),
-        ("256", "bit hash-chained", False),
+        (str(verified).zfill(2), t("verified orders", "已验证订单"), False),
+        ("00", t("live funds at risk", "在险真实资金"), True),
+        (tier, t("assurance tier", "保障层级"), False),
+        ("256", t("bit hash-chained", "位哈希链"), False),
     ]
     cells = "".join(
         f'<div><span class="rl-proof__num{" rl-proof__num--ok" if ok else ""}">{_e(num)}</span>'
-        f'<span class="rl-proof__label">{_e(label)}</span></div>'
+        f'<span class="rl-proof__label">{label}</span></div>'
         for num, label, ok in items
     )
     return f'    <div class="rl-proofbar">{cells}</div>'
@@ -288,12 +290,12 @@ def _proofbar(release: dict[str, Any], showcase_orders: list[dict[str, Any]]) ->
 def _tier_meter(release: dict[str, Any]) -> str:
     executed = bool((release.get("execution_evidence") or {}).get("bitget_order_id"))
     segments = [
-        ("L0", "sim-only", "rl-tier__seg--reached"),
-        ("L1", "demo-executed", "rl-tier__seg--on" if executed else ""),
-        ("L2", "live-gated", ""),
+        ("L0", t("sim-only", "仅模拟"), "rl-tier__seg--reached"),
+        ("L1", t("demo-executed", "已执行模拟"), "rl-tier__seg--on" if executed else ""),
+        ("L2", t("live-gated", "实盘受闸"), ""),
     ]
     segs = "".join(
-        f'<div class="rl-tier__seg {cls}"><b>{_e(code)}</b>{_e(label)}</div>' for code, label, cls in segments
+        f'<div class="rl-tier__seg {cls}"><b>{_e(code)}</b>{label}</div>' for code, label, cls in segments
     )
     return f'    <div class="rl-tier">{segs}</div>'
 
@@ -324,7 +326,7 @@ def _violation_telemetry(reason_code: object) -> str:
         '<div class="rl-box"><dl class="rl-dl">'
         f'<dt>reason_code</dt><dd>{code_badge}</dd>'
         f'<dt>severity</dt><dd><span class="rl-badge{sev_cls}">{_e(meta.severity)}</span></dd>'
-        f'<dt>recoverable</dt><dd>{_e("yes" if meta.recoverable else "no")}</dd>'
+        f'<dt>recoverable</dt><dd>{t("yes", "是") if meta.recoverable else t("no", "否")}</dd>'
         f'<dt>summary</dt><dd>{_e(meta.summary)}</dd>'
         "</dl></div>"
     )
@@ -456,7 +458,7 @@ def _script() -> str:
 
 
 def _metric(label: str, value: object) -> str:
-    return f'<div class="rl-box"><span class="rl-box__label">{_e(label)}</span><strong>{value}</strong></div>'
+    return f'<div class="rl-box"><span class="rl-box__label">{label}</span><strong>{value}</strong></div>'
 
 
 def _badge(value: object) -> str:

@@ -149,12 +149,12 @@ on itself):
   unaffected: genuine bundles are produced only after a full REPLAYED verify
   under a server-held trust policy before any order is placed.
 
-## 评委 60 秒零密钥复核
+## 60-second zero-secret judge review
 
 This is the preferred judge path for checking the committed release evidence on
 a clean machine. It is demo-only, tied to Bitget `paptrading: 1` artifacts, and
-is **非 Bitget Playbook 正式发布**. It verifies existing public artifacts; it
-does not place orders and 不需要 Bitget demo credentials.
+is **not an official Bitget Playbook release**. It verifies existing public artifacts; it
+does not place orders and does not require Bitget demo credentials.
 
 ```bash
 uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json

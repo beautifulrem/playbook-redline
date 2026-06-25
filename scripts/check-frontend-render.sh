@@ -9,10 +9,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HELIUM="/Applications/Helium.app/Contents/MacOS/Helium"
+BROWSER="/Applications/Helium.app/Contents/MacOS/Helium"
+[ -x "$BROWSER" ] || BROWSER="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+[ -x "$BROWSER" ] || BROWSER="/Applications/Chromium.app/Contents/MacOS/Chromium"
+export RL_BROWSER="$BROWSER"
 PC="$(ls -d "$HOME"/.npm/_npx/*/node_modules/puppeteer-core 2>/dev/null | head -1 || true)"
-if [ ! -x "$HELIUM" ] || [ -z "$PC" ]; then
-  echo "SKIP frontend render gate: need Helium + puppeteer-core (local/browser-only check)"; exit 0
+if [ ! -x "$BROWSER" ] || [ -z "$PC" ]; then
+  echo "SKIP frontend render gate: need a Chromium-family browser + puppeteer-core (local/browser-only check)"; exit 0
 fi
 NM="$(dirname "$PC")"
 OUT="$(mktemp -d)"; trap 'rm -rf "$OUT"' EXIT

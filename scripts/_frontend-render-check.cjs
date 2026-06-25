@@ -4,7 +4,7 @@
 // overflow" quality bar). Intended scrollers and the decorative chain crosshair are exempt.
 const puppeteer = require("puppeteer-core");
 
-const HELIUM = "/Applications/Helium.app/Contents/MacOS/Helium";
+const HELIUM = process.env.RL_BROWSER || "/Applications/Helium.app/Contents/MacOS/Helium";
 const WIDTHS = [1280, 390];
 const INTENDED_SCROLLERS = ["rl-scroll-x", "rl-cmd__body", "rl-ta", "rl-pre"];
 const urls = process.argv.slice(2);
@@ -25,32 +25,38 @@ const urls = process.argv.slice(2);
       page.on("requestfailed", (r) => { if (!r.url().startsWith("data:")) errors.push("reqfail:" + r.url()); });
       await page.setViewport({ width, height: 900 });
       await page.goto("file://" + url, { waitUntil: "networkidle0" });
-      const result = await page.evaluate((ok) => {
-        const root = document.documentElement;
-        const pageOverflow = root.scrollWidth > root.clientWidth + 1;
-        const skip = new Set(["SVG", "RECT", "PATH", "I", "HR", "TEXTAREA"]);
-        const over = [];
-        document.querySelectorAll("body *").forEach((el) => {
-          if (skip.has(el.tagName)) return;
-          const cls = typeof el.className === "string" ? el.className.split(" ") : [];
-          if (ok.some((c) => cls.includes(c))) return;
-          if (cls.includes("rl-chain__node")) return; // crosshair ::after straddles the joint by design
-          if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
-            const cs = getComputedStyle(el);
-            if (cs.overflowX === "visible" || cs.overflowX === "clip") {
-              over.push(el.tagName + "." + (cls[0] || ""));
+      const errProblems = errors.length ? ["console-errors=" + JSON.stringify(errors.slice(0, 3))] : [];
+      for (const lang of ["en", "zh"]) {
+        await page.evaluate((l) => {
+          if (l === "zh") document.documentElement.setAttribute("data-lang", "zh");
+          else document.documentElement.removeAttribute("data-lang");
+        }, lang);
+        const result = await page.evaluate((ok) => {
+          const root = document.documentElement;
+          const pageOverflow = root.scrollWidth > root.clientWidth + 1;
+          const skip = new Set(["SVG", "RECT", "PATH", "I", "HR", "TEXTAREA"]);
+          const over = [];
+          document.querySelectorAll("body *").forEach((el) => {
+            if (skip.has(el.tagName)) return;
+            const cls = typeof el.className === "string" ? el.className.split(" ") : [];
+            if (ok.some((c) => cls.includes(c))) return;
+            if (cls.includes("rl-chain__node")) return; // crosshair ::after straddles the joint by design
+            if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+              const cs = getComputedStyle(el);
+              if (cs.overflowX === "visible" || cs.overflowX === "clip") {
+                over.push(el.tagName + "." + (cls[0] || ""));
+              }
             }
-          }
-        });
-        return { pageOverflow, over: [...new Set(over)] };
-      }, INTENDED_SCROLLERS);
-      const name = url.split("/").pop() + "@" + width;
-      const problems = [];
-      if (errors.length) problems.push("console-errors=" + JSON.stringify(errors.slice(0, 3)));
-      if (result.pageOverflow) problems.push("page-overflow");
-      if (result.over.length) problems.push("element-overflow=" + result.over.join(","));
-      if (problems.length) { console.error("FAIL " + name + ": " + problems.join("; ")); failed++; }
-      else console.log("ok   " + name);
+          });
+          return { pageOverflow, over: [...new Set(over)] };
+        }, INTENDED_SCROLLERS);
+        const name = url.split("/").pop() + "@" + width + ":" + lang;
+        const problems = lang === "en" ? [...errProblems] : [];
+        if (result.pageOverflow) problems.push("page-overflow");
+        if (result.over.length) problems.push("element-overflow=" + result.over.join(","));
+        if (problems.length) { console.error("FAIL " + name + ": " + problems.join("; ")); failed++; }
+        else console.log("ok   " + name);
+      }
       await page.close();
     }
   }

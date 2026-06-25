@@ -1704,7 +1704,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
             verification = verify_release_attestation(attestation_path=attestation_path, bundle_path=bundle_path)
         import html as _html
 
-        from redline.render import _inline_css, randomart_svg
+        from redline.render import _I18N_SCRIPT, _inline_css, _lang_toggle, randomart_svg, t
 
         seed = str(verification.get("attestation_hash") or verification.get("bundle_hash") or "")
         seal = ""
@@ -1722,9 +1722,9 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
             '<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>Release Attestation</title><style>{_inline_css()}</style></head>'
-            f'<body><main class="rl-main"><h1 class="rl-macro">Attestation</h1>'
+            f'<body><main class="rl-main">{_lang_toggle()}<h1 class="rl-macro rl-caret">{t("Attestation", "认证")}</h1>'
             f'<p class="rl-label">{_html.escape(str(release_id))}</p>{seal}'
-            f'{render_attestation_status_html(verification=verification)}</main></body></html>'
+            f'{render_attestation_status_html(verification=verification)}</main>{_I18N_SCRIPT}</body></html>'
         )
         return HTMLResponse(doc)
 

@@ -7165,11 +7165,11 @@ def test_zero_key_judge_docs_and_openapi_contract_are_current() -> None:
     ]
 
     for text in [readme, backend]:
-        assert "评委 60 秒零密钥复核" in text
+        assert "60-second zero-secret judge review" in text
         assert "demo-only" in text
         assert "paptrading: 1" in text
-        assert "非 Bitget Playbook 正式发布" in text
-        assert "不需要 Bitget demo credentials" in text
+        assert "not an official Bitget Playbook release" in text
+        assert "does not require Bitget demo credentials" in text
         for command in zero_key_commands:
             assert command in text
 

@@ -138,12 +138,17 @@ def verify_release_attestation(*, attestation_path: Path, bundle_path: Path, tru
     return payload
 
 
+def _t(en: str, zh: str) -> str:
+    """Bilingual inline text (matches render.t and the .i18n CSS toggle)."""
+    return f'<span class="i18n"><span lang="en">{html.escape(en)}</span><span lang="zh">{html.escape(zh)}</span></span>'
+
+
 def render_attestation_status_html(*, verification: dict[str, Any]) -> str:
     """Attestation status as a design-system section (status band + telemetry DL). No own
     <style> — it inherits the page's inlined redline.css (offline evidence page or the
     standalone attestation.html shell)."""
     ok = bool(verification.get("ok"))
-    status = "ATTESTED" if ok else "ATTESTATION INVALID"
+    status = _t("ATTESTED", "已认证") if ok else _t("ATTESTATION INVALID", "认证无效")
     band = "rl-band--pass" if ok else ""
     rows = [
         ("bundle_hash", str(verification.get("bundle_hash") or "")),
@@ -158,9 +163,9 @@ def render_attestation_status_html(*, verification: dict[str, Any]) -> str:
         if value
     )
     return (
-        '<p class="rl-sec">attestation</p>\n'
-        f'<div class="rl-band {band}"><span class="rl-band__verdict">{html.escape(status)}</span>'
-        '<span class="rl-band__meta">ed25519 release attestation</span></div>\n'
+        f'<p class="rl-sec">{_t("attestation", "认证")}</p>\n'
+        f'<div class="rl-band {band}"><span class="rl-band__verdict">{status}</span>'
+        f'<span class="rl-band__meta">{_t("ed25519 release attestation", "ed25519 发布认证")}</span></div>\n'
         f'<div class="rl-box"><dl class="rl-dl">{dl}</dl></div>'
     )
 
