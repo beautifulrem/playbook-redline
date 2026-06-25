@@ -319,6 +319,8 @@ html[data-lang="zh"] .i18n > [lang="zh"] { display: inline; }
 .rl-lang__btn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; background: transparent; color: var(--rl-muted); border: 0; cursor: pointer; letter-spacing: var(--rl-track); }
 .rl-lang__btn + .rl-lang__btn { border-left: var(--rl-border); }
 html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh"] .rl-lang__btn[data-lang-set="zh"] { color: var(--rl-fg); background: var(--rl-surface-2); }
+.rl-ghbtn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; color: var(--rl-fg); border: var(--rl-border); text-decoration: none; text-transform: uppercase; letter-spacing: var(--rl-track); white-space: nowrap; }
+.rl-ghbtn:hover { border-color: var(--rl-pass); color: var(--rl-pass); }
 
 /* ===== ambient / idle motion (every keyframe is auto-disabled by the prefers-reduced-motion reset above) ===== */
 /* a slow scan line crossing the randomart seal — keeps the signature element alive at rest */

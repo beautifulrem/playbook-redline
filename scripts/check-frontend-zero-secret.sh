@@ -15,15 +15,16 @@ check_file() {
   if [ ! -f "$f" ]; then echo "ZERO-SECRET FAIL: not a regular file: $f" >&2; fail=1; return; fi
   checked=$((checked + 1))
 
-  # A) a self-contained page must contain ZERO http(s) URLs (covers script/link/url()/@import/any quote)
-  if grep -nEi 'https?://' "$f" >/dev/null 2>&1; then
-    echo "ZERO-SECRET FAIL ($f): contains http(s):// URL (page must be self-contained)" >&2
-    grep -nEi 'https?://' "$f" | head -5 >&2 || true
+  # A) self-contained: ZERO external http(s) RESOURCE refs. The ONLY allowed https URL is a
+  #    click-only anchor to the public repo (loads nothing on render; offline verification stays intact).
+  if grep -nEi 'https?://' "$f" | grep -vF 'https://github.com/beautifulrem/playbook-redline' >/dev/null 2>&1; then
+    echo "ZERO-SECRET FAIL ($f): contains a non-repo http(s):// URL (page must be self-contained)" >&2
+    grep -nEi 'https?://' "$f" | grep -vF 'https://github.com/beautifulrem/playbook-redline' | head -5 >&2 || true
     fail=1
   fi
 
   # B) no protocol-relative external refs in src / href / url() / @import
-  if grep -nEi '(src|srcset|href|poster)[[:space:]]*=[[:space:]]*["'"'"']?//|url\([[:space:]]*["'"'"']?//|@import[[:space:]]*["'"'"']?//|//[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}([^a-zA-Z0-9.-]|$)' "$f" >/dev/null 2>&1; then
+  if grep -nEi '(src|srcset|href|poster)[[:space:]]*=[[:space:]]*["'"'"']?//|url\([[:space:]]*["'"'"']?//|@import[[:space:]]*["'"'"']?//|//[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}([^a-zA-Z0-9.-]|$)' "$f" | grep -vF 'github.com/beautifulrem/playbook-redline' >/dev/null 2>&1; then
     echo "ZERO-SECRET FAIL ($f): protocol-relative external reference" >&2
     fail=1
   fi

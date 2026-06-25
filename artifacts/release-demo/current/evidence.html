@@ -318,6 +318,8 @@ html[data-lang="zh"] .i18n > [lang="zh"] { display: inline; }
 .rl-lang__btn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; background: transparent; color: var(--rl-muted); border: 0; cursor: pointer; letter-spacing: var(--rl-track); }
 .rl-lang__btn + .rl-lang__btn { border-left: var(--rl-border); }
 html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh"] .rl-lang__btn[data-lang-set="zh"] { color: var(--rl-fg); background: var(--rl-surface-2); }
+.rl-ghbtn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; color: var(--rl-fg); border: var(--rl-border); text-decoration: none; text-transform: uppercase; letter-spacing: var(--rl-track); white-space: nowrap; }
+.rl-ghbtn:hover { border-color: var(--rl-pass); color: var(--rl-pass); }
 
 
 
@@ -331,7 +333,7 @@ html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh
 </head>
 <body>
   <main class="rl-main">
-    <div class="rl-topbar"><div class="rl-lang" role="group" aria-label="language / 语言"><button type="button" class="rl-lang__btn" data-lang-set="en">EN</button><button type="button" class="rl-lang__btn" data-lang-set="zh">中</button></div></div>
+    <div class="rl-topbar"><a class="rl-ghbtn" href="https://github.com/beautifulrem/playbook-redline" target="_blank" rel="noopener"><span class="i18n"><span lang="en">View on GitHub</span><span lang="zh">GitHub 仓库</span></span> &nearr;</a><div class="rl-lang" role="group" aria-label="language / 语言"><button type="button" class="rl-lang__btn" data-lang-set="en">EN</button><button type="button" class="rl-lang__btn" data-lang-set="zh">中</button></div></div>
     <h1 class="rl-macro rl-caret">Redline Evidence Comparison</h1>
     <div class="rl-cols-2">
       <section>

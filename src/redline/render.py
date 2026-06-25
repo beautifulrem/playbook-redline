@@ -32,9 +32,15 @@ def t(en: str, zh: str) -> str:
     return f'<span class="i18n"><span lang="en">{_esc(en)}</span><span lang="zh">{_esc(zh)}</span></span>'
 
 
+REPO_URL = "https://github.com/beautifulrem/playbook-redline"
+
+
 def _lang_toggle() -> str:
     return (
-        '<div class="rl-topbar"><div class="rl-lang" role="group" aria-label="language / 语言">'
+        '<div class="rl-topbar">'
+        f'<a class="rl-ghbtn" href="{REPO_URL}" target="_blank" rel="noopener">'
+        '<span class="i18n"><span lang="en">View on GitHub</span><span lang="zh">GitHub 仓库</span></span> &nearr;</a>'
+        '<div class="rl-lang" role="group" aria-label="language / 语言">'
         '<button type="button" class="rl-lang__btn" data-lang-set="en">EN</button>'
         '<button type="button" class="rl-lang__btn" data-lang-set="zh">中</button>'
         "</div></div>"

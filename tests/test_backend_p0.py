@@ -7291,9 +7291,10 @@ def test_verify_page_self_contained_and_self_verifies() -> None:
     assert digest in doc
     assert "INTACT" in doc
     assert "randomart" in doc.lower()
-    # self-contained / offline: no external references, no rendered secret material
+    # self-contained / offline: no external RESOURCE refs, no rendered secret material.
+    # The only allowed outbound https is a click-only anchor to the public repo (not a resource load).
     assert "http://" not in doc
-    assert "https://" not in doc
+    assert "https://" not in doc.replace("https://github.com/beautifulrem/playbook-redline", "")
     assert "passphrase" not in doc.lower()
     assert "-----begin" not in doc.lower()
 
