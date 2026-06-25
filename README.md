@@ -8,6 +8,7 @@
 ![mode](https://img.shields.io/badge/Bitget-demo%20%2F%20paptrading%20only-F7931A)
 ![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
 ![rule](https://img.shields.io/badge/no%20proof-no%20verdict-111111)
+![license](https://img.shields.io/badge/license-MIT-blue)
 
 **Pre-release control gate for AI-edited trading strategies.** When an AI changes a trading playbook, Redline does not trust the diff. It runs a **fixed crash-test suite** against the edited strategy, signs the verdict into a **hash-chained ed25519 receipt**, and **only then allows a real Bitget demo order**. Failing edits are **withheld before they can ever trade**.
 
@@ -349,3 +350,7 @@ DEPLOYMENT.md     container deployment and judge runbook
 Dockerfile        production-style service image
 scripts/          helper verification scripts
 ```
+
+## License
+
+[MIT](LICENSE) © 2026 Playbook Redline contributors.
