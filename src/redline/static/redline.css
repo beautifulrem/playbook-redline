@@ -289,16 +289,17 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-fp__img svg { display: block; width: 100%; height: 100%; }
 
 /* RANDOMART RECEIPT SEAL — the signature emblem (SSH Drunken Bishop fingerprint of the hash) */
-.rl-seal { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--rl-3); align-items: center; max-width: 380px; padding: var(--rl-3); border: var(--rl-border-strong); background: var(--rl-surface); position: relative; }
-.rl-seals { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--rl-3); }
+.rl-seal { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--rl-4); align-items: center; max-width: 440px; padding: var(--rl-4); border: var(--rl-border-strong); background: var(--rl-surface); position: relative; }
+.rl-seals { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--rl-3); }
 .rl-seal::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(0,0,0,0.5); }   /* engraved bevel */
 .rl-seal--pass { border-color: var(--rl-pass); }
 .rl-seal--void { border-color: var(--rl-hazard); }
-.rl-seal__art { display: block; width: 92px; height: auto; border: var(--rl-border); background: var(--rl-bg); padding: 4px; }
+.rl-seal__art { display: block; width: 124px; height: auto; border: var(--rl-border-strong); background: var(--rl-bg); padding: 6px; }
 .rl-seal__art svg { display: block; width: 100%; height: auto; }
 .rl-seal__body { min-width: 0; }
-.rl-seal__stamp { display: block; font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; font-size: 1.05rem; line-height: 1; color: var(--rl-fg); }
+.rl-seal__stamp { display: inline-block; font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; font-size: 1rem; line-height: 1; color: var(--rl-fg); border: 2px solid currentColor; padding: 3px 9px; }
 .rl-seal--pass .rl-seal__stamp, .rl-seal--pass .rl-seal__art { color: var(--rl-pass); }
 .rl-seal--void .rl-seal__stamp, .rl-seal--void .rl-seal__art { color: var(--rl-hazard); }
 .rl-seal__algo { display: block; color: var(--rl-muted); text-transform: uppercase; letter-spacing: var(--rl-track); font-size: 10px; margin-top: var(--rl-1); }
-.rl-seal__hash { display: block; font-family: var(--rl-mono); color: var(--rl-faint); font-size: 11px; margin-top: var(--rl-1); overflow-wrap: anywhere; }
+.rl-seal__hash { display: block; font-family: var(--rl-mono); color: var(--rl-faint); font-size: 11px; margin-top: var(--rl-2); overflow-wrap: anywhere; }
+.rl-seal__edge { display: block; font-family: var(--rl-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--rl-faint); margin-top: var(--rl-3); padding-top: var(--rl-2); border-top: var(--rl-border); }   /* folio edge mark */

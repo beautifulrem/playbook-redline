@@ -218,7 +218,8 @@ def _release_seal(release: dict[str, Any], state: str) -> str:
         f'    <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
         f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_e(stamp)}</span>'
         f'<span class="rl-seal__algo">SSH randomart &middot; release fingerprint</span>'
-        f'<span class="rl-seal__hash">{_e(short)}</span></span></div>'
+        f'<span class="rl-seal__hash">{_e(short)}</span>'
+        f'<span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span></div>'
     )
 
 

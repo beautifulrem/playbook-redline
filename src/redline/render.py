@@ -70,8 +70,9 @@ _VERIFY_SCRIPT = """
     var peak = 1, j; for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) if (grid[j][i] > peak) peak = grid[j][i];
     var fills = ""; for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) { var v = grid[j][i]; if (v) fills += '<rect x="' + (i*cell) + '" y="' + (j*cell) + '" width="' + cell + '" height="' + cell + '" fill-opacity="' + (0.16 + 0.84 * (v / peak)).toFixed(2) + '"/>'; }
     var sx = cols >> 1, sy = rows >> 1;
+    var frame = '<rect x="0.5" y="0.5" width="' + (cols*cell-1) + '" height="' + (rows*cell-1) + '" fill="none" stroke="currentColor" stroke-opacity=".3"/>';
     var marks = '<rect x="' + (sx*cell) + '" y="' + (sy*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/><rect x="' + (x*cell) + '" y="' + (y*cell) + '" width="' + cell + '" height="' + cell + '" fill="none" stroke="currentColor" stroke-opacity=".85"/>';
-    return '<svg viewBox="0 0 ' + (cols*cell) + ' ' + (rows*cell) + '" fill="currentColor" role="img" aria-label="randomart fingerprint">' + fills + marks + '</svg>';
+    return '<svg viewBox="0 0 ' + (cols*cell) + ' ' + (rows*cell) + '" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart fingerprint">' + frame + fills + marks + '</svg>';
   }
   var root = document.getElementById("vf-root");
   var expected = root.getAttribute("data-expected");
@@ -217,7 +218,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
     </div>
     <div class="rl-seal rl-seal--pass" id="vf-seal">
       <span class="rl-seal__art" id="vf-art">{randomart_svg(digest)}</span>
-      <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart &middot; live fingerprint</span><span class="rl-seal__hash" id="vf-hash">{short}</span></span>
+      <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart &middot; live fingerprint</span><span class="rl-seal__hash" id="vf-hash">{short}</span><span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span>
     </div>
     <p class="rl-sec">Tamper control &middot; change one byte, watch the fingerprint morph</p>
     <div class="rl-box">
@@ -538,13 +539,14 @@ def randomart_svg(seed: str, cell: int = 9) -> str:
         if grid[j][i]
     )
     sx, sy = cols // 2, rows // 2
+    frame = f'<rect x="0.5" y="0.5" width="{cols * cell - 1}" height="{rows * cell - 1}" fill="none" stroke="currentColor" stroke-opacity=".3"/>'
     marks = (
         f'<rect x="{sx*cell}" y="{sy*cell}" width="{cell}" height="{cell}" fill="none" stroke="currentColor" stroke-opacity=".85"/>'
         f'<rect x="{x*cell}" y="{y*cell}" width="{cell}" height="{cell}" fill="none" stroke="currentColor" stroke-opacity=".85"/>'
     )
     return (
-        f'<svg viewBox="0 0 {cols*cell} {rows*cell}" fill="currentColor" role="img" aria-label="randomart hash fingerprint of the receipt">'
-        + fills + marks + "</svg>"
+        f'<svg viewBox="0 0 {cols*cell} {rows*cell}" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart hash fingerprint of the receipt">'
+        + frame + fills + marks + "</svg>"
     )
 
 
@@ -560,7 +562,8 @@ def _render_seal(panel: EvidencePanel) -> str:
         f'        <div class="rl-seal {mod}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
         f'<span class="rl-seal__body"><span class="rl-seal__stamp">{_esc(stamp)}</span>'
         f'<span class="rl-seal__algo">SSH randomart · receipt fingerprint</span>'
-        f'<span class="rl-seal__hash">{_esc(short)}</span></span></div>'
+        f'<span class="rl-seal__hash">{_esc(short)}</span>'
+        f'<span class="rl-seal__edge">ED25519 · PLAYBOOK REDLINE</span></span></div>'
     )
 
 
