@@ -1,8 +1,22 @@
 # Playbook Redline
 
-**Pre-release control gate for AI-edited trading strategies.**
+> **No AI-edited strategy reaches Bitget until it survives a fixed crash-test suite.**
+> Every verdict is a signed, tamper-evident receipt you can verify offline — no server required. *No proof, no verdict.*
 
-When an AI changes a trading playbook, Redline does not trust the diff. It runs a **fixed crash-test suite** against the edited strategy, signs the verdict into a **hash-chained ed25519 receipt**, and **only then allows a real Bitget demo order**. Failing edits are **withheld before they can ever trade**. The core rule is simple: no proof, no verdict.
+![tests](https://img.shields.io/badge/tests-372%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.12-3776AB)
+![mode](https://img.shields.io/badge/Bitget-demo%20%2F%20paptrading%20only-F7931A)
+![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
+![rule](https://img.shields.io/badge/no%20proof-no%20verdict-111111)
+
+**Pre-release control gate for AI-edited trading strategies.** When an AI changes a trading playbook, Redline does not trust the diff. It runs a **fixed crash-test suite** against the edited strategy, signs the verdict into a **hash-chained ed25519 receipt**, and **only then allows a real Bitget demo order**. Failing edits are **withheld before they can ever trade**.
+
+<p align="center">
+  <img src="submission-evidence/screenshots/tamper-1-intact.png" width="49%" alt="INTACT — the signed receipt verifies offline">
+  &nbsp;
+  <img src="submission-evidence/screenshots/tamper-2-fail.png" width="49%" alt="INTEGRITY FAIL — flip one byte and the seal voids; Bitget never called">
+</p>
+<p align="center"><sub>Offline, pure-JS tamper check — flip one byte in the receipt and the randomart seal voids, the verdict flips to <b>INTEGRITY FAIL</b>, and the proof shows Bitget was never called.</sub></p>
 
 ## Why this is different (not another audit log)
 
