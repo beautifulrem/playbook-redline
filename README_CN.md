@@ -50,6 +50,8 @@ Redline 夹在「改策略的 AI」和交易所中间。三种接法：
 
 ## 安装
 
+先决条件：Python 3.12 和 [uv](https://docs.astral.sh/uv/)（或 `pip install -e .`）。
+
 ```bash
 make install
 make audit

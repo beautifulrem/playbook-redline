@@ -50,6 +50,8 @@ Redline sits between an AI that edits a strategy and the exchange. Three ways to
 
 ## Install
 
+Prerequisites: Python 3.12 and [uv](https://docs.astral.sh/uv/) (or `pip install -e .`).
+
 ```bash
 make install
 make audit
