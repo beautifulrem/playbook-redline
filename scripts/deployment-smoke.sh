@@ -12,6 +12,13 @@ print(secrets.token_urlsafe(32))
 PY
 )"
 fi
+# production env (below) refuses to start without a >=32-char session secret; mint an ephemeral one.
+SESSION_SECRET="$(python - <<'PY'
+import secrets
+
+print(secrets.token_urlsafe(32))
+PY
+)"
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/redline-deploy-smoke.XXXXXX")"
 IMAGE="playbook-redline-service:smoke"
 CONTAINER="redline-service-smoke-${PORT}"
@@ -73,6 +80,7 @@ case "$MODE" in
       --name "$CONTAINER" \
       -e REDLINE_SERVICE_ENV=production \
       -e REDLINE_SERVICE_TOKEN="$TOKEN" \
+      -e REDLINE_AUTH_SESSION_SECRET="$SESSION_SECRET" \
       -e REDLINE_SERVICE_CORS_ORIGINS=http://localhost:3000 \
       -p "127.0.0.1:${PORT}:8080" \
       "$IMAGE" >/dev/null
@@ -81,6 +89,7 @@ case "$MODE" in
     REDLINE_SERVICE_ENV=production \
     REDLINE_SERVICE_ROOT="$ROOT/state" \
     REDLINE_SERVICE_TOKEN="$TOKEN" \
+    REDLINE_AUTH_SESSION_SECRET="$SESSION_SECRET" \
     REDLINE_SERVICE_CORS_ORIGINS=http://localhost:3000 \
     REDLINE_SERVICE_HOST=127.0.0.1 \
     REDLINE_SERVICE_PORT="$PORT" \
