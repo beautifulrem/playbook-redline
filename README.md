@@ -50,6 +50,37 @@ Redline sits between an AI that edits a strategy and the exchange. Three ways to
 - **HTTP service.** Drive it from your orchestrator: `POST /v1/runs` to crash-test a candidate, then `POST /v1/runs/{run_id}/execute` to place the demo order only on a chained, signed PASS. The OpenAPI contract is checked in at `schemas/service-openapi.json` (see [`SERVICE_API.md`](SERVICE_API.md)).
 - **MCP tool.** `redline-mcp` (stdio) exposes one read-only tool, `redline_check_receipt`, so an AI agent can verify a receipt mid-conversation without ever touching the verdict path.
 
+## MCP server (use it from an agent)
+
+Redline ships a narrow [MCP](https://modelcontextprotocol.io) server so an AI agent can verify a receipt mid-conversation. It registers exactly one **read-only** tool and never runs verdict logic for the caller, so an agent can check a result but cannot move it: there is no way to turn a WITHHELD into a PASS through the tool.
+
+Run it over stdio:
+
+```bash
+uv run redline-mcp
+```
+
+Register it with any MCP client (Claude Desktop, an agent runtime, an IDE):
+
+```json
+{
+  "mcpServers": {
+    "playbook-redline": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/playbook-redline", "redline-mcp"]
+    }
+  }
+}
+```
+
+The one tool, **`redline_check_receipt`**, verifies a receipt without mutating any package or platform state:
+
+- `receipt_path` (required): the receipt to check.
+- `pkg_path` (optional): when given, Redline **replays** the package to re-derive the verdict; without it the check is hash-only (integrity, not a verdict).
+- returns `status`, `reason_code`, `receipt_hash`, `chain_status`, and `proof_coverage` (schema `redline.mcp.check.v1`).
+
+A typical agent loop: the agent edits a playbook, runs the gate (CLI or `POST /v1/runs`), then calls `redline_check_receipt` on the resulting receipt before it trusts the PASS or ships anything downstream. The verdict path stays out of the agent's reach by construction.
+
 ## Install
 
 Prerequisites: Python 3.12 and [uv](https://docs.astral.sh/uv/) (or `pip install -e .`).

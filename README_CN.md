@@ -50,6 +50,37 @@ Redline 夹在「改策略的 AI」和交易所中间。三种接法：
 - **HTTP 服务。** 从你的编排器驱动：`POST /v1/runs` 崩溃测试一个候选，再 `POST /v1/runs/{run_id}/execute`，只有链式、已签名的 PASS 才会下那笔模拟单。OpenAPI 契约签入在 `schemas/service-openapi.json`（见 [`SERVICE_API.md`](SERVICE_API.md)）。
 - **MCP 工具。** `redline-mcp`（stdio）只暴露一个只读工具 `redline_check_receipt`，让 AI agent 在对话里就能验一张回执，碰都不碰裁决路径。
 
+## MCP 服务（给 agent 用）
+
+Redline 带了一个很窄的 [MCP](https://modelcontextprotocol.io) 服务，让 AI agent 在对话里就能验一张回执。它只注册**一个只读工具**，从不替调用方跑裁决逻辑：agent 能查结果，但动不了结果，没法靠这个工具把 WITHHELD 变成 PASS。
+
+用 stdio 跑起来：
+
+```bash
+uv run redline-mcp
+```
+
+接进任意 MCP 客户端（Claude Desktop、agent 运行时、IDE）：
+
+```json
+{
+  "mcpServers": {
+    "playbook-redline": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/playbook-redline", "redline-mcp"]
+    }
+  }
+}
+```
+
+只有一个工具 **`redline_check_receipt`**，验一张回执，不动任何 package 或平台状态：
+
+- `receipt_path`（必填）：要验的回执。
+- `pkg_path`（选填）：给了它，Redline 就**重放** package 重新推出裁决；不给就是纯哈希校验（只验完整性，不是裁决）。
+- 返回 `status`、`reason_code`、`receipt_hash`、`chain_status`、`proof_coverage`（schema `redline.mcp.check.v1`）。
+
+典型的 agent 回路：agent 改完 playbook，跑闸门（CLI 或 `POST /v1/runs`），在它信这个 PASS、或往下游发任何东西之前，先对生成的回执调一次 `redline_check_receipt`。裁决路径从设计上就够不着 agent。
+
 ## 安装
 
 先决条件：Python 3.12 和 [uv](https://docs.astral.sh/uv/)（或 `pip install -e .`）。
