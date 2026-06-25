@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -307,20 +307,41 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-seal-mini { display: inline-block; width: 40px; border: var(--rl-border); background: var(--rl-bg); padding: 2px; vertical-align: middle; color: var(--rl-faint); }
 .rl-seal-mini svg { display: block; width: 100%; height: auto; }
 .rl-seal-mini--pass { color: var(--rl-pass); border-color: var(--rl-pass); }
-.rl-row--between { justify-content: space-between; width: 100%; }</style>
+.rl-row--between { justify-content: space-between; width: 100%; }
+
+
+.i18n > [lang] { display: none; }
+html:not([data-lang="zh"]) .i18n > [lang="en"] { display: inline; }
+html[data-lang="zh"] .i18n > [lang="zh"] { display: inline; }
+.rl-topbar { display: flex; justify-content: flex-end; align-items: center; gap: var(--rl-3); margin-bottom: var(--rl-3); }
+.rl-lang { display: inline-flex; border: var(--rl-border); }
+.rl-lang__btn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; background: transparent; color: var(--rl-muted); border: 0; cursor: pointer; letter-spacing: var(--rl-track); }
+.rl-lang__btn + .rl-lang__btn { border-left: var(--rl-border); }
+html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh"] .rl-lang__btn[data-lang-set="zh"] { color: var(--rl-fg); background: var(--rl-surface-2); }
+
+
+
+.rl-seal__art { position: relative; overflow: hidden; }
+.rl-seal__art::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; pointer-events: none; background: rgba(255, 255, 255, 0.45); animation: rl-kf-sealscan 4.2s linear infinite; }
+@keyframes rl-kf-sealscan { 0% { top: 0; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+.rl-pulse::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; background: var(--rl-pass); animation: rl-kf-pulse 1.9s ease-in-out infinite; }
+.rl-pulse--hazard::before { background: var(--rl-hazard); }
+@keyframes rl-kf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }</style>
 </head>
 <body>
   <main class="rl-main">
-    <h1 class="rl-macro">Redline Evidence Comparison</h1>
+    <div class="rl-topbar"><div class="rl-lang" role="group" aria-label="language / 语言"><button type="button" class="rl-lang__btn" data-lang-set="en">EN</button><button type="button" class="rl-lang__btn" data-lang-set="zh">中</button></div></div>
+    <h1 class="rl-macro rl-caret">Redline Evidence Comparison</h1>
     <div class="rl-cols-2">
       <section>
         <p class="rl-label">PASS -&gt; Bitget demo order</p>
         <div class="rl-band rl-band--pass">
           <span class="rl-band__verdict">PASS</span>
-          <span class="rl-band__meta">REPLAYED CHAINED SIGNED · DEMO paptrading:1 non-mainnet</span>
+          <span class="rl-band__meta"><span class="i18n"><span lang="en">REPLAYED CHAINED SIGNED</span><span lang="zh">已重放 已链接 已签名</span></span> · <span class="i18n"><span lang="en">DEMO paptrading:1 non-mainnet</span><span lang="zh">演示 paptrading:1 非主网</span></span></span>
         </div>
         <div class="rl-seal rl-seal--pass"><span class="rl-seal__art"><svg viewBox="0 0 153 81" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart hash fingerprint of the receipt"><rect x="0.5" y="0.5" width="152" height="80" fill="none" stroke="currentColor" stroke-opacity=".3"/><rect x="18" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="27" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="36" y="0" width="9" height="9" fill-opacity="0.40"/><rect x="54" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="72" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="81" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="90" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="108" y="0" width="9" height="9" fill-opacity="0.28"/><rect x="126" y="0" width="9" height="9" fill-opacity="0.40"/><rect x="135" y="0" width="9" height="9" fill-opacity="0.40"/><rect x="144" y="0" width="9" height="9" fill-opacity="0.52"/><rect x="27" y="9" width="9" height="9" fill-opacity="0.52"/><rect x="45" y="9" width="9" height="9" fill-opacity="0.28"/><rect x="63" y="9" width="9" height="9" fill-opacity="0.40"/><rect x="72" y="9" width="9" height="9" fill-opacity="0.40"/><rect x="81" y="9" width="9" height="9" fill-opacity="0.40"/><rect x="90" y="9" width="9" height="9" fill-opacity="0.28"/><rect x="99" y="9" width="9" height="9" fill-opacity="0.52"/><rect x="117" y="9" width="9" height="9" fill-opacity="0.28"/><rect x="126" y="9" width="9" height="9" fill-opacity="0.28"/><rect x="135" y="9" width="9" height="9" fill-opacity="0.76"/><rect x="144" y="9" width="9" height="9" fill-opacity="0.52"/><rect x="36" y="18" width="9" height="9" fill-opacity="0.88"/><rect x="54" y="18" width="9" height="9" fill-opacity="1.00"/><rect x="63" y="18" width="9" height="9" fill-opacity="0.40"/><rect x="72" y="18" width="9" height="9" fill-opacity="0.28"/><rect x="81" y="18" width="9" height="9" fill-opacity="0.28"/><rect x="90" y="18" width="9" height="9" fill-opacity="0.64"/><rect x="108" y="18" width="9" height="9" fill-opacity="0.28"/><rect x="117" y="18" width="9" height="9" fill-opacity="0.28"/><rect x="126" y="18" width="9" height="9" fill-opacity="0.64"/><rect x="144" y="18" width="9" height="9" fill-opacity="0.28"/><rect x="27" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="45" y="27" width="9" height="9" fill-opacity="0.88"/><rect x="54" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="63" y="27" width="9" height="9" fill-opacity="0.76"/><rect x="81" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="99" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="108" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="117" y="27" width="9" height="9" fill-opacity="0.52"/><rect x="126" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="135" y="27" width="9" height="9" fill-opacity="0.28"/><rect x="54" y="36" width="9" height="9" fill-opacity="0.52"/><rect x="63" y="36" width="9" height="9" fill-opacity="0.40"/><rect x="72" y="36" width="9" height="9" fill-opacity="0.28"/><rect x="99" y="36" width="9" height="9" fill-opacity="0.40"/><rect x="108" y="36" width="9" height="9" fill-opacity="0.28"/><rect x="117" y="36" width="9" height="9" fill-opacity="0.40"/><rect x="126" y="36" width="9" height="9" fill-opacity="0.28"/><rect x="135" y="36" width="9" height="9" fill-opacity="0.28"/><rect x="144" y="36" width="9" height="9" fill-opacity="0.28"/><rect x="45" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="54" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="63" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="72" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="90" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="108" y="45" width="9" height="9" fill-opacity="0.28"/><rect x="117" y="45" width="9" height="9" fill-opacity="0.28"/><rect x="126" y="45" width="9" height="9" fill-opacity="0.28"/><rect x="135" y="45" width="9" height="9" fill-opacity="0.40"/><rect x="36" y="54" width="9" height="9" fill-opacity="0.40"/><rect x="63" y="54" width="9" height="9" fill-opacity="0.52"/><rect x="81" y="54" width="9" height="9" fill-opacity="0.52"/><rect x="99" y="54" width="9" height="9" fill-opacity="0.28"/><rect x="126" y="54" width="9" height="9" fill-opacity="0.28"/><rect x="144" y="54" width="9" height="9" fill-opacity="0.40"/><rect x="27" y="63" width="9" height="9" fill-opacity="0.28"/><rect x="72" y="63" width="9" height="9" fill-opacity="0.40"/><rect x="90" y="63" width="9" height="9" fill-opacity="0.40"/><rect x="135" y="63" width="9" height="9" fill-opacity="0.28"/><rect x="72" y="36" width="9" height="9" fill="none" stroke="currentColor" stroke-opacity=".85"/><rect x="36" y="18" width="9" height="9" fill="none" stroke="currentColor" stroke-opacity=".85"/></svg></span><span class="rl-seal__body"><span class="rl-seal__stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart · receipt fingerprint</span><span class="rl-seal__hash">sha256:071b36293c3667779cf…</span><span class="rl-seal__edge">ED25519 · PLAYBOOK REDLINE</span></span></div>
-        <p class="rl-sec">redline 侧</p>
+        <p class="rl-sec"><span class="i18n"><span lang="en">redline side</span><span lang="zh">redline 侧</span></span></p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>PASS</dd>
           <dt>reason_code</dt><dd>PASS</dd>
@@ -328,7 +349,7 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
           <dt>receipt_hash</dt><dd class="rl-mono">sha256:071b36293c3667779cfdf46e0840f796314fdc8d7a8b980bce0d3851762042f2</dd>
           <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0<br>max_drawdown &lt;= 0.08000000 observed 0.00498134<br>no_entry_when &lt;= 0 observed 0<br>replay_wellformed == 24 observed 24<br>trade_budget &lt;= 20.00000000 observed 1.00000000<br>2 anchored scenarios</dd>
         </dl></div>
-        <p class="rl-sec">执行侧</p>
+        <p class="rl-sec"><span class="i18n"><span lang="en">execution side</span><span lang="zh">执行侧</span></span></p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>bitget_order_id</dt><dd class="rl-mono">1453610833413308417</dd>
           <dt>client_oid</dt><dd class="rl-mono">rl-98eb356e754b0eab27b6442f92c29</dd>
@@ -346,10 +367,10 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
         <p class="rl-label">WITHHELD -&gt; blocked before Bitget</p>
         <div class="rl-band ">
           <span class="rl-band__verdict">WITHHELD</span>
-          <span class="rl-band__meta">BLOCKED · BITGET 未被调用 · DEMO paptrading:1 non-mainnet</span>
+          <span class="rl-band__meta"><span class="i18n"><span lang="en">BLOCKED</span><span lang="zh">已拦截</span></span> · <span class="i18n"><span lang="en">BITGET NOT CALLED</span><span lang="zh">BITGET 未被调用</span></span> · <span class="i18n"><span lang="en">DEMO paptrading:1 non-mainnet</span><span lang="zh">演示 paptrading:1 非主网</span></span></span>
         </div>
         <div class="rl-seal rl-seal--void"><span class="rl-seal__art"><svg viewBox="0 0 153 81" fill="currentColor" shape-rendering="crispEdges" role="img" aria-label="randomart hash fingerprint of the receipt"><rect x="0.5" y="0.5" width="152" height="80" fill="none" stroke="currentColor" stroke-opacity=".3"/><rect x="0" y="0" width="9" height="9" fill-opacity="0.30"/><rect x="9" y="0" width="9" height="9" fill-opacity="0.58"/><rect x="18" y="0" width="9" height="9" fill-opacity="0.58"/><rect x="27" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="36" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="45" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="63" y="0" width="9" height="9" fill-opacity="0.30"/><rect x="81" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="90" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="108" y="0" width="9" height="9" fill-opacity="0.58"/><rect x="117" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="126" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="135" y="0" width="9" height="9" fill-opacity="0.44"/><rect x="0" y="9" width="9" height="9" fill-opacity="0.30"/><rect x="9" y="9" width="9" height="9" fill-opacity="0.44"/><rect x="18" y="9" width="9" height="9" fill-opacity="0.44"/><rect x="27" y="9" width="9" height="9" fill-opacity="0.44"/><rect x="36" y="9" width="9" height="9" fill-opacity="0.30"/><rect x="54" y="9" width="9" height="9" fill-opacity="0.44"/><rect x="72" y="9" width="9" height="9" fill-opacity="0.30"/><rect x="90" y="9" width="9" height="9" fill-opacity="0.30"/><rect x="99" y="9" width="9" height="9" fill-opacity="1.00"/><rect x="108" y="9" width="9" height="9" fill-opacity="0.58"/><rect x="117" y="9" width="9" height="9" fill-opacity="0.86"/><rect x="144" y="9" width="9" height="9" fill-opacity="0.30"/><rect x="9" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="18" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="27" y="18" width="9" height="9" fill-opacity="0.58"/><rect x="45" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="63" y="18" width="9" height="9" fill-opacity="0.30"/><rect x="81" y="18" width="9" height="9" fill-opacity="0.30"/><rect x="90" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="99" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="108" y="18" width="9" height="9" fill-opacity="1.00"/><rect x="117" y="18" width="9" height="9" fill-opacity="0.44"/><rect x="126" y="18" width="9" height="9" fill-opacity="0.30"/><rect x="135" y="18" width="9" height="9" fill-opacity="0.30"/><rect x="144" y="18" width="9" height="9" fill-opacity="0.30"/><rect x="0" y="27" width="9" height="9" fill-opacity="0.30"/><rect x="9" y="27" width="9" height="9" fill-opacity="0.30"/><rect x="18" y="27" width="9" height="9" fill-opacity="0.72"/><rect x="36" y="27" width="9" height="9" fill-opacity="0.44"/><rect x="45" y="27" width="9" height="9" fill-opacity="0.30"/><rect x="54" y="27" width="9" height="9" fill-opacity="0.30"/><rect x="72" y="27" width="9" height="9" fill-opacity="0.44"/><rect x="90" y="27" width="9" height="9" fill-opacity="0.30"/><rect x="99" y="27" width="9" height="9" fill-opacity="0.44"/><rect x="108" y="27" width="9" height="9" fill-opacity="0.58"/><rect x="126" y="27" width="9" height="9" fill-opacity="0.58"/><rect x="144" y="27" width="9" height="9" fill-opacity="0.44"/><rect x="9" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="18" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="27" y="36" width="9" height="9" fill-opacity="0.44"/><rect x="36" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="54" y="36" width="9" height="9" fill-opacity="0.44"/><rect x="63" y="36" width="9" height="9" fill-opacity="0.44"/><rect x="99" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="117" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="135" y="36" width="9" height="9" fill-opacity="0.72"/><rect x="144" y="36" width="9" height="9" fill-opacity="0.30"/><rect x="27" y="45" width="9" height="9" fill-opacity="0.30"/><rect x="45" y="45" width="9" height="9" fill-opacity="0.44"/><rect x="54" y="45" width="9" height="9" fill-opacity="0.30"/><rect x="63" y="45" width="9" height="9" fill-opacity="0.30"/><rect x="126" y="45" width="9" height="9" fill-opacity="0.44"/><rect x="144" y="45" width="9" height="9" fill-opacity="0.44"/><rect x="36" y="54" width="9" height="9" fill-opacity="0.44"/><rect x="135" y="54" width="9" height="9" fill-opacity="0.30"/><rect x="144" y="54" width="9" height="9" fill-opacity="0.44"/><rect x="27" y="63" width="9" height="9" fill-opacity="0.30"/><rect x="144" y="63" width="9" height="9" fill-opacity="0.44"/><rect x="72" y="36" width="9" height="9" fill="none" stroke="currentColor" stroke-opacity=".85"/><rect x="144" y="63" width="9" height="9" fill="none" stroke="currentColor" stroke-opacity=".85"/></svg></span><span class="rl-seal__body"><span class="rl-seal__stamp">VOID</span><span class="rl-seal__algo">SSH randomart · receipt fingerprint</span><span class="rl-seal__hash">sha256:289405d2f8dd0460bc2…</span><span class="rl-seal__edge">ED25519 · PLAYBOOK REDLINE</span></span></div>
-        <p class="rl-sec">redline 侧</p>
+        <p class="rl-sec"><span class="i18n"><span lang="en">redline side</span><span lang="zh">redline 侧</span></span></p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>WITHHELD</dd>
           <dt>reason_code</dt><dd>NEW_BLOCK_BREACH</dd>
@@ -358,16 +379,36 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
           <dt>strength_summary</dt><dd>tested: max_drawdown &lt;= 0.08000000 observed 0<br>max_drawdown &lt;= 0.08000000 observed 0.00498134<br>max_drawdown &lt;= 0.08000000 observed 0.02029149<br>max_drawdown &lt;= 0.08000000 observed 0.17663366<br>no_entry_when &lt;= 0 observed 0<br>no_entry_when &lt;= 0 observed 2.00000000<br>replay_wellformed == 24 observed 24<br>trade_budget &lt;= 20.00000000 observed 1.00000000<br>2 anchored scenarios</dd>
         </dl></div>
 
-        <p class="rl-sec">拦截侧</p>
+        <p class="rl-sec"><span class="i18n"><span lang="en">block side</span><span lang="zh">拦截侧</span></span></p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>block reason_code</dt><dd class="rl-mono">NEW_BLOCK_BREACH</dd>
-          <dt>exchange call</dt><dd>Bitget 未被调用</dd>
+          <dt>exchange call</dt><dd><span class="i18n"><span lang="en">Bitget was not called</span><span lang="zh">Bitget 未被调用</span></span></dd>
         </dl></div>
       </section>
     </div>
     <hr>
-    <p class="rl-muted">Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布</p>
+    <p class="rl-muted"><span class="i18n"><span lang="en">The Redline verdict authorized this Bitget demo (paptrading) order. This is not an official Bitget Playbook release.</span><span lang="zh">Redline 裁决授权了这笔 Bitget 模拟盘（demo）订单；这不是 Bitget Playbook 正式发布。</span></span></p>
   </main>
+  
+<script>
+(function () {
+  var KEY = "rl-lang", h = document.documentElement;
+  function apply(l) {
+    if (l === "zh") { h.setAttribute("data-lang", "zh"); h.setAttribute("lang", "zh-Hans"); }
+    else { h.removeAttribute("data-lang"); h.setAttribute("lang", "en"); }
+    try { window.dispatchEvent(new CustomEvent("rl-lang", { detail: l })); } catch (e) {}
+  }
+  var s = "en"; try { if (localStorage.getItem(KEY) === "zh") s = "zh"; } catch (e) {}
+  apply(s);
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-lang-set]") : null;
+    if (!b) return;
+    var l = b.getAttribute("data-lang-set"); apply(l);
+    try { localStorage.setItem(KEY, l); } catch (e) {}
+  });
+})();
+</script>
+
   
 <script>
 (function () {

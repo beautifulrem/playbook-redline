@@ -309,3 +309,23 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-seal-mini svg { display: block; width: 100%; height: auto; }
 .rl-seal-mini--pass { color: var(--rl-pass); border-color: var(--rl-pass); }
 .rl-row--between { justify-content: space-between; width: 100%; }
+
+/* ===== bilingual EN / 中 toggle — dual-text spans, MDN [lang] selector pattern ===== */
+.i18n > [lang] { display: none; }
+html:not([data-lang="zh"]) .i18n > [lang="en"] { display: inline; }
+html[data-lang="zh"] .i18n > [lang="zh"] { display: inline; }
+.rl-topbar { display: flex; justify-content: flex-end; align-items: center; gap: var(--rl-3); margin-bottom: var(--rl-3); }
+.rl-lang { display: inline-flex; border: var(--rl-border); }
+.rl-lang__btn { font-family: var(--rl-mono); font-size: 11px; line-height: 1.8; padding: 0 9px; background: transparent; color: var(--rl-muted); border: 0; cursor: pointer; letter-spacing: var(--rl-track); }
+.rl-lang__btn + .rl-lang__btn { border-left: var(--rl-border); }
+html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh"] .rl-lang__btn[data-lang-set="zh"] { color: var(--rl-fg); background: var(--rl-surface-2); }
+
+/* ===== ambient / idle motion (every keyframe is auto-disabled by the prefers-reduced-motion reset above) ===== */
+/* a slow scan line crossing the randomart seal — keeps the signature element alive at rest */
+.rl-seal__art { position: relative; overflow: hidden; }
+.rl-seal__art::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; pointer-events: none; background: rgba(255, 255, 255, 0.45); animation: rl-kf-sealscan 4.2s linear infinite; }
+@keyframes rl-kf-sealscan { 0% { top: 0; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+/* quietly pulsing live status dot */
+.rl-pulse::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; background: var(--rl-pass); animation: rl-kf-pulse 1.9s ease-in-out infinite; }
+.rl-pulse--hazard::before { background: var(--rl-hazard); }
+@keyframes rl-kf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }

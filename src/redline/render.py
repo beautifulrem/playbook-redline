@@ -20,11 +20,50 @@ from redline.sponsor.bitget_execution import ExecutionBlocked, load_execution_ev
 from redline.verifier import load_receipt
 
 
-HONEST_STATEMENT = "Redline verdict 授权了这笔 Bitget 模拟盘订单；这不是 Bitget Playbook 正式发布"
+HONEST_STATEMENT_EN = "The Redline verdict authorized this Bitget demo (paptrading) order. This is not an official Bitget Playbook release."
+HONEST_STATEMENT_ZH = "Redline 裁决授权了这笔 Bitget 模拟盘（demo）订单；这不是 Bitget Playbook 正式发布。"
+HONEST_STATEMENT = HONEST_STATEMENT_EN  # back-compat alias
 
 # Self-contained verify/tamper engine: pure-JS sha256 (no crypto.subtle / secure-context
 # dependency, works offline on file://) + a JS port of the Drunken Bishop randomart that
 # matches render.randomart_svg, so editing the evidence morphs the seal and flips the verdict.
+def t(en: str, zh: str) -> str:
+    """Bilingual inline text: both languages are emitted; CSS reveals the active one (.i18n)."""
+    return f'<span class="i18n"><span lang="en">{_esc(en)}</span><span lang="zh">{_esc(zh)}</span></span>'
+
+
+def _lang_toggle() -> str:
+    return (
+        '<div class="rl-topbar"><div class="rl-lang" role="group" aria-label="language / 语言">'
+        '<button type="button" class="rl-lang__btn" data-lang-set="en">EN</button>'
+        '<button type="button" class="rl-lang__btn" data-lang-set="zh">中</button>'
+        "</div></div>"
+    )
+
+
+# one-click EN/中 switch: dual-text spans toggled via <html data-lang>, persisted, broadcast for live re-render
+_I18N_SCRIPT = """
+<script>
+(function () {
+  var KEY = "rl-lang", h = document.documentElement;
+  function apply(l) {
+    if (l === "zh") { h.setAttribute("data-lang", "zh"); h.setAttribute("lang", "zh-Hans"); }
+    else { h.removeAttribute("data-lang"); h.setAttribute("lang", "en"); }
+    try { window.dispatchEvent(new CustomEvent("rl-lang", { detail: l })); } catch (e) {}
+  }
+  var s = "en"; try { if (localStorage.getItem(KEY) === "zh") s = "zh"; } catch (e) {}
+  apply(s);
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-lang-set]") : null;
+    if (!b) return;
+    var l = b.getAttribute("data-lang-set"); apply(l);
+    try { localStorage.setItem(KEY, l); } catch (e) {}
+  });
+})();
+</script>
+"""
+
+
 _VERIFY_SCRIPT = """
 <script>
 (function () {
@@ -79,20 +118,34 @@ _VERIFY_SCRIPT = """
   var input = document.getElementById("vf-input");
   var original = input.value;
   function setText(id, t) { var el = document.getElementById(id); if (el) el.textContent = t; }
+  function L() { return document.documentElement.getAttribute("data-lang") === "zh" ? "zh" : "en"; }
+  var STR = {
+    intact: { en: "INTACT", zh: "完好" },
+    fail: { en: "INTEGRITY FAIL", zh: "完整性失效" },
+    okmeta: { en: "sha256 matches \\u00b7 fingerprint verified", zh: "sha256 一致 \\u00b7 指纹已验证" },
+    badmeta: { en: "sha256 MISMATCH \\u00b7 evidence tampered \\u00b7 Bitget never called", zh: "sha256 不一致 \\u00b7 证据被篡改 \\u00b7 Bitget 从未被调用" },
+    verified: { en: "VERIFIED", zh: "已验证" },
+    voided: { en: "VOID", zh: "作废" },
+    okstatus: { en: "sha256 match", zh: "sha256 一致" },
+    badstatus: { en: "sha256 MISMATCH", zh: "sha256 不一致" }
+  };
+  function S(k) { return STR[k][L()]; }
   function update() {
     var digest = sha256hex(input.value), ok = digest === expected;
     document.getElementById("vf-art").innerHTML = randomart(digest);
     setText("vf-hash", digest.slice(0, 24) + "\\u2026");
-    setText("vf-verdict", ok ? "INTACT" : "INTEGRITY FAIL");
-    setText("vf-meta", ok ? "sha256 matches \\u00b7 fingerprint verified" : "sha256 MISMATCH \\u00b7 evidence tampered \\u00b7 Bitget never called");
-    setText("vf-stamp", ok ? "VERIFIED" : "VOID");
-    setText("vf-status", ok ? "sha256 match" : "sha256 MISMATCH");
+    setText("vf-verdict", ok ? S("intact") : S("fail"));
+    setText("vf-meta", ok ? S("okmeta") : S("badmeta"));
+    setText("vf-stamp", ok ? S("verified") : S("voided"));
+    setText("vf-status", ok ? S("okstatus") : S("badstatus"));
     document.getElementById("vf-band").classList.toggle("rl-band--pass", ok);
     var seal = document.getElementById("vf-seal");
     seal.classList.toggle("rl-seal--pass", ok);
     seal.classList.toggle("rl-seal--void", !ok);
   }
   input.addEventListener("input", update);
+  window.addEventListener("rl-lang", update);
+  update();
   document.getElementById("vf-flip").addEventListener("click", function () {
     var v = input.value; if (!v) return; var i = Math.floor(v.length / 2);
     input.value = v.slice(0, i) + String.fromCharCode(v.charCodeAt(i) ^ 1) + v.slice(i + 1);
@@ -200,7 +253,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     short = _esc(digest[:24] + "…")
     return f"""<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -209,32 +262,34 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
 </head>
 <body>
   <main class="rl-main" id="vf-root" data-expected="{digest}">
-    <h1 class="rl-macro">Verify</h1>
-    <p class="rl-label">offline self-verification &middot; no network &middot; edit the evidence to break the seal</p>
+    {_lang_toggle()}
+    <h1 class="rl-macro rl-caret">{t("Verify", "校验")}</h1>
+    <p class="rl-label">{t("offline self-verification · no network · edit the evidence to break the seal", "离线自校验 · 无需联网 · 编辑证据即可破坏印章")}</p>
     <hr>
-    <div class="rl-band rl-band--pass" id="vf-band">
+    <div class="rl-band rl-band--pass rl-scanin" id="vf-band">
       <span class="rl-band__verdict" id="vf-verdict">INTACT</span>
       <span class="rl-band__meta" id="vf-meta">sha256 matches &middot; fingerprint verified</span>
     </div>
     <div class="rl-seal rl-seal--pass" id="vf-seal">
       <span class="rl-seal__art" id="vf-art">{randomart_svg(digest)}</span>
-      <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">SSH randomart &middot; live fingerprint</span><span class="rl-seal__hash" id="vf-hash">{short}</span><span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span>
+      <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">{t("SSH randomart · live fingerprint", "SSH randomart · 实时指纹")}</span><span class="rl-seal__hash" id="vf-hash">{short}</span><span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span>
     </div>
-    <p class="rl-sec">Tamper control &middot; change one byte, watch the fingerprint morph</p>
+    <p class="rl-sec">{t("Tamper control · change one byte, watch the fingerprint morph", "篡改控制台 · 改动一个字节，观察指纹形变")}</p>
     <div class="rl-box">
-      <p class="rl-label">expected sha256 &nbsp; <span class="rl-mono">{digest}</span></p>
+      <p class="rl-label">{t("expected sha256", "期望 sha256")} &nbsp; <span class="rl-mono">{digest}</span></p>
       <textarea id="vf-input" class="rl-ta" spellcheck="false" aria-label="evidence payload">{_esc(payload)}</textarea>
-      <p class="rl-row"><button type="button" class="rl-btn rl-btn--hazard" id="vf-flip">flip one byte</button><button type="button" class="rl-btn" id="vf-reset">reset</button><span class="rl-mono" id="vf-status">sha256 match</span></p>
+      <p class="rl-row"><button type="button" class="rl-btn rl-btn--hazard" id="vf-flip">{t("flip one byte", "翻转一个字节")}</button><button type="button" class="rl-btn" id="vf-reset">{t("reset", "重置")}</button><span class="rl-mono" id="vf-status">sha256 match</span></p>
     </div>
-    <p class="rl-sec">Zero-secret reproduce on a clean machine</p>
+    <p class="rl-sec">{t("Zero-secret reproduce on a clean machine", "在干净机器上零密钥复现")}</p>
     <div class="rl-cmd"><div class="rl-cmd__body">
-      <samp class="rl-cmd__cmt">same check in your terminal, exits non-zero on tamper</samp>
+      <samp class="rl-cmd__cmt">{t("same check in your terminal, exits non-zero on tamper", "在你的终端里做同样的校验，被篡改时以非零码退出")}</samp>
       <samp>uv run redline verify-chain &lt;release_dir&gt; --json</samp>
       <samp>scripts/tamper-demo.sh</samp>
     </div></div>
     <hr>
-    <p class="rl-muted">{_esc(HONEST_STATEMENT)}</p>
+    <p class="rl-muted">{t(HONEST_STATEMENT_EN, HONEST_STATEMENT_ZH)}</p>
   </main>
+  {_I18N_SCRIPT}
   {_VERIFY_SCRIPT}
 </body>
 </html>
@@ -428,7 +483,7 @@ def _render_document(*, title: str, panels: list[EvidencePanel], comparison: boo
     rendered = "\n".join(_render_panel(panel, with_title=comparison) for panel in panels)
     inner = f'    <div class="rl-cols-2">\n{rendered}\n    </div>' if comparison else rendered
     return f"""<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -437,11 +492,13 @@ def _render_document(*, title: str, panels: list[EvidencePanel], comparison: boo
 </head>
 <body>
   <main class="rl-main">
-    <h1 class="rl-macro">{_esc(title)}</h1>
+    {_lang_toggle()}
+    <h1 class="rl-macro rl-caret">{_esc(title)}</h1>
 {inner}
     <hr>
-    <p class="rl-muted">{_esc(HONEST_STATEMENT)}</p>
+    <p class="rl-muted">{t(HONEST_STATEMENT_EN, HONEST_STATEMENT_ZH)}</p>
   </main>
+  {_I18N_SCRIPT}
   {_EVIDENCE_SCRIPT}
 </body>
 </html>
@@ -454,7 +511,7 @@ def _render_panel(panel: EvidencePanel, *, with_title: bool = False) -> str:
     return f"""      <section>
 {title_html}        <div class="rl-band {band_mod}">
           <span class="rl-band__verdict">{_esc(panel.verdict)}</span>
-          <span class="rl-band__meta">{_esc(_band_meta(panel))}</span>
+          <span class="rl-band__meta">{_band_meta(panel)}</span>
         </div>
 {_render_seal(panel)}
 {_render_redline(panel)}
@@ -464,7 +521,7 @@ def _render_panel(panel: EvidencePanel, *, with_title: bool = False) -> str:
 
 
 def _render_redline(panel: EvidencePanel) -> str:
-    return f"""        <p class="rl-sec">redline 侧</p>
+    return f"""        <p class="rl-sec">{t("redline side", "redline 侧")}</p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>verdict</dt><dd>{_esc(panel.verdict)}</dd>
           <dt>reason_code</dt><dd>{_esc(panel.reason_code)}</dd>
@@ -478,7 +535,7 @@ def _render_execution(panel: EvidencePanel) -> str:
     if panel.evidence is None or panel.invalid_reason_code is not None:
         return ""
     evidence = panel.evidence
-    return f"""        <p class="rl-sec">执行侧</p>
+    return f"""        <p class="rl-sec">{t("execution side", "执行侧")}</p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>bitget_order_id</dt><dd class="rl-mono">{_esc(evidence.bitget_order_id)}</dd>
           <dt>client_oid</dt><dd class="rl-mono">{_esc(evidence.client_oid)}</dd>
@@ -498,10 +555,10 @@ def _render_block(panel: EvidencePanel) -> str:
     if panel.invalid_reason_code:
         return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ EVIDENCE INVALID · {_esc(_invalid_message(panel.invalid_reason_code))}</span></div>"""
     reason = panel.block_reason_code or panel.reason_code
-    return f"""        <p class="rl-sec">拦截侧</p>
+    return f"""        <p class="rl-sec">{t("block side", "拦截侧")}</p>
         <div class="rl-box"><dl class="rl-dl">
           <dt>block reason_code</dt><dd class="rl-mono">{_esc(reason)}</dd>
-          <dt>exchange call</dt><dd>Bitget 未被调用</dd>
+          <dt>exchange call</dt><dd>{t("Bitget was not called", "Bitget 未被调用")}</dd>
         </dl></div>"""
 
 
@@ -568,14 +625,14 @@ def _render_seal(panel: EvidencePanel) -> str:
 
 
 def _band_meta(panel: EvidencePanel) -> str:
-    suffix = "DEMO paptrading:1 non-mainnet"
+    suffix = t("DEMO paptrading:1 non-mainnet", "演示 paptrading:1 非主网")
     if panel.invalid_reason_code:
-        return f"INTEGRITY FAIL · {suffix}"
+        return f'{t("INTEGRITY FAIL", "完整性失效")} · {suffix}'
     if panel.evidence is not None and panel.verdict == "PASS":
-        return f"REPLAYED CHAINED SIGNED · {suffix}"
+        return f'{t("REPLAYED CHAINED SIGNED", "已重放 已链接 已签名")} · {suffix}'
     if panel.verdict == "WITHHELD":
-        return f"BLOCKED · BITGET 未被调用 · {suffix}"
-    return f"BLOCKED · {suffix}"
+        return f'{t("BLOCKED", "已拦截")} · {t("BITGET NOT CALLED", "BITGET 未被调用")} · {suffix}'
+    return f'{t("BLOCKED", "已拦截")} · {suffix}'
 
 
 def _invalid_panel(title: str, reason_code: str) -> EvidencePanel:
