@@ -228,11 +228,11 @@ The service OpenAPI contract is checked in at `schemas/service-openapi.json`.
 Frontend-facing endpoint semantics and response examples are documented in
 `SERVICE_API.md`.
 
-### 评委 60 秒零密钥复核
+### 60-second zero-secret judge review
 
 A fresh checkout can verify the checked-in release evidence without calling
 Bitget and without any local secret material. This path is intentionally
-demo-only, uses evidence from Bitget `paptrading: 1`, and is **非 Bitget Playbook 正式发布**.
+demo-only, uses evidence from Bitget `paptrading: 1`, and is **not an official Bitget Playbook release**.
 
 ```bash
 uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json
@@ -242,7 +242,7 @@ open artifacts/release-demo/current/evidence.html
 
 Expected result: `verify-chain` reports a passing chained release, the tamper
 demo exits non-zero after proving a modified bundle fails verification, and the
-HTML page shows the read-only judge evidence view. This review path 不需要 Bitget demo credentials; credentials are only required when you intentionally
+HTML page shows the read-only judge evidence view. This review path does not require Bitget demo credentials; credentials are only required when you intentionally
 rerun `scripts/release-demo.sh` or `scripts/execution-demo.sh` to create new
 demo orders.
 
