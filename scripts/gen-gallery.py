@@ -2,7 +2,7 @@
 """Render a self-contained gallery of the Redline design-system components.
 
 The single CSS source (src/redline/static/redline.css) is INLINED so the page is
-offline self-contained — the same path evidence pages use. This lets chrome-devtools
+offline self-contained, the same path evidence pages use. This lets a headless browser
 render it via file:// and verify the inline path + zero-secret invariant.
 
 Usage: gen-gallery.py [out.html]   (default: /tmp/redline-gallery.html)
@@ -135,13 +135,13 @@ DOC = (
     '<!doctype html>\n<html lang="en">\n<head>\n'
     '<meta charset="utf-8">\n'
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-    "<title>Redline — Design System</title>\n"
+    "<title>Redline Design System</title>\n"
     "<style>{css}</style>\n</head>\n<body>{body}</body>\n</html>\n"
 )
 
 
 def fingerprint_svg(seed: str, size: int = 42, cells: int = 5) -> str:
-    """A deterministic identicon-style glyph rendered from a hash — a unique 'image' per hash.
+    """A deterministic identicon-style glyph rendered from a hash, a unique 'image' per hash.
     Inline SVG (no xmlns → valid HTML5), fill=currentColor so it inherits the wrapper's brand color."""
     digest = hashlib.sha256(seed.encode("utf-8")).digest()
     pad = 3.0

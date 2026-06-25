@@ -10,6 +10,16 @@ __pycache__/
 .env.local
 .env.*.local
 
+# local-only working notes (kept off the public remote)
+/CODEX_GOAL_BACKEND_V2.md
+/CODEX_GOAL_BACKEND_V3_RECOMMENDED.md
+/CODEX_PROGRESS.md
+/FRONTEND_GOAL.md
+/FRONTEND_PROGRESS.md
+/FRONTEND_ARCHITECTURE.md
+/SUBMISSION_GOAL.md
+/SUBMISSION_COPY.md
+
 docs/
 proofs/
 

@@ -59,7 +59,7 @@ _I18N_SCRIPT = """
     for (var i = 0; i < bs.length; i++) { bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-lang-set") === l ? "true" : "false"); }
     try { window.dispatchEvent(new CustomEvent("rl-lang", { detail: l })); } catch (e) {}
   }
-  var s = "en"; try { if (localStorage.getItem(KEY) === "zh") s = "zh"; } catch (e) {}
+  var s = "zh"; try { if (localStorage.getItem(KEY) === "en") s = "en"; } catch (e) {}
   apply(s);
   document.addEventListener("click", function (e) {
     var b = e.target && e.target.closest ? e.target.closest("[data-lang-set]") : null;
@@ -261,7 +261,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     short = _esc(digest[:24] + "…")
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-Hans" data-lang="zh">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -491,7 +491,7 @@ def _render_document(*, title: str, panels: list[EvidencePanel], comparison: boo
     rendered = "\n".join(_render_panel(panel, with_title=comparison) for panel in panels)
     inner = f'    <div class="rl-cols-2">\n{rendered}\n    </div>' if comparison else rendered
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-Hans" data-lang="zh">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

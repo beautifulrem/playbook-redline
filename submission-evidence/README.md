@@ -1,6 +1,6 @@
-# Submission evidence — verify it yourself in ~2 minutes, offline
+# Submission evidence: verify it yourself in about 2 minutes, offline
 
-**Playbook Redline is the pre-release control gate for AI-edited trading strategies:** it runs a fixed crash-test suite on the edited playbook, signs the verdict into a hash-chained ed25519 receipt, and places a **real Bitget demo order ONLY after PASS** — failing edits are **withheld before they can ever trade**.
+**Playbook Redline is the pre-release control gate for AI-edited trading strategies.** It runs a fixed crash-test suite on the edited playbook, signs the verdict into a hash-chained ed25519 receipt, and places a **real Bitget demo order only after PASS**. Failing edits are **withheld before they can ever trade**.
 
 > This folder lets a judge confirm the whole claim from a fresh clone, **no server, no secrets, no network**. Every command below was captured into the `.txt`/`.json` files next to this README. Re-run them and you will get the same result.
 
@@ -15,11 +15,9 @@
 | 5. Tamper | Flip one byte → the seal **fails closed** | `bash scripts/tamper-demo.sh` | exit `4`, `release evidence bundle is not valid` | [`04-tamper-fail-closed.txt`](04-tamper-fail-closed.txt) |
 | 5b. Tamper (in-browser) | Same, interactively: edit the JSON → randomart seal deforms → `INTEGRITY FAIL` | open the offline verify page and change one character | seal turns red | [before](screenshots/tamper-1-intact.png) · [after](screenshots/tamper-2-fail.png) |
 
-**Visual proof — the seal breaking when one byte is flipped (offline, pure-JS):**
+**Visual proof, the seal breaking when one byte is flipped (offline, pure-JS):**
 
-![INTACT — green seal, SHA256 matches, fingerprint verified](screenshots/tamper-1-intact.png)
-
-![INTEGRITY FAIL — one byte flipped, seal voids red, "BITGET NEVER CALLED"](screenshots/tamper-2-fail.png)
+![Offline tamper check: flip one byte, the randomart seal voids, the verdict flips to INTEGRITY FAIL, and Bitget was never called](tamper.gif)
 
 ## Copy-paste reproduce (fresh clone)
 
@@ -50,4 +48,4 @@ The real demo order id (`1453610833413308417`) is a **non-secret Bitget demo id*
 - **Not a per-trade firewall** (VEIL/Sentinel): Redline evaluates the *edited release candidate*, not one order at a time.
 - The crash-test suite is **fixed** so the AI cannot move the goalposts after editing its own strategy.
 
-> Honest note: TrackProof has stronger post-hoc / on-chain notarization. Redline uses just-enough cryptography (hash-chain + ed25519) to support its actual novelty — **pre-release gating + conditional real execution** — which no other entry does.
+> Honest note: TrackProof has stronger post-hoc, on-chain notarization. Redline uses just enough cryptography (hash-chain plus ed25519) to support its actual novelty, which is **pre-release gating plus conditional real execution**, something no other entry does.

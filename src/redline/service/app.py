@@ -1719,7 +1719,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
                 f'<span class="rl-seal__hash">{short}</span></span></div>'
             )
         doc = (
-            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<!doctype html><html lang="zh-Hans" data-lang="zh"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>Release Attestation</title><style>{_inline_css()}</style></head>'
             f'<body><main class="rl-main">{_lang_toggle()}<h1 class="rl-macro rl-caret">{t("Attestation", "认证")}</h1>'

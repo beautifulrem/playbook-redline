@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hans" data-lang="zh">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -405,7 +405,7 @@ html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh
     for (var i = 0; i < bs.length; i++) { bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-lang-set") === l ? "true" : "false"); }
     try { window.dispatchEvent(new CustomEvent("rl-lang", { detail: l })); } catch (e) {}
   }
-  var s = "en"; try { if (localStorage.getItem(KEY) === "zh") s = "zh"; } catch (e) {}
+  var s = "zh"; try { if (localStorage.getItem(KEY) === "en") s = "en"; } catch (e) {}
   apply(s);
   document.addEventListener("click", function (e) {
     var b = e.target && e.target.closest ? e.target.closest("[data-lang-set]") : null;

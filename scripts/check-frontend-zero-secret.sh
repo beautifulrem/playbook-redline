@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Evidence / verify pages must be fully self-contained (offline-verifiable moat) and never
-# render secret MATERIAL. Hardened per cross-model review (Codex): fails (not OK) when
+# render secret MATERIAL. Hardened per cross-model review: fails (not OK) when
 # nothing is checked; bans ALL http(s) and protocol-relative external refs.
 # Usage: check-frontend-zero-secret.sh <file.html | dir>   (console pages are NOT checked here)
 set -euo pipefail

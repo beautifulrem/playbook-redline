@@ -1,104 +1,56 @@
 # Playbook Redline
 
-> **No AI-edited strategy reaches Bitget until it survives a fixed crash-test suite.**
-> Every verdict is a signed, tamper-evident receipt you can verify offline — no server required. *No proof, no verdict.*
+> No AI-edited strategy reaches Bitget until it survives a fixed crash-test suite.
+> Every verdict is a signed, tamper-evident receipt you can verify offline, with no server. *No proof, no verdict.*
 
-![tests](https://img.shields.io/badge/tests-372%20passing-brightgreen)
+[English](README.md) · [中文](README_CN.md)
+
+![tests](https://img.shields.io/badge/tests-373%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12-3776AB)
 ![mode](https://img.shields.io/badge/Bitget-demo%20%2F%20paptrading%20only-F7931A)
 ![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
-![rule](https://img.shields.io/badge/no%20proof-no%20verdict-111111)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-**Pre-release control gate for AI-edited trading strategies.** When an AI changes a trading playbook, Redline does not trust the diff. It runs a **fixed crash-test suite** against the edited strategy, signs the verdict into a **hash-chained ed25519 receipt**, and **only then allows a real Bitget demo order**. Failing edits are **withheld before they can ever trade**.
+Playbook Redline is a pre-release control gate for AI-edited trading strategies. When an AI rewrites a trading playbook, Redline does not trust the diff. It replays the edited strategy against a fixed crash-test suite, writes the verdict into a hash-chained ed25519 receipt, and places a real Bitget demo order only after the suite passes. Edits that fail are withheld before they can trade.
 
 <p align="center">
-  <img src="submission-evidence/tamper.gif" width="78%" alt="Offline tamper check — flip one byte and the randomart seal voids, the verdict flips to INTEGRITY FAIL, and the proof shows Bitget was never called">
+  <img src="submission-evidence/tamper.gif" width="78%" alt="Offline tamper check: flip one byte and the randomart seal voids, the verdict flips to INTEGRITY FAIL, and the proof shows Bitget was never called">
 </p>
-<p align="center"><sub>Offline, pure-JS tamper check — flip one byte in the receipt and the randomart seal voids, the verdict flips to <b>INTEGRITY FAIL</b>, and the proof shows Bitget was never called.</sub></p>
+<p align="center"><sub>Offline, pure-JS tamper check. Flip one byte in the receipt and the randomart seal voids, the verdict flips to <b>INTEGRITY FAIL</b>, and the proof shows Bitget was never called.</sub></p>
 
-## Why this is different (not another audit log)
+## Verify it yourself
 
-| System | Proves past record | **Gates the AI edit before release** | **Real Bitget demo execution** | Offline tamper verify |
-|---|:--:|:--:|:--:|:--:|
-| TrackProof | ✅ (on-chain, stronger) | ❌ | ❌ | ✅ |
-| VEIL / Sentinel | partial | ❌ | ❌ | ❌ |
-| **Playbook Redline** | ✅ | **✅ only here** | **✅ only here** | ✅ |
-
-- **Not a track-record notary:** Redline gates a strategy *before* it trades, instead of certifying trades after the fact.
-- **Not a per-trade firewall:** Redline evaluates the *edited release candidate*, not one order at a time.
-- **Not a backtest toy:** PASS can trigger a real Bitget demo/paper order; FAIL withholds execution.
-- The crash-test suite is **fixed** so the AI cannot move the goalposts after editing its own strategy.
-
-## Judge this by running (offline, ~2 min, no server, no secrets)
-
-See **[`submission-evidence/`](submission-evidence/)** — every step below is captured and re-runnable from a fresh clone:
+A 60-second zero-secret judge review, offline, with no server and no Bitget credentials. Every step is captured under [`submission-evidence/`](submission-evidence/) and re-runnable from a fresh clone. This path is demo-only, uses evidence from Bitget `paptrading: 1`, and is not an official Bitget Playbook release.
 
 ```bash
-B=artifacts/release-demo/current/service/releases/release-demo-good/release-evidence-bundle.json
-A=artifacts/release-demo/current/service/releases/release-demo-good/release-attestation.json
-
-make verify-demo                                                  # 1. gate: bad AI edit WITHHELD, good one PASSES  -> exit 0
-uv run redline verify-release-bundle      "$B" --json             # 2. hash-chained receipt                         -> exit 0
-uv run redline verify-release-attestation "$A" --bundle "$B" --json  # 3. ed25519 signature                        -> exit 0
-bash scripts/tamper-demo.sh                                       # 5. flip one byte -> integrity fails closed      -> exit 4
-open artifacts/evidence-tamper-check.html                         # interactive: edit the JSON, watch the seal break
+uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json  # passing chained release
+bash scripts/tamper-demo.sh                                                                            # flip one byte, integrity fails closed -> exit 4
+open artifacts/release-demo/current/evidence.html                                                      # the read-only judge evidence page
 ```
 
-The real demo order `1453610833413308417` is `paptrading:1`, demo-only — no mainnet, no secrets ([`submission-evidence/05-real-bitget-order.json`](submission-evidence/05-real-bitget-order.json)).
+`verify-chain` reports a passing chained release, the tamper demo exits non-zero after a modified bundle fails verification, and the HTML page is the read-only judge evidence view. This review path does not require Bitget demo credentials; they are only needed to rerun `scripts/release-demo.sh` and mint new demo orders.
 
-## Why Now
+The real demo order `1453610833413308417` ran on Bitget `paptrading: 1`, demo-only, with no mainnet access and no secrets ([`submission-evidence/05-real-bitget-order.json`](submission-evidence/05-real-bitget-order.json)).
 
-AI-edited trading playbooks can move faster than manual review, but every edit also changes risk exposure. Playbook Redline makes the handoff from "generated strategy" to "publishable Bitget playbook" auditable: deterministic replay, fixed crash tapes, receipt hashes, proof sidecars, and sponsor read-back all have to line up before a package can be exported.
+## How it works
 
-## Hackathon Fit
+1. An AI edits a trading playbook. That edited candidate is what Redline checks, not the prose of the diff.
+2. Redline replays the candidate against a **fixed** crash-test suite: max drawdown, crash-window no-entry, and a trade budget. The suite is fixed on purpose, so the AI cannot move its own goalposts after editing its strategy.
+3. On FAIL, the candidate is withheld. No order is placed.
+4. On PASS, the verdict is written into a hash-chained, ed25519-signed receipt, and one real Bitget demo order is placed under `paptrading: 1`.
+5. Anyone can re-verify the receipt offline. Change one byte and the chain breaks, the signature fails, and the seal voids.
 
-- Bitget relevance: focuses on copy-trading/playbook safety before publication, with a sponsor read-back path for live run verification.
-- Technical depth: combines deterministic replay, canonical hashing, proof coverage, sandboxing, signed ledger checkpoints, a narrow MCP receipt-check tool, JSON schemas, and CI integration.
-- Product clarity: the primary user is a strategy author or reviewer who needs a yes/no publish gate plus machine-checkable evidence, not another dashboard without enforceable provenance.
-- Demo strength: checked-in pass and withheld artifacts show both sides of the gate, while `verify-proof` and `check --package` let judges replay the evidence locally.
-- Extensibility: probe definitions, suites, package import, report rendering, internal MCP helper surfaces, and sponsor adapters are separated so additional Bitget scenarios can be added without rewriting the proof kernel; the public FastMCP registration exposes only the safe receipt-check tool.
+## How it compares
 
-## Hackathon Submission Reference
+| System | Proves past record | Gates the AI edit before release | Real Bitget demo execution | Offline tamper verify |
+|---|:--:|:--:|:--:|:--:|
+| TrackProof | yes (on-chain, stronger) | no | no | yes |
+| VEIL / Sentinel | partial | no | no | no |
+| **Playbook Redline** | yes | **yes** | **yes** | yes |
 
-- Project submission form: https://forms.gle/wemHkddKAxR3wFFz9
-- Developer manual and submission rules: https://bitget-ai.gitbook.io/hackathon/untitled#ti-jiao-gui-ze
-- Registration/submission window: June 16, 2026 00:00 through June 25, 2026 24:00 (UTC+8).
-- Strategy submissions should prepare both simulated-trading and live-trading
-  data. Current Playbook trading support is live-only, so simulated data should
-  be produced separately, either by running local/backtest data or by using
-  tools such as GetAgent Studio.
-- Before final submission, re-check the developer manual for the current required fields, judging materials, demo expectations, and any rule changes.
+Redline is not a track-record notary: it gates a candidate before it trades instead of certifying trades after the fact. It is not a per-trade firewall: it evaluates the edited release candidate, not one order at a time. And it is not a backtest toy: a pass can place a real Bitget demo order, while a fail withholds execution. TrackProof has stronger post-hoc, on-chain notarization; Redline uses just enough cryptography to support its own job, which is the pre-release gate plus conditional real execution.
 
-## What Is Included
-
-- Deterministic replay engine for fixture playbooks
-- Blocking probes for drawdown, no-entry, and trade budget checks
-- Decision kernel with closed reason codes
-- Receipt issuer and verifier
-- Ed25519-signed ledger checkpoint attestation for production publish verification
-- Proof-level verification command
-- Machine-readable backend doctor for Day-0 fixture, schema, replay, and proof-map smoke checks
-- Static verdict-path import gate for proof/probe/verifier code
-- FastAPI service boundary with token-gated run creation, SQLite/Postgres run state, DB-backed queue claiming, OpenAPI, package upload/import, artifact download, and container deployment smoke
-- Frontend-facing demo flow script that verifies HTTP artifacts, receipt replay, and sponsor preflight
-- JSON schemas for receipts, reports, specs, suites, decisions, doctor results, proof verification, ledger checkpoints, ledger attestations, package annotations, sponsor evidence, and verification results
-- Demo fixtures and generated demo artifacts for pass and withheld cases
-- Fail-closed tests for sandbox and verdict-path violations
-
-## Security Boundary
-
-Candidate strategies run in a subprocess. On macOS, the worker is additionally
-wrapped with `sandbox-exec` to deny network access, process forking, and file
-writes. Inside the worker, Python audit hooks deny socket/subprocess/fork/exec,
-filesystem mutation, reads outside the package/runtime allowlist, and
-`ctypes`/`cffi`. Scenario bars are preloaded by trusted code and are not exposed
-as readable files to candidate strategies. The verdict path uses only built-in
-probes and a separate tripwire rejects network/LLM SDK imports. This is a local
-proof-kernel sandbox for demo and CI use; production exchange execution should
-still use the exchange's own runtime sandbox.
-
-## Quick Start
+## Install
 
 ```bash
 make install
@@ -112,242 +64,61 @@ Expected demo outcomes:
 - `candidate_good`: `pass` with `BASELINE_GENESIS`
 - `candidate_bad`: `withheld` with `NEW_BLOCK_BREACH`
 
-The bundled suite contains two 24-bar BTCUSDT windows and three blocking probes:
-max drawdown, crash-window no-entry, and trade budget.
+The bundled suite is two 24-bar BTCUSDT windows and three blocking probes (max drawdown, crash-window no-entry, trade budget). `BASELINE_GENESIS` exits with code `10` as an amber state, because the fixture baseline is not chained to a previous receipt. Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses package-bound replay.
 
-`fixtures/demo_pack/playbook_identity.lock` pins the adapter-supported Playbook
-source boundary. `redline import --write-lock fixtures/demo_pack --json`
-refreshes that lock; receipts record `package.identity_lock_hash`, and replayed
-verification fails closed if a locked source file drifts.
+## Usage
 
-`BASELINE_GENESIS` intentionally exits with code `10` as an amber state because the fixture baseline is not chained to a previous receipt.
-Hash-only checks are integrity-only and return `unverified_no_verdict`; trusted verification uses package-bound replay. `redline check --package ...` now replays by default, while `--hash-only` must be supplied explicitly for integrity-only inspection.
-Replay verification also checks the local `issuance-ledger.checkpoint.json` beside the receipt. A final publish path must use a chained `PASS` receipt plus an Ed25519-signed ledger attestation verified against a protected trust policy.
-The bundled GitHub Action treats that amber demo state as failure unless
-`allow-amber-baseline-genesis` is explicitly enabled and the caller workspace
-demo package hash matches the bundled fixture hash.
-
-## CLI
+Run the gate, then verify the receipt:
 
 ```bash
 uv run redline run fixtures/demo_pack \
-  --baseline baseline \
-  --candidate candidate_bad \
+  --baseline baseline --candidate candidate_bad \
   --suite fixtures/suites/demo_suite.json \
   --spec fixtures/specs/redline_spec.json \
-  --out artifacts/demo/withheld \
-  --json
+  --out artifacts/demo/withheld --json
 
 uv run redline verify-proof artifacts/demo/pass/receipt.json \
   --proof-id proof:package_canonical:7bc11572ef15a4a40cdf1856 \
   --package fixtures/demo_pack \
   --suite fixtures/suites/demo_suite.json \
-  --spec fixtures/specs/redline_spec.json \
-  --json
-
-uv run redline import fixtures/demo_pack --json
-uv run redline compile fixtures/specs/redline_spec.json --json
-uv run redline report artifacts/demo/pass/report.json \
-  --receipt artifacts/demo/pass/receipt.json \
-  --package fixtures/demo_pack
-
-uv run redline publish fixtures/demo_pack artifacts/demo/pass/receipt.json --json
+  --spec fixtures/specs/redline_spec.json --json
 ```
 
-`redline report` without `--verified` renders only an `UNVERIFIED PREVIEW`.
-`--verified` is reserved for receipts that are replayed, chained, and backed by
-an externally signed ledger checkpoint under a pinned trusted policy; the
-bundled genesis fixture is not one. Like production publish, verified report
-stamping reads `REDLINE_TRUST_POLICY` and `REDLINE_TRUST_POLICY_HASH` from the
-protected environment.
-`redline publish` is fail-closed: the fixture pass receipt is still blocked as
-`BASELINE_GENESIS` unless `--allow-demo-baseline-genesis` is supplied for a demo
-annotation. That demo annotation is not final publish evidence. For a production
-publish preflight, sign the checkpoint with `redline sign-ledger-checkpoint` and
-pass `--ledger-attestation`. `redline publish` reads the trusted policy only
-from `REDLINE_TRUST_POLICY` and requires its protected hash in
-`REDLINE_TRUST_POLICY_HASH`. Store both outside the local artifact folder, for
-example through CI secret management, repository environment protection, or
-sponsor-side key custody. `redline check` and `verify-ledger-attestation` can
-still accept a raw public key for low-level debugging, but `redline publish`
-requires the protected trust policy pair.
+`redline report` without `--verified` renders only an `UNVERIFIED PREVIEW`. A final publish path must use a chained `PASS` receipt plus an ed25519-signed ledger attestation verified against a pinned trust policy; the bundled genesis fixture is not one. Trust-key generation, ledger signing, and the sponsor-adapter publish flow are documented inline in the CLI help and in [`SERVICE_API.md`](SERVICE_API.md).
 
-```bash
-uv run redline trust-keygen --out-private /tmp/redline-trust.private --out-public /tmp/redline-trust.public
-uv run redline trust-policy \
-  --public-key "$(cat /tmp/redline-trust.public)" \
-  --key-id redline-demo \
-  --issuer redline-ci \
-  --out /tmp/redline-trust-policy.json
-uv run redline sign-ledger-checkpoint artifacts/demo/pass/issuance-ledger.checkpoint.json \
-  --private-key-file /tmp/redline-trust.private \
-  --key-id redline-demo \
-  --issuer redline-ci \
-  --out /tmp/redline-ledger.attestation.json
-uv run redline verify-ledger-attestation /tmp/redline-ledger.attestation.json \
-  artifacts/demo/pass/issuance-ledger.checkpoint.json \
-  --trust-policy /tmp/redline-trust-policy.json
-export REDLINE_TRUST_POLICY=/tmp/redline-trust-policy.json
-export REDLINE_TRUST_POLICY_HASH="$(python -c 'import json;print(json.load(open("/tmp/redline-trust-policy.json"))["policy_hash"])')"
-```
+## Service
 
-The Python wheel installs the CLI and library only. The bundled fixture package,
-schemas, GitHub Action, and checked-in demo artifacts are repository assets; use
-a repository checkout for the complete demo.
-
-## Service API
-
-The HTTP service is a thin FastAPI boundary over the same proof kernel. It does
-not shell out to the CLI and does not create a second verdict path: workers call
-`run_redline`, persist run state in SQLite, and expose the generated
-receipt/report/proof artifacts from isolated per-run directories.
+The HTTP service is a thin FastAPI boundary over the same proof kernel. It does not shell out to the CLI and does not create a second verdict path: workers call `run_redline`, persist run state, and expose the generated receipt, report, and proof artifacts from isolated per-run directories.
 
 ```bash
 REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
-```
 
-Minimal local flow:
-
-```bash
 curl -s http://127.0.0.1:8080/health
-
-curl -s -X POST http://127.0.0.1:8080/v1/packages/import \
-  -H 'content-type: application/json' \
-  -H 'x-redline-token: redline-demo' \
-  -d '{"package_path":"fixtures/demo_pack"}'
-
 curl -s -X POST http://127.0.0.1:8080/v1/runs \
-  -H 'content-type: application/json' \
-  -H 'x-redline-token: redline-demo' \
+  -H 'content-type: application/json' -H 'x-redline-token: redline-demo' \
   -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}'
 ```
 
-The service OpenAPI contract is checked in at `schemas/service-openapi.json`.
-Frontend-facing endpoint semantics and response examples are documented in
-`SERVICE_API.md`.
+`POST /v1/runs/{run_id}/execute` is the demo execution gate. It consumes a replayed, chained, signed `PASS` receipt and places one Bitget demo order under `paptrading: 1`. WITHHELD, hash-only, unsigned, unchained, tampered, missing-credential, and default-mainnet cases all return `blocked` before any order call. The release backend layers versioned strategy releases, simulated-trading evidence, risk-policy binding, human approval, and a hash-verified evidence bundle on top of that gate, and `/v1/judge/console` renders a read-only review surface over it. The OpenAPI contract is checked in at `schemas/service-openapi.json`. Endpoint semantics live in [`SERVICE_API.md`](SERVICE_API.md); deployment and the judge runbook are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### 60-second zero-secret judge review
+## Security boundary
 
-A fresh checkout can verify the checked-in release evidence without calling
-Bitget and without any local secret material. This path is intentionally
-demo-only, uses evidence from Bitget `paptrading: 1`, and is **not an official Bitget Playbook release**.
+Candidate strategies run in a subprocess. On macOS the worker is also wrapped with `sandbox-exec` to deny network access, process forking, and file writes. Inside the worker, Python audit hooks deny sockets, subprocess, fork, exec, filesystem mutation, reads outside the package and runtime allowlist, and `ctypes`/`cffi`. Scenario bars are preloaded by trusted code and are never exposed as readable files to candidate strategies. The verdict path uses only built-in probes, and a separate tripwire rejects network and LLM SDK imports. This is a local proof-kernel sandbox for demo and CI use; production exchange execution should still use the exchange's own runtime sandbox.
 
-```bash
-uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json
-scripts/tamper-demo.sh
-open artifacts/release-demo/current/evidence.html
-```
-
-Expected result: `verify-chain` reports a passing chained release, the tamper
-demo exits non-zero after proving a modified bundle fails verification, and the
-HTML page shows the read-only judge evidence view. This review path does not require Bitget demo credentials; credentials are only required when you intentionally
-rerun `scripts/release-demo.sh` or `scripts/execution-demo.sh` to create new
-demo orders.
-
-`POST /v1/runs/{run_id}/execute` is the demo execution gate. It consumes a
-replayed, chained, signed `PASS` receipt and places one Bitget demo order using
-Demo API credentials plus `paptrading: 1`. WITHHELD, hash-only, unsigned,
-unchained, tampered, missing-credential, and default-mainnet cases return
-`blocked` before any order call. The gate writes `execution-evidence.json` and
-`execution-ledger.jsonl` as hash-checked run artifacts. For the full boundary,
-see `BACKEND_COMPLETENESS.md`; for a real demo run, export demo credentials and
-run `scripts/execution-demo.sh`.
-
-The production release backend adds versioned strategy releases on top of the
-run gate. A release candidate must bind a Redline `PASS` run, import
-simulated-trading evidence, bind a risk policy, receive human approval, execute
-a Bitget demo order, and generate a hash-verified evidence bundle before it is
-`release_ready`. The release API includes `/v1/strategy-versions`,
-`/v1/release-candidates`, `/simulation-evidence`, `/risk-policy`, `/approve`,
-`/execute-demo`, `/demo-showcase-orders`, `/evidence`, `/evidence.html`,
-`/attest`, `/attestation`, `/attestation.html`, `/audit-ledger`, and
-`/jobs/showcase-order`, `/jobs/{job_id}/events`, and `/v1/release-safety`.
-`redline render-evidence` can render a demo-only,
-read-only judge evidence page from existing run/release artifacts, and
-release-ready candidates can create additional demo-only showcase orders for
-live judge clicks, either synchronously or through a release job with an event
-ledger. `/v1/judge/console` is a backend-rendered control surface that lists
-release candidates and links through to release detail pages with job events,
-bundle verification, and attestation status. `redline attest-release-bundle`
-signs a verified release bundle hash into a local attestation that judges can
-verify offline. Local/demo human reviewers can use dev session auth so approval
-evidence binds to an authenticated principal instead of request-body text.
-Mainnet
-publish remains gated and disabled by default; demo execution does not imply
-Playbook live activation. See `PRODUCTION_RELEASE_BACKEND.md`,
-`HACKATHON_SUBMISSION.md`, and run:
-
-```bash
-scripts/release-demo.sh
-scripts/hackathon-submit-check.sh
-```
-
-Deployment shape: Render Blueprint + containerized FastAPI service. Local/CI can
-use SQLite under `REDLINE_SERVICE_ROOT`; Render uses Postgres metadata plus a
-persistent disk for hash-verified artifacts. This keeps long-running proof jobs
-and artifact hashes inside one stable runtime boundary instead of relying on a
-serverless filesystem.
-
-```bash
-REDLINE_DEPLOYMENT_SMOKE_MODE=local make deployment-smoke
-```
-
-CI runs the same flow against the Docker image. Production mode requires a
-non-default 32+ character `REDLINE_SERVICE_TOKEN`, explicit CORS origins, and
-Postgres connection string when `REDLINE_SERVICE_METADATA_STORE=postgres`.
-After Render is live, use `make remote-smoke` for the frontend flow and
-`make remote-production-check` for OpenAPI parity, CORS, 401/404, optional 429,
-and error-redaction checks. `make remote-smoke-actions` stores the remote URL,
-token, and frontend origin as GitHub Actions secrets, then triggers the manual
-remote smoke workflow. Deployment details, cleanup, and the judge runbook are in
-`DEPLOYMENT.md`.
-
-## Verification Script
-
-```bash
-scripts/verify-sponsor-run.sh artifacts/sponsor/demo-readback.json artifacts/demo/pass/receipt.json fixtures/demo_pack
-```
-
-The script emits one machine-parseable JSON document containing both the receipt
-check and sponsor read-back result. It runs receipt verification in replayed mode
-with package binding, then calls `redline verify-sponsor-run`. The bundled
-recorded file is not treated as live Bitget proof by itself, so
-`BITGET_CREDENTIALS_REQUIRED` / `SPONSOR_EVIDENCE_UNVERIFIED` is expected unless
-a sponsor transport and credentials are configured.
-
-`redline publish --execute` is an experimental sponsor-adapter wrapper, not an
-official Bitget publish hook. It requires `REDLINE_BITGET_ACCESS_KEY`,
-`REDLINE_BITGET_SECRET_KEY`, and `REDLINE_BITGET_PASSPHRASE` (or the same names
-without the `REDLINE_` prefix), writes a redacted `sponsor-transcript.jsonl`,
-persists `sponsor_evidence`, and still refuses final publish unless the local
-preflight is already chained and signed. `--final-publish` additionally requires
-`--execute`, `--yes-final-publish`, and `REDLINE_ALLOW_FINAL_PUBLISH=1`; a
-credentialed response must include durable publish/readback identifiers before it
-can reach `READBACK_VERIFIED` or `PUBLISHED`. The current adapter uses injectable
-mock transport for tests plus a conservative HMAC-signed HTTP wrapper for a
-future documented Playbook sponsor contract. Sponsor execution uploads the clean
-package archive; the Redline annotation stays as local preflight/proof evidence.
-Sponsor `metrics_output_hash` records the platform read-back payload and is not
-treated as the Redline receipt result hash. Without those credentials and a
-proof-eligible live read-back, the award evidence is the local proof kernel,
-receipt verifier, proof sidecars, signed ledger path, and reproducible checked-in
-artifacts; the recorded sponsor file is only a schema fixture.
-
-## Repository Layout
+## Repository layout
 
 ```text
 src/redline/      backend package
-tests/            backend P0 tests
+tests/            backend tests
 fixtures/         demo packages, suites, specs
 schemas/          exported JSON schemas
 artifacts/demo/   checked-in demo receipts and proof artifacts
-artifacts/sponsor recorded sponsor-attestation shape fixture
-BACKEND_COMPLETENESS.md demo execution and publish boundary
-SERVICE_API.md    service API contract for frontend/demo integration
-DEPLOYMENT.md     container deployment and judge runbook
-Dockerfile        production-style service image
 scripts/          helper verification scripts
+SERVICE_API.md    service API contract
+DEPLOYMENT.md     container deployment and judge runbook
 ```
+
+Built for the Bitget AI Hackathon, Trading Infra track. Demo execution uses Bitget `paptrading: 1` only and does not imply Playbook live activation.
 
 ## License
 

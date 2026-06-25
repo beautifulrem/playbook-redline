@@ -165,7 +165,7 @@ def render_judge_release_html(
 
 def _document(*, title: str, body: str) -> str:
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-Hans" data-lang="zh">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />

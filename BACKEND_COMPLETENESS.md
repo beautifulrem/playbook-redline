@@ -126,7 +126,7 @@ Documented limitations confirmed by an independent verdict-path / security
 review of the v2 backend (the review the implementing agent could not perform
 on itself):
 
-- **Receipt schema v3.3 — cross-version verify with v3.2 is RESTORED.** v3.3 adds
+- **Receipt schema v3.3, cross-version verify with v3.2 is RESTORED.** v3.3 adds
   optional fields, but `compute_receipt_hash` now drops None (absent) fields
   (`exclude_none=True`), so a pre-v3.3 receipt that never carried those fields
   still hashes to its stored value and verifies (it reads as intact, not
@@ -137,11 +137,11 @@ on itself):
   re-reviewed: determinism preserved (200 runs → 1 hash), issue/verify symmetric,
   tamper-evidence intact (null-drop forgery rejected at schema validation).
   Note: `compute_ledger_checkpoint_hash` does not yet share the exclude-none rule
-  — inert today (checkpoints carry no None fields); a follow-up could align it.
+  This is inert today (checkpoints carry no None fields); a follow-up could align it.
 - **Offline bundle / attestation verification is integrity-only unless a signer
   is pinned.** By default `verify-chain` / `verify-release-attestation` prove
   internal consistency and that the embedded Ed25519 signature matches the
-  attestation's own public key — without a pin, a self-consistent bundle
+  attestation's own public key. Without a pin, a self-consistent bundle
   self-signed with an attacker's key would pass `ok=true`. Pass
   `--trusted-public-key <ed25519-public:...>` (supported on `verify-chain` and
   `verify-release-attestation`) to require that exact signer; a foreign or

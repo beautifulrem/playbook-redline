@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deterministic "on-brand" lint for the Tactical Telemetry design system.
-# Hardened per cross-model review (Codex): pins exact brand tokens, catches all
+# Hardened per cross-model review: pins exact brand tokens, catches all
 # radius / shadow / gradient / non-token-color forms, no fake-pass. Exit 0 = clean.
 set -euo pipefail
 
