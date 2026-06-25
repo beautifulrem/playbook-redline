@@ -11,6 +11,8 @@
 ![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
+**在线 demo**（免安装、免登录）：<https://beautifulrem.github.io/playbook-redline/>
+
 Playbook Redline 是给 AI 改写交易策略用的发布前校验闸。AI 改一份 playbook，Redline 不信这段 diff：它把改完的策略放进固定崩溃测试里重放，裁决生成一张 ed25519 签名的哈希链回执；套件全过，才真下一笔 Bitget 模拟单。没过的改动，下单前就拦住。
 
 <p align="center">

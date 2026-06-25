@@ -11,6 +11,8 @@
 ![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
+**Live demo** (no install, no login): <https://beautifulrem.github.io/playbook-redline/>
+
 Playbook Redline is a pre-release control gate for AI-edited trading strategies. When an AI rewrites a trading playbook, Redline does not trust the diff. It replays the edited strategy against a fixed crash-test suite, writes the verdict into a hash-chained ed25519 receipt, and places a real Bitget demo order only after the suite passes. Edits that fail are withheld before they can trade.
 
 <p align="center">
