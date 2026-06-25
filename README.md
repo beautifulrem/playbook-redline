@@ -40,15 +40,13 @@ The real demo order `1453610833413308417` ran on Bitget `paptrading: 1`, demo-on
 4. On PASS, the verdict is written into a hash-chained, ed25519-signed receipt, and one real Bitget demo order is placed under `paptrading: 1`.
 5. Anyone can re-verify the receipt offline. Change one byte and the chain breaks, the signature fails, and the seal voids.
 
-## How it compares
+## Integration
 
-| System | Proves past record | Gates the AI edit before release | Real Bitget demo execution | Offline tamper verify |
-|---|:--:|:--:|:--:|:--:|
-| TrackProof | yes (on-chain, stronger) | no | no | yes |
-| VEIL / Sentinel | partial | no | no | no |
-| **Playbook Redline** | yes | **yes** | **yes** | yes |
+Redline sits between an AI that edits a strategy and the exchange. Three ways to wire it in:
 
-Redline gates the edited release candidate before it can trade. It is not a track-record notary or a per-trade firewall: it judges the edit itself, not past trades or individual live orders. A PASS can place one real Bitget demo order; a FAIL withholds execution. TrackProof has stronger post-hoc, on-chain notarization; Redline spends just enough cryptography on its own job, the pre-release gate plus conditional real execution.
+- **CLI in CI.** Run `redline run` on the edited candidate and gate on the exit code, then `redline verify-release-bundle` before you ship: a non-zero exit stops the pipeline, a PASS leaves a signed receipt to archive. This is the path `make verify-demo` exercises.
+- **HTTP service.** Drive it from your orchestrator: `POST /v1/runs` to crash-test a candidate, then `POST /v1/runs/{run_id}/execute` to place the demo order only on a chained, signed PASS. The OpenAPI contract is checked in at `schemas/service-openapi.json` (see [`SERVICE_API.md`](SERVICE_API.md)).
+- **MCP tool.** `redline-mcp` (stdio) exposes one read-only tool, `redline_check_receipt`, so an AI agent can verify a receipt mid-conversation without ever touching the verdict path.
 
 ## Install
 

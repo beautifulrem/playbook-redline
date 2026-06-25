@@ -36,16 +36,4 @@ open artifacts/evidence-tamper-check.html # 5b. interactive byte-flip
 
 The real demo order id (`1453610833413308417`) is a **non-secret Bitget demo id**; no API keys, secrets, or mainnet funds are involved (`paptrading:1`, demo only).
 
-## Why this is different (not another audit log)
-
-| System | Proves past record | **Gates the AI edit before release** | **Real Bitget demo execution** | Offline tamper verify |
-|---|:--:|:--:|:--:|:--:|
-| TrackProof | ✅ (on-chain, stronger) | ❌ | ❌ | ✅ |
-| VEIL / Sentinel | partial | ❌ | ❌ | ❌ |
-| **Playbook Redline** | ✅ | **✅ only here** | **✅ only here** | ✅ |
-
-- **Not a track-record notary** (TrackProof): Redline gates a strategy *before* it trades, instead of certifying trades after the fact.
-- **Not a per-trade firewall** (VEIL/Sentinel): Redline evaluates the *edited release candidate*, not one order at a time.
-- The crash-test suite is **fixed** so the AI cannot move the goalposts after editing its own strategy.
-
-> Honest note: TrackProof has stronger post-hoc, on-chain notarization. Redline uses just enough cryptography (hash-chain plus ed25519) to support its actual novelty, which is **pre-release gating plus conditional real execution**, something no other entry does.
+> The crash-test suite is **fixed**, so the AI cannot move the goalposts after editing its own strategy. A PASS is what places the real Bitget demo order; a FAIL withholds it.

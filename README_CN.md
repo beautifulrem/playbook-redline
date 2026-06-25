@@ -40,15 +40,13 @@ open artifacts/release-demo/current/evidence.html                               
 4. 过了，裁决写进一张哈希链、ed25519 签名的回执，并在 `paptrading: 1` 下真下一笔 Bitget 模拟单。
 5. 这张回执谁都能离线复验。改掉一个字节，链就断、签名就失效、印章就作废。
 
-## 横向对比
+## 集成
 
-| 系统 | 证明历史记录 | 在发布前拦住 AI 改动 | 真实 Bitget 模拟执行 | 离线篡改校验 |
-|---|:--:|:--:|:--:|:--:|
-| TrackProof | 有（上链，更强） | 没有 | 没有 | 有 |
-| VEIL / Sentinel | 部分 | 没有 | 没有 | 没有 |
-| **Playbook Redline** | 有 | **有** | **有** | 有 |
+Redline 夹在「改策略的 AI」和交易所中间。三种接法：
 
-Redline 做的是发布前拦截，不是事后给成交做公证；它看的是改过的发布候选，不是一笔笔订单；过了能真下一笔 Bitget 模拟单，没过就扣住执行。TrackProof 在事后、上链公证这条线上更强；Redline 只用刚好够用的密码学，撑住自己的本职：发布前的闸门，加上有条件的真实执行。
+- **CI 里的 CLI。** 对改完的候选跑 `redline run`，用退出码当闸门，发布前再跑 `redline verify-release-bundle`：非零退出就卡住流水线，PASS 就留下一张签名回执存档。`make verify-demo` 走的就是这条路。
+- **HTTP 服务。** 从你的编排器驱动：`POST /v1/runs` 崩溃测试一个候选，再 `POST /v1/runs/{run_id}/execute`，只有链式、已签名的 PASS 才会下那笔模拟单。OpenAPI 契约签入在 `schemas/service-openapi.json`（见 [`SERVICE_API.md`](SERVICE_API.md)）。
+- **MCP 工具。** `redline-mcp`（stdio）只暴露一个只读工具 `redline_check_receipt`，让 AI agent 在对话里就能验一张回执，碰都不碰裁决路径。
 
 ## 安装
 
