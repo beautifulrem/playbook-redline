@@ -128,7 +128,7 @@ def render_judge_release_html(
     <h2 class="rl-sec">{t("Actions", "操作")}</h2>
     <div class="rl-box">
       <div class="rl-row">
-        <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">{t("Run live Bitget demo showcase order", "运行实时 Bitget 模拟展示订单")}</button>
+        <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">{t("Run live Bitget demo showcase order", "发起一笔 Bitget 模拟单演示")}</button>
         <button type="button" class="rl-btn" data-action="attest" data-release-id="{_e(release_id)}">{t("Attest bundle", "认证打包")}</button>
         <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence">{t("Download bundle", "下载打包")}</a>
         <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence.html">{t("Open evidence.html", "打开 evidence.html")}</a>
@@ -347,7 +347,7 @@ def _script() -> str:
 (() => {
   function L() { return document.documentElement.getAttribute("data-lang") === "zh" ? "zh" : "en"; }
   var STR = {
-    offline: { en: "offline view \\u00b7 live actions need the served console", zh: "离线视图 \\u00b7 实时操作需在已部署的控制台进行" },
+    offline: { en: "offline view \\u00b7 live actions need the served console", zh: "离线视图 \\u00b7 实时操作要在已部署的控制台上做" },
     session: { en: "session", zh: "会话" },
     notauth: { en: "not authenticated", zh: "未认证" },
     devlogin: { en: "Dev login", zh: "开发登录" },
@@ -359,7 +359,7 @@ def _script() -> str:
     loggedout: { en: "logged out", zh: "已登出" },
     placing: { en: "placing demo order\\u2026", zh: "正在下模拟单\\u2026" },
     placed: { en: "demo order placed and reconciled", zh: "模拟单已下并完成对账" },
-    reloadev: { en: "reload for evidence", zh: "刷新以查看证据" },
+    reloadev: { en: "reload for evidence", zh: "刷新后查看证据" },
     jobword: { en: "job ", zh: "任务 " },
     timeout: { en: "timed out", zh: "超时" },
     attested: { en: "bundle attested", zh: "打包已认证" },

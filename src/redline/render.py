@@ -21,7 +21,7 @@ from redline.verifier import load_receipt
 
 
 HONEST_STATEMENT_EN = "The Redline verdict authorized this Bitget demo (paptrading) order. This is not an official Bitget Playbook release."
-HONEST_STATEMENT_ZH = "Redline 裁决授权了这笔 Bitget 模拟盘（demo）订单；这不是 Bitget Playbook 正式发布。"
+HONEST_STATEMENT_ZH = "这笔 Bitget 模拟盘（demo）订单，是 Redline 裁决放行后才下的；这不是 Bitget Playbook 正式发布。"
 HONEST_STATEMENT = HONEST_STATEMENT_EN  # back-compat alias
 
 # Self-contained verify/tamper engine: pure-JS sha256 (no crypto.subtle / secure-context
@@ -272,7 +272,7 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
   <main class="rl-main" id="vf-root" data-expected="{digest}">
     {_lang_toggle()}
     <h1 class="rl-macro rl-caret">{t("Verify", "校验")}</h1>
-    <p class="rl-label">{t("offline self-verification · no network · edit the evidence to break the seal", "离线自校验 · 无需联网 · 编辑证据即可破坏印章")}</p>
+    <p class="rl-label">{t("offline self-verification · no network · edit the evidence to break the seal", "离线自验 · 不联网 · 改证据，印章当场作废")}</p>
     <hr>
     <div class="rl-band rl-band--pass rl-scanin" id="vf-band">
       <span class="rl-band__verdict" id="vf-verdict">INTACT</span>
@@ -282,15 +282,15 @@ def render_verify_html(panel: EvidencePanel | None = None) -> str:
       <span class="rl-seal__art" id="vf-art">{randomart_svg(digest)}</span>
       <span class="rl-seal__body"><span class="rl-seal__stamp" id="vf-stamp">VERIFIED</span><span class="rl-seal__algo">{t("SSH randomart · live fingerprint", "SSH randomart · 实时指纹")}</span><span class="rl-seal__hash" id="vf-hash">{short}</span><span class="rl-seal__edge">ED25519 &middot; PLAYBOOK REDLINE</span></span>
     </div>
-    <p class="rl-sec">{t("Tamper control · change one byte, watch the fingerprint morph", "篡改控制台 · 改动一个字节，观察指纹形变")}</p>
+    <p class="rl-sec">{t("Tamper control · change one byte, watch the fingerprint morph", "篡改控制台 · 改一个字节，看指纹怎么变")}</p>
     <div class="rl-box">
       <p class="rl-label">{t("expected sha256", "期望 sha256")} &nbsp; <span class="rl-mono">{digest}</span></p>
       <textarea id="vf-input" class="rl-ta" spellcheck="false" aria-label="evidence payload">{_esc(payload)}</textarea>
       <p class="rl-row"><button type="button" class="rl-btn rl-btn--hazard" id="vf-flip">{t("flip one byte", "翻转一个字节")}</button><button type="button" class="rl-btn" id="vf-reset">{t("reset", "重置")}</button><span class="rl-mono" id="vf-status">sha256 match</span></p>
     </div>
-    <p class="rl-sec">{t("Zero-secret reproduce on a clean machine", "在干净机器上零密钥复现")}</p>
+    <p class="rl-sec">{t("Zero-secret reproduce on a clean machine", "干净机器、零密钥，原样复现")}</p>
     <div class="rl-cmd"><div class="rl-cmd__body">
-      <samp class="rl-cmd__cmt">{t("same check in your terminal, exits non-zero on tamper", "在你的终端里做同样的校验，被篡改时以非零码退出")}</samp>
+      <samp class="rl-cmd__cmt">{t("same check in your terminal, exits non-zero on tamper", "终端跑同一套校验；一旦篡改，退出码非零")}</samp>
       <samp>uv run redline verify-chain &lt;release_dir&gt; --json</samp>
       <samp>scripts/tamper-demo.sh</samp>
     </div></div>
@@ -633,11 +633,11 @@ def _render_seal(panel: EvidencePanel) -> str:
 
 
 def _band_meta(panel: EvidencePanel) -> str:
-    suffix = t("DEMO paptrading:1 non-mainnet", "演示 paptrading:1 非主网")
+    suffix = t("DEMO paptrading:1 non-mainnet", "演示 paptrading:1 不碰主网")
     if panel.invalid_reason_code:
         return f'{t("INTEGRITY FAIL", "完整性失效")} · {suffix}'
     if panel.evidence is not None and panel.verdict == "PASS":
-        return f'{t("REPLAYED CHAINED SIGNED", "已重放 已链接 已签名")} · {suffix}'
+        return f'{t("REPLAYED CHAINED SIGNED", "已重放 已接链 已签名")} · {suffix}'
     if panel.verdict == "WITHHELD":
         return f'{t("BLOCKED", "已拦截")} · {t("BITGET NOT CALLED", "BITGET 未被调用")} · {suffix}'
     return f'{t("BLOCKED", "已拦截")} · {suffix}'

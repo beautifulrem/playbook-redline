@@ -48,7 +48,7 @@ The real demo order `1453610833413308417` ran on Bitget `paptrading: 1`, demo-on
 | VEIL / Sentinel | partial | no | no | no |
 | **Playbook Redline** | yes | **yes** | **yes** | yes |
 
-Redline is not a track-record notary: it gates a candidate before it trades instead of certifying trades after the fact. It is not a per-trade firewall: it evaluates the edited release candidate, not one order at a time. And it is not a backtest toy: a pass can place a real Bitget demo order, while a fail withholds execution. TrackProof has stronger post-hoc, on-chain notarization; Redline uses just enough cryptography to support its own job, which is the pre-release gate plus conditional real execution.
+Redline gates the edited release candidate before it can trade. It is not a track-record notary or a per-trade firewall: it judges the edit itself, not past trades or individual live orders. A PASS can place one real Bitget demo order; a FAIL withholds execution. TrackProof has stronger post-hoc, on-chain notarization; Redline spends just enough cryptography on its own job, the pre-release gate plus conditional real execution.
 
 ## Install
 

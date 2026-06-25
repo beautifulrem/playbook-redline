@@ -1,7 +1,7 @@
 # Playbook Redline
 
-> AI 改写的策略，必须先扛过一套固定的崩溃测试，才能碰到 Bitget。
-> 每一次裁决都是一张签名、可验篡改的回执，离线即可校验，不需要任何服务器。*没有证明，就没有裁决。*
+> AI 改写的策略，得先扛过一套固定的崩溃测试，才能碰到 Bitget。
+> 每一次裁决都是一张签名、可验篡改的回执，离线就能校验，不用任何服务器。*没有证明，就没有裁决。*
 
 [English](README.md) · [中文](README_CN.md)
 
@@ -11,16 +11,16 @@
 ![MCP](https://img.shields.io/badge/MCP-receipt--check%20tool-7E3FF2)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-Playbook Redline 是一道给「AI 改写的交易策略」用的发布前控制闸。当 AI 改写一份交易 playbook 时，Redline 不相信这段 diff。它把改过的策略放进一套固定的崩溃测试里重放，把裁决写进一张哈希链 ed25519 回执，只有套件通过之后，才会真的下一笔 Bitget 模拟单。没通过的改动，会在它能下单之前就被拦下。
+Playbook Redline 是给 AI 改写交易策略用的发布前校验闸。AI 改一份 playbook，Redline 不信这段 diff：它把改完的策略放进固定崩溃测试里重放，裁决生成一张 ed25519 签名的哈希链回执；套件全过，才真下一笔 Bitget 模拟单。没过的改动，下单前就拦住。
 
 <p align="center">
-  <img src="submission-evidence/tamper.gif" width="78%" alt="离线篡改校验：改动一个字节，randomart 印章作废，裁决翻成 INTEGRITY FAIL，证据显示 Bitget 从未被调用">
+  <img src="submission-evidence/tamper.gif" width="78%" alt="离线篡改校验：改一个字节，randomart 印章作废，裁决翻成 INTEGRITY FAIL，证据显示全程没调用过 Bitget">
 </p>
-<p align="center"><sub>离线、纯 JS 的篡改校验。把回执里的一个字节改掉，randomart 印章就会作废，裁决翻成 <b>INTEGRITY FAIL</b>，证据里能看到 Bitget 从未被调用。</sub></p>
+<p align="center"><sub>离线、纯 JS 的篡改校验。把回执里的一个字节改掉，randomart 印章就作废，裁决翻成 <b>INTEGRITY FAIL</b>，证据里能看到全程没调用过 Bitget。</sub></p>
 
 ## 自己动手验证
 
-一次 60 秒、零密钥的评委复核，离线，不需要服务器，也不需要任何 Bitget 凭证。下面每一步都记录在 [`submission-evidence/`](submission-evidence/) 里，从全新 clone 即可复跑。这条路径仅限 demo，用的是 Bitget `paptrading: 1` 的证据，不代表 Bitget Playbook 正式发布。
+一次 60 秒、零密钥的评委复核：离线，不用服务器，也不用任何 Bitget 凭证。下面每一步都记录在 [`submission-evidence/`](submission-evidence/) 里，从全新 clone 就能复跑。这条路只用 demo，证据来自 Bitget `paptrading: 1`，不代表 Bitget Playbook 正式发布。
 
 ```bash
 uv run redline verify-chain artifacts/release-demo/current/service/releases/release-demo-good --json  # 通过的链式发布
@@ -28,17 +28,17 @@ bash scripts/tamper-demo.sh                                                     
 open artifacts/release-demo/current/evidence.html                                                      # 只读的评委证据页
 ```
 
-`verify-chain` 报告一个通过的链式发布;tamper 脚本在改过的 bundle 校验失败后以非零码退出;HTML 页是只读的评委证据视图。这条复核路径不需要 Bitget demo 凭证;只有当你重跑 `scripts/release-demo.sh` 去铸新的 demo 单时才需要。
+`verify-chain` 会输出一个通过的链式发布；tamper 脚本改过 bundle 后会校验失败，以非零码退出；HTML 是只读的评委证据页。这条复核路不用 Bitget demo 凭证；只有重跑 `scripts/release-demo.sh` 去下新的 demo 单时才需要。
 
-真实模拟单 `1453610833413308417` 跑在 Bitget `paptrading: 1` 上,仅限 demo,不碰主网,不用密钥(见 [`submission-evidence/05-real-bitget-order.json`](submission-evidence/05-real-bitget-order.json))。
+真实模拟单 `1453610833413308417` 来自 Bitget `paptrading: 1`，仅用于 demo，不碰主网、不用密钥（见 [`submission-evidence/05-real-bitget-order.json`](submission-evidence/05-real-bitget-order.json)）。
 
 ## 工作原理
 
-1. AI 改一份交易 playbook。Redline 检查的是改完的候选策略本身，而不是 diff 的描述。
-2. Redline 把候选策略放进一套**固定**的崩溃测试里重放：最大回撤、暴跌窗口不入场、交易预算。套件之所以固定，是因为不能让 AI 改完自己的策略后再去挪动判分线。
-3. 不通过，候选就被扣下，不下任何单。
-4. 通过，裁决写进一张哈希链、ed25519 签名的回执，并在 `paptrading: 1` 下真下一笔 Bitget 模拟单。
-5. 任何人都能离线重新校验这张回执。改掉一个字节，链就断、签名就失效、印章就作废。
+1. AI 改一份交易 playbook。Redline 验的是改完的策略本身，不是 diff 说了什么。
+2. Redline 把候选策略放进一套**固定**的崩溃测试里重放：最大回撤、暴跌窗口不入场、交易预算。固定套件是刻意的：不能让 AI 改完自己的策略，又回头去挪判分线。
+3. 没过，候选就扣下，不下任何单。
+4. 过了，裁决写进一张哈希链、ed25519 签名的回执，并在 `paptrading: 1` 下真下一笔 Bitget 模拟单。
+5. 这张回执谁都能离线复验。改掉一个字节，链就断、签名就失效、印章就作废。
 
 ## 横向对比
 
@@ -48,7 +48,7 @@ open artifacts/release-demo/current/evidence.html                               
 | VEIL / Sentinel | 部分 | 没有 | 没有 | 没有 |
 | **Playbook Redline** | 有 | **有** | **有** | 有 |
 
-Redline 不是记录公证：它在策略下单之前就拦，而不是事后给成交开证明。它也不是逐单防火墙：它评估的是改过的发布候选，而不是一笔一笔的订单。它更不是回测玩具：通过可以真下一笔 Bitget 模拟单，不通过就扣住执行。TrackProof 在事后、上链公证这条线上更强；Redline 只用刚好够用的密码学来支撑自己的本职，也就是发布前的闸门，加上有条件的真实执行。
+Redline 做的是发布前拦截，不是事后给成交做公证；它看的是改过的发布候选，不是一笔笔订单；过了能真下一笔 Bitget 模拟单，没过就扣住执行。TrackProof 在事后、上链公证这条线上更强；Redline 只用刚好够用的密码学，撑住自己的本职：发布前的闸门，加上有条件的真实执行。
 
 ## 安装
 
@@ -64,7 +64,7 @@ make goldens-check
 - `candidate_good`：`pass`，带 `BASELINE_GENESIS`
 - `candidate_bad`：`withheld`，带 `NEW_BLOCK_BREACH`
 
-内置套件是两段 24 根 K 线的 BTCUSDT 窗口，加三个阻断式探针（最大回撤、暴跌窗口不入场、交易预算）。`BASELINE_GENESIS` 以退出码 `10` 表示一个琥珀（amber）状态，因为夹具基线没有链到上一张回执。纯哈希检查只校验完整性，返回 `unverified_no_verdict`；可信校验走的是绑定包的重放。
+内置套件是两段 24 根 K 线的 BTCUSDT 窗口，外加三个阻断式探针（最大回撤、暴跌窗口不入场、交易预算）。`BASELINE_GENESIS` 用退出码 `10` 表示一个琥珀（amber）状态，因为夹具基线没有接到上一张回执。纯哈希检查只验完整性，返回 `unverified_no_verdict`；可信校验走的是绑定包的重放。
 
 ## 用法
 
@@ -84,11 +84,11 @@ uv run redline verify-proof artifacts/demo/pass/receipt.json \
   --spec fixtures/specs/redline_spec.json --json
 ```
 
-`redline report` 不带 `--verified` 时只渲染 `UNVERIFIED PREVIEW`。最终发布路径必须用一张链式 `PASS` 回执，加上一份对照固定信任策略校验过的 ed25519 签名账本背书；内置的 genesis 夹具不算。信任密钥生成、账本签名、以及对接交易所的 publish 流程都写在 CLI 帮助和 [`SERVICE_API.md`](SERVICE_API.md) 里。
+`redline report` 不带 `--verified` 时只渲染 `UNVERIFIED PREVIEW`。最终发布得有两样东西：一张链式 `PASS` 回执，和一份 ed25519 签名的账本背书（背书要按固定 trust policy 校验通过）；内置的 genesis 夹具不算。信任密钥生成、账本签名、对接交易所的 publish 流程，都写在 CLI 帮助和 [`SERVICE_API.md`](SERVICE_API.md) 里。
 
 ## 服务
 
-HTTP 服务是套在同一个证明内核外的一层薄薄的 FastAPI 边界。它不调用 CLI，也不另开一条裁决路径：worker 直接调 `run_redline`，持久化运行状态，并从每次运行各自隔离的目录里暴露生成的回执、报告和证明产物。
+HTTP 服务是套在同一个证明内核外的一层薄 FastAPI 边界。它不调 CLI，也不另开一条裁决路径：worker 直接调 `run_redline`，把运行状态落库，再从每次运行各自隔离的目录对外提供生成的回执、报告和证明产物。
 
 ```bash
 REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
@@ -99,11 +99,11 @@ curl -s -X POST http://127.0.0.1:8080/v1/runs \
   -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}'
 ```
 
-`POST /v1/runs/{run_id}/execute` 是 demo 执行闸门。它消费一张重放过、链式、签名的 `PASS` 回执，在 `paptrading: 1` 下下一笔 Bitget 模拟单。WITHHELD、纯哈希、未签名、未链式、被篡改、缺凭证、默认主网这些情况，都会在调用下单之前返回 `blocked`。发布后端在这道闸门之上再叠了版本化策略发布、模拟交易证据、风险策略绑定、人工审批，以及一份哈希校验过的证据包；`/v1/judge/console` 在它之上渲染一个只读的评审界面。OpenAPI 契约签入在 `schemas/service-openapi.json`。端点语义见 [`SERVICE_API.md`](SERVICE_API.md)，部署和评委 runbook 见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
+`POST /v1/runs/{run_id}/execute` 是 demo 执行闸门。它只收一张重放通过、已接链、已签名的 `PASS` 回执；满足了，才在 `paptrading: 1` 下下一笔 Bitget 模拟单。WITHHELD、纯哈希、未签名、未接链、被篡改、缺凭证、默认主网这些情况，都会在下单前返回 `blocked`。发布后端在这道闸门之上又叠了版本化策略发布、模拟交易证据、风险策略绑定、人工审批，以及一份哈希校验过的证据包；`/v1/judge/console` 在它之上渲染一个只读的评审界面。OpenAPI 契约签入在 `schemas/service-openapi.json`。端点语义见 [`SERVICE_API.md`](SERVICE_API.md)，部署和评委 runbook 见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
 
 ## 安全边界
 
-候选策略跑在子进程里。在 macOS 上，worker 还额外套了 `sandbox-exec`，禁掉网络、进程 fork 和文件写入。worker 内部用 Python 审计钩子，禁掉 socket、subprocess、fork、exec、文件改动、读取包和运行时白名单之外的路径，以及 `ctypes`/`cffi`。场景数据由可信代码预加载，从不以可读文件的形式暴露给候选策略。裁决路径只用内置探针，另有一道 tripwire 拒绝网络和 LLM SDK 的 import。这是一个供 demo 和 CI 用的本地证明内核沙箱；生产环境的交易所执行，仍应使用交易所自己的运行时沙箱。
+候选策略跑在子进程里。在 macOS 上，worker 还额外套一层 `sandbox-exec`，禁掉网络、进程 fork 和文件写入。worker 内部用 Python 审计钩子，禁掉 socket、subprocess、fork、exec、文件改动、读取包和运行时白名单以外的路径，以及 `ctypes`/`cffi`。场景数据由可信代码预加载，从不以可读文件的形式给到候选策略。裁决路径只用内置探针，另有一道 tripwire 挡掉网络和 LLM SDK 的 import。这是给 demo 和 CI 用的本地证明内核沙箱；生产环境的交易所执行，仍该用交易所自己的运行时沙箱。
 
 ## 仓库结构
 
