@@ -344,7 +344,7 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
 
     @app.post("/v1/auth/dev-login", tags=["auth"])
     def dev_login_endpoint(payload: Annotated[dict[str, object] | None, Body()] = None):
-        if not service.config.dev_auth_enabled and not service.config.dev_auth_user:
+        if service.config.environment == "production" or (not service.config.dev_auth_enabled and not service.config.dev_auth_user):
             raise HTTPException(status_code=403, detail="dev auth is disabled")
         requested_login = str((payload or {}).get("login") or "") or None
         principal = dev_principal(

@@ -957,6 +957,22 @@ def test_service_config_rejects_production_default_token(monkeypatch) -> None:
         ServiceConfig.from_env()
 
 
+def test_service_config_rejects_production_dev_auth(monkeypatch) -> None:
+    # a production deploy must fail closed if dev-auth knobs are set: /v1/auth/dev-login would
+    # otherwise mint a privileged session for unauthenticated callers (privilege-escalation footgun).
+    monkeypatch.setenv("REDLINE_SERVICE_ENV", "production")
+    monkeypatch.setenv("REDLINE_SERVICE_TOKEN", "p" * 40)
+    monkeypatch.setenv("REDLINE_AUTH_SESSION_SECRET", "s" * 40)
+    monkeypatch.setenv("REDLINE_SERVICE_CORS_ORIGINS", "https://example.com")
+    monkeypatch.setenv("REDLINE_DEV_AUTH_ENABLED", "true")
+    with pytest.raises(ValueError, match="must not enable dev auth"):
+        ServiceConfig.from_env()
+    monkeypatch.delenv("REDLINE_DEV_AUTH_ENABLED", raising=False)
+    monkeypatch.setenv("REDLINE_DEV_AUTH_USER", "release-manager")
+    with pytest.raises(ValueError, match="must not enable dev auth"):
+        ServiceConfig.from_env()
+
+
 def test_service_records_schema_migration_status(tmp_path: Path) -> None:
     client = _client(tmp_path)
 

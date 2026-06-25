@@ -84,6 +84,8 @@ class ServiceConfig:
                 raise ValueError("production auth sessions require REDLINE_AUTH_SESSION_SECRET with at least 32 characters")
             if self.github_oauth_client_id and (not self.github_oauth_client_secret or not self.github_oauth_redirect_uri):
                 raise ValueError("GitHub OAuth requires REDLINE_GITHUB_OAUTH_CLIENT_SECRET and REDLINE_GITHUB_OAUTH_REDIRECT_URI")
+            if self.dev_auth_enabled or self.dev_auth_user:
+                raise ValueError("production service must not enable dev auth (unset REDLINE_DEV_AUTH_ENABLED / REDLINE_DEV_AUTH_USER)")
 
     @classmethod
     def from_env(cls) -> ServiceConfig:
