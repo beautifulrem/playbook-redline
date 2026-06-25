@@ -161,6 +161,10 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-live--err b { color: var(--rl-hazard); }
 .rl-adv { margin: var(--rl-2) 0; }
 .rl-adv summary { cursor: pointer; }
+/* click-to-copy hash/id values (offline evidence page, progressive enhancement) */
+.rl-copyable { cursor: pointer; }
+.rl-copyable:hover { color: var(--rl-pass); }
+.rl-copied { color: var(--rl-pass); }
 
 /* narrow viewports: stack the band so the verdict meta never clips off-screen */
 @media (max-width: 560px) { .rl-band { flex-direction: column; align-items: flex-start; gap: var(--rl-2); } }

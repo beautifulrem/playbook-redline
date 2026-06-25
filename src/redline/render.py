@@ -398,6 +398,31 @@ def _inline_css() -> str:
     return re.sub(r"/\*.*?\*/", "", css, flags=re.S).strip()
 
 
+_EVIDENCE_SCRIPT = """
+<script>
+(function () {
+  var nodes = document.querySelectorAll(".rl-mono");
+  for (var i = 0; i < nodes.length; i++) {
+    (function (el) {
+      if (el.children.length) return;
+      var text = (el.textContent || "").trim();
+      if (text.length < 8) return;
+      el.classList.add("rl-copyable");
+      el.setAttribute("title", "click to copy");
+      el.addEventListener("click", function () {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(function () {
+          el.classList.add("rl-copied");
+          setTimeout(function () { el.classList.remove("rl-copied"); }, 800);
+        });
+      });
+    })(nodes[i]);
+  }
+})();
+</script>
+"""
+
+
 def _render_document(*, title: str, panels: list[EvidencePanel], comparison: bool) -> str:
     rendered = "\n".join(_render_panel(panel, with_title=comparison) for panel in panels)
     inner = f'    <div class="rl-cols-2">\n{rendered}\n    </div>' if comparison else rendered
@@ -416,6 +441,7 @@ def _render_document(*, title: str, panels: list[EvidencePanel], comparison: boo
     <hr>
     <p class="rl-muted">{_esc(HONEST_STATEMENT)}</p>
   </main>
+  {_EVIDENCE_SCRIPT}
 </body>
 </html>
 """
