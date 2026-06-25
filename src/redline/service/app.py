@@ -1702,7 +1702,31 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
             }
         else:
             verification = verify_release_attestation(attestation_path=attestation_path, bundle_path=bundle_path)
-        return HTMLResponse(f"<!doctype html><html><head><meta charset=\"utf-8\"><title>Release Attestation</title></head><body>{render_attestation_status_html(verification=verification)}</body></html>")
+        import html as _html
+
+        from redline.render import _inline_css, randomart_svg
+
+        seed = str(verification.get("attestation_hash") or verification.get("bundle_hash") or "")
+        seal = ""
+        if seed:
+            tone = "rl-seal--pass" if verification.get("ok") else "rl-seal--void"
+            stamp = "VERIFIED" if verification.get("ok") else "VOID"
+            short = _html.escape(seed[:26] + "…" if len(seed) > 26 else seed)
+            seal = (
+                f'<div class="rl-seal {tone}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
+                f'<span class="rl-seal__body"><span class="rl-seal__stamp">{stamp}</span>'
+                f'<span class="rl-seal__algo">SSH randomart &middot; attestation fingerprint</span>'
+                f'<span class="rl-seal__hash">{short}</span></span></div>'
+            )
+        doc = (
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<title>Release Attestation</title><style>{_inline_css()}</style></head>'
+            f'<body><main class="rl-main"><h1 class="rl-macro">Attestation</h1>'
+            f'<p class="rl-label">{_html.escape(str(release_id))}</p>{seal}'
+            f'{render_attestation_status_html(verification=verification)}</main></body></html>'
+        )
+        return HTMLResponse(doc)
 
     @router.get("/release-candidates/{release_id}/evidence.html", response_class=HTMLResponse)
     def release_evidence_html_endpoint(release_id: str) -> HTMLResponse:
@@ -1723,10 +1747,10 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
             try:
                 _release, bundle_path, _manifest_path, _manifest_hash, _manifest = _ensure_release_evidence_bundle(service=service, release=release)
                 status_html = render_attestation_status_html(verification=verify_release_attestation(attestation_path=attestation_path, bundle_path=bundle_path))
-                html_doc = html_doc.replace("</body>", status_html + "</body>")
+                html_doc = html_doc.replace("</main>", status_html + "</main>", 1)
             except (CanonicalizationError, ValueError):
                 status_html = render_attestation_status_html(verification={"ok": False, "checks": [{"name": "attestation", "ok": False, "detail": "invalid"}]})
-                html_doc = html_doc.replace("</body>", status_html + "</body>")
+                html_doc = html_doc.replace("</main>", status_html + "</main>", 1)
         return HTMLResponse(html_doc)
 
     @router.get("/release-candidates/{release_id}/audit-ledger")

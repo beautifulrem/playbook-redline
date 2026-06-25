@@ -32,6 +32,7 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
     <h1 class="rl-macro">Judge Console</h1>
     <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; principal {_e(principal)}</p>
     <hr>
+{_session_bar()}
     <h2 class="rl-sec">Safety</h2>
     <div class="rl-grid rl-grid--3">
       {_metric("release freeze", _flag(safety.get("release_freeze")))}
@@ -44,7 +45,6 @@ def render_judge_console_html(*, principal: str, safety: dict[str, Any], release
       <tbody>{rows}</tbody>
     </table></div>
     {_chrome()}
-    {_script()}
 """
     return _document(title="Redline Judge Console", body=body)
 
@@ -121,17 +121,18 @@ def render_judge_release_html(
       {_metric("execution freeze", _flag(safety.get("execution_freeze")))}
       {_metric("mainnet enabled", _flag(safety.get("mainnet_orders_enabled")))}
     </div>
+    <h2 class="rl-sec">Session</h2>
+{_session_bar()}
     <h2 class="rl-sec">Actions</h2>
     <div class="rl-box">
-      <div class="rl-tamper__row">
-        <input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="Redline token" />
-        <button type="button" class="rl-btn" data-action="save-token">Save token</button>
+      <div class="rl-row">
         <button type="button" class="rl-btn" data-action="run-showcase" data-release-id="{_e(release_id)}">Run live Bitget demo showcase order</button>
         <button type="button" class="rl-btn" data-action="attest" data-release-id="{_e(release_id)}">Attest bundle</button>
         <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence">Download bundle</a>
         <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/evidence.html">Open evidence.html</a>
         <a class="rl-btn" href="/v1/release-candidates/{_e(release_id)}/attestation.html">Open attestation.html</a>
       </div>
+      <p class="rl-live" id="rl-job-status" aria-live="polite"></p>
     </div>
     <h2 class="rl-sec">Verification</h2>
     <div class="rl-cols-2">
@@ -153,7 +154,6 @@ def render_judge_release_html(
     <h2 class="rl-sec">Audit ledger</h2>
     <pre class="rl-pre">{audit_lines}</pre>
     {_chrome()}
-    {_script()}
 """
     return _document(title=f"Release {release_id}", body=body)
 
@@ -171,9 +171,24 @@ def _document(*, title: str, body: str) -> str:
   <main class="rl-main">
 {body}
   </main>
+  <div class="rl-toast" id="rl-toast" role="status" aria-live="polite"></div>
+{_script()}
 </body>
 </html>
 """
+
+
+def _session_bar() -> str:
+    return """    <div class="rl-box">
+      <p class="rl-live" id="rl-session">checking session&hellip;</p>
+      <div class="rl-row">
+        <button type="button" class="rl-btn" data-action="dev-login">Dev login</button>
+        <button type="button" class="rl-btn" data-action="logout">Log out</button>
+        <details class="rl-adv"><summary class="rl-label">token auth (advanced)</summary>
+          <div class="rl-row"><input id="redline-token" class="rl-input" type="password" autocomplete="off" aria-label="Redline token" placeholder="X-Redline-Token (optional)" /><button type="button" class="rl-btn" data-action="save-token">Save token</button></div>
+        </details>
+      </div>
+    </div>"""
 
 
 def _chrome() -> str:
@@ -285,42 +300,60 @@ def _script() -> str:
 (() => {
   const tokenInput = document.getElementById("redline-token");
   if (tokenInput && localStorage.getItem("redlineJudgeToken")) tokenInput.value = localStorage.getItem("redlineJudgeToken");
-  function token() {
-    const value = tokenInput ? tokenInput.value.trim() : "";
-    if (!value) window.alert("Enter a Redline token first.");
-    return value;
+  const toastEl = document.getElementById("rl-toast");
+  let toastTimer = null;
+  function toast(msg, kind) {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.className = "rl-toast is-on" + (kind ? " rl-toast--" + kind : "");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = "rl-toast"; }, 3500);
   }
+  function token() { return tokenInput ? tokenInput.value.trim() : ""; }
   async function api(path, options = {}) {
-    const value = token();
-    if (!value) throw new Error("missing token");
-    const headers = Object.assign({"X-Redline-Token": value}, options.headers || {});
-    return fetch(path, Object.assign({}, options, {headers}));
+    const t = token();
+    const headers = Object.assign({}, options.headers || {}, t ? { "X-Redline-Token": t } : {});
+    return fetch(path, Object.assign({ credentials: "same-origin" }, options, { headers }));
   }
+  async function refreshSession() {
+    const el = document.getElementById("rl-session");
+    if (!el) return;
+    try {
+      const r = await api("/v1/auth/me");
+      if (!r.ok) throw new Error(String(r.status));
+      const data = await r.json();
+      const p = data.principal || {};
+      el.className = "rl-live";
+      el.innerHTML = "session: <b>" + (p.principal_id || "authenticated") + "</b>" + (Array.isArray(p.scopes) && p.scopes.length ? " &middot; " + p.scopes.join(" ") : "");
+    } catch (e) {
+      el.className = "rl-live rl-live--err";
+      el.innerHTML = "not authenticated &middot; <b>Dev login</b> or paste a token";
+    }
+  }
+  function busy(button, on) { if (!button) return; button.setAttribute("aria-busy", on ? "true" : "false"); button.disabled = on; }
   async function refreshEvents(releaseId, jobId) {
     const target = document.getElementById("job-events");
-    const events = await api(`/v1/release-candidates/${releaseId}/jobs/${jobId}/events.ndjson`);
-    const text = await events.text();
+    const r = await api("/v1/release-candidates/" + releaseId + "/jobs/" + jobId + "/events.ndjson");
+    const text = await r.text();
     if (target) target.textContent = text || "No job events";
+    const status = document.getElementById("rl-job-status");
+    const last = (text || "").trim().split("\\n").pop() || "";
+    if (status && last) status.innerHTML = '<span class="rl-spin"></span> ' + last.slice(0, 90);
   }
   async function pollJob(releaseId, jobId) {
     for (let i = 0; i < 30; i += 1) {
       await refreshEvents(releaseId, jobId);
-      const response = await api(`/v1/release-candidates/${releaseId}/jobs/${jobId}`);
-      const job = await response.json();
-      if (job.status === "succeeded" || job.status === "failed" || job.status === "cancelled") return job;
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const r = await api("/v1/release-candidates/" + releaseId + "/jobs/" + jobId);
+      const job = await r.json();
+      if (["succeeded", "failed", "cancelled"].includes(job.status)) return job;
+      await new Promise((res) => setTimeout(res, 1000));
     }
     return null;
   }
   document.addEventListener("click", async (event) => {
     const copyBtn = event.target.closest("[data-copy]");
     if (copyBtn) {
-      try {
-        await navigator.clipboard.writeText(copyBtn.dataset.copy);
-        const prev = copyBtn.textContent;
-        copyBtn.textContent = "copied";
-        setTimeout(() => { copyBtn.textContent = prev; }, 1200);
-      } catch (err) { /* clipboard unavailable */ }
+      try { await navigator.clipboard.writeText(copyBtn.dataset.copy); const prev = copyBtn.textContent; copyBtn.textContent = "copied"; setTimeout(() => { copyBtn.textContent = prev; }, 1200); } catch (e) {}
       return;
     }
     const button = event.target.closest("[data-action]");
@@ -328,28 +361,47 @@ def _script() -> str:
     const action = button.dataset.action;
     if (action === "save-token") {
       if (tokenInput) localStorage.setItem("redlineJudgeToken", tokenInput.value.trim());
-      return;
+      toast("token saved", "ok"); refreshSession(); return;
     }
     const releaseId = button.dataset.releaseId;
-    button.disabled = true;
+    busy(button, true);
     try {
-      if (action === "run-showcase") {
-        const response = await api(`/v1/release-candidates/${releaseId}/jobs/showcase-order`, {
-          method: "POST",
-          headers: {"Content-Type": "application/json", "Idempotency-Key": `judge-console-${Date.now()}`},
-          body: JSON.stringify({side: "buy", size: "0.0001"})
-        });
-        const job = await response.json();
-        await pollJob(releaseId, job.job_id);
+      if (action === "dev-login") {
+        const login = window.prompt("dev login as (blank = default):", "") || undefined;
+        const r = await api("/v1/auth/dev-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(login ? { login } : {}) });
+        if (!r.ok) throw new Error("dev login failed (" + r.status + ")");
+        const data = await r.json();
+        toast("logged in as " + ((data.principal || {}).principal_id || "ok"), "ok");
+        await refreshSession();
+      } else if (action === "logout") {
+        await api("/v1/auth/logout", { method: "POST" });
+        toast("logged out", "ok"); await refreshSession();
+      } else if (action === "run-showcase") {
+        const status = document.getElementById("rl-job-status");
+        if (status) { status.className = "rl-live"; status.innerHTML = '<span class="rl-spin"></span> placing demo order&hellip;'; }
+        const r = await api("/v1/release-candidates/" + releaseId + "/jobs/showcase-order", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": "judge-console-" + Date.now() }, body: JSON.stringify({ side: "buy", size: "0.0001" }) });
+        if (!r.ok) throw new Error("showcase request failed (" + r.status + ")");
+        const job = await r.json();
+        const final = await pollJob(releaseId, job.job_id);
+        if (final && final.status === "succeeded") {
+          toast("demo order placed and reconciled", "ok");
+          if (status) status.innerHTML = "<b>succeeded</b> &middot; reload for evidence";
+        } else {
+          toast("job " + (final ? final.status : "timed out"), "err");
+          if (status) { status.className = "rl-live rl-live--err"; status.innerHTML = "<b>" + (final ? final.status : "timeout") + "</b>"; }
+        }
+      } else if (action === "attest") {
+        const r = await api("/v1/release-candidates/" + releaseId + "/attest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        if (!r.ok) throw new Error("attest failed (" + r.status + ")");
+        toast("bundle attested", "ok"); setTimeout(() => window.location.reload(), 700);
       }
-      if (action === "attest") {
-        await api(`/v1/release-candidates/${releaseId}/attest`, {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
-        window.location.reload();
-      }
+    } catch (err) {
+      toast(err.message || "action failed", "err");
     } finally {
-      button.disabled = false;
+      busy(button, false);
     }
   });
+  refreshSession();
 })();
 </script>
 """

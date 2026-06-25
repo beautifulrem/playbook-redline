@@ -139,33 +139,30 @@ def verify_release_attestation(*, attestation_path: Path, bundle_path: Path, tru
 
 
 def render_attestation_status_html(*, verification: dict[str, Any]) -> str:
+    """Attestation status as a design-system section (status band + telemetry DL). No own
+    <style> — it inherits the page's inlined redline.css (offline evidence page or the
+    standalone attestation.html shell)."""
     ok = bool(verification.get("ok"))
     status = "ATTESTED" if ok else "ATTESTATION INVALID"
-    cls = "ok" if ok else "bad"
+    band = "rl-band--pass" if ok else ""
     rows = [
-        ("status", status),
         ("bundle_hash", str(verification.get("bundle_hash") or "")),
         ("evidence_merkle_root", str(verification.get("evidence_merkle_root") or "")),
         ("attestation_hash", str(verification.get("attestation_hash") or "")),
         ("provider", str(verification.get("provider") or "")),
         ("external_reference", json.dumps(verification.get("external_reference") or {}, sort_keys=True)),
     ]
-    rendered_rows = "\n".join(f"<tr><th>{html.escape(label)}</th><td>{html.escape(value)}</td></tr>" for label, value in rows if value)
-    return f"""
-<section class="attestation {cls}">
-  <style>
-    .attestation {{ margin: 24px auto; max-width: 1120px; padding: 16px; border: 1px solid #d0d7de; border-radius: 8px; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-    .attestation.ok {{ border-color: #2da44e; }}
-    .attestation.bad {{ border-color: #cf222e; }}
-    .attestation h2 {{ margin: 0 0 12px; font-size: 18px; }}
-    .attestation table {{ width: 100%; border-collapse: collapse; }}
-    .attestation th {{ width: 180px; text-align: left; color: #57606a; }}
-    .attestation th, .attestation td {{ padding: 6px 0; border-top: 1px solid #d8dee4; word-break: break-all; }}
-  </style>
-  <h2>{html.escape(status)}</h2>
-  <table>{rendered_rows}</table>
-</section>
-"""
+    dl = "\n".join(
+        f'<dt>{html.escape(label)}</dt><dd class="rl-mono">{html.escape(value)}</dd>'
+        for label, value in rows
+        if value
+    )
+    return (
+        '<p class="rl-sec">attestation</p>\n'
+        f'<div class="rl-band {band}"><span class="rl-band__verdict">{html.escape(status)}</span>'
+        '<span class="rl-band__meta">ed25519 release attestation</span></div>\n'
+        f'<div class="rl-box"><dl class="rl-dl">{dl}</dl></div>'
+    )
 
 
 def release_evidence_merkle_root(bundle: Mapping[str, Any]) -> str:
