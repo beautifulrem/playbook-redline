@@ -633,13 +633,13 @@ def _render_seal(panel: EvidencePanel) -> str:
 
 
 def _band_meta(panel: EvidencePanel) -> str:
-    suffix = t("DEMO paptrading:1 non-mainnet", "演示 paptrading:1 不碰主网")
+    suffix = t("DEMO · paptrading:1 · non-mainnet", "模拟盘（paptrading:1，非主网）")
     if panel.invalid_reason_code:
         return f'{t("INTEGRITY FAIL", "完整性失效")} · {suffix}'
     if panel.evidence is not None and panel.verdict == "PASS":
-        return f'{t("REPLAYED CHAINED SIGNED", "已重放 已接链 已签名")} · {suffix}'
+        return f'{t("REPLAYED · CHAINED · SIGNED", "已重放、已接链、已签名")} · {suffix}'
     if panel.verdict == "WITHHELD":
-        return f'{t("BLOCKED", "已拦截")} · {t("BITGET NOT CALLED", "BITGET 未被调用")} · {suffix}'
+        return f'{t("BLOCKED · BITGET NOT CALLED", "已拦截，未调用 Bitget")} · {suffix}'
     return f'{t("BLOCKED", "已拦截")} · {suffix}'
 
 
