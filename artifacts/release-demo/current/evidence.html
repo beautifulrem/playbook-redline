@@ -112,7 +112,7 @@ hr { border: 0; border-top: var(--rl-border); margin: var(--rl-6) 0; }
 .rl-sec::before { content: ""; display: inline-block; width: 16px; height: 1px; background: var(--rl-line-strong); vertical-align: middle; margin-right: var(--rl-2); }
 
 
-.rl-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rl-3) var(--rl-6); padding: var(--rl-4) var(--rl-6); border: var(--rl-border-strong); border-left-width: 6px; border-left-color: var(--rl-hazard); background: var(--rl-surface); }
+.rl-band { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rl-3) var(--rl-6); padding: var(--rl-4) var(--rl-6); border: var(--rl-border-strong); border-left-width: 6px; border-left-color: var(--rl-hazard); background: var(--rl-surface); position: relative; }
 .rl-band + .rl-band { margin-top: var(--rl-3); }
 .rl-band--pass { border-left-color: var(--rl-pass); }
 .rl-band__verdict { font-family: var(--rl-grotesk); font-weight: 800; text-transform: uppercase; letter-spacing: -0.03em; line-height: 1; font-size: clamp(1.75rem, 4vw, 3rem); color: var(--rl-hazard); }
@@ -329,7 +329,10 @@ html:not([data-lang="zh"]) .rl-lang__btn[data-lang-set="en"], html[data-lang="zh
 
 .rl-pulse::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; background: var(--rl-pass); animation: rl-kf-pulse 1.9s ease-in-out infinite; }
 .rl-pulse--hazard::before { background: var(--rl-hazard); }
-@keyframes rl-kf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }</style>
+@keyframes rl-kf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+.rl-band:not(.rl-band--pass)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; pointer-events: none; background: repeating-linear-gradient(45deg, var(--rl-hazard) 0 7px, var(--rl-hazard-ink) 7px 14px); background-size: 19.8px 100%; animation: rl-kf-hazard 1.1s linear infinite; }
+@keyframes rl-kf-hazard { from { background-position: 0 0; } to { background-position: 19.8px 0; } }</style>
 </head>
 <body>
   <main class="rl-main">

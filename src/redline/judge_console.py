@@ -154,7 +154,10 @@ def render_judge_release_html(
     <h2 class="rl-sec">{t("Latest job events", "最新任务事件")}</h2>
     <pre class="rl-pre" id="job-events">{event_lines}</pre>
     <h2 class="rl-sec">{t("Audit ledger", "审计账本")}</h2>
-    <pre class="rl-pre">{audit_lines}</pre>
+    <details class="rl-adv">
+      <summary class="rl-label">{len(audit_entries)} {t("entries", "条")}</summary>
+      <pre class="rl-pre">{audit_lines}</pre>
+    </details>
     {_chrome()}
 """
     return _document(title=f"Release {release_id}", body=body)
