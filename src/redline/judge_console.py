@@ -105,6 +105,8 @@ def render_judge_release_html(
     {_chain_walk(release, bundle_status, attestation_status)}
     <h2 class="rl-sec">Assurance tier</h2>
     {_tier_meter(release)}
+    <h2 class="rl-sec">Verdict reason</h2>
+    {_violation_telemetry(release.get("redline_reason_code"))}
     <h2 class="rl-sec">Release</h2>
     <div class="rl-grid rl-grid--3">
       {_metric("state", _badge(release.get("state")))}
@@ -287,6 +289,33 @@ def _short_id(value: object) -> str:
     return raw if len(raw) <= 14 else raw[:6] + "…" + raw[-4:]
 
 
+def _violation_telemetry(reason_code: object) -> str:
+    raw = str(reason_code or "").strip()
+    if not raw:
+        return ""
+    meta = None
+    try:
+        from redline.models import ReasonCode
+        from redline.violations import REASON_META
+
+        meta = REASON_META.get(ReasonCode(raw))
+    except (ValueError, KeyError, ImportError):
+        meta = None
+    code_cls = " rl-badge--ok" if raw == "PASS" else (" rl-badge--fail" if (meta and meta.severity == "blocking") else "")
+    code_badge = f'<span class="rl-badge{code_cls}">{_e(raw)}</span>'
+    if meta is None:
+        return f'<div class="rl-box"><dl class="rl-dl"><dt>reason_code</dt><dd>{code_badge}</dd></dl></div>'
+    sev_cls = " rl-badge--fail" if meta.severity == "blocking" else ""
+    return (
+        '<div class="rl-box"><dl class="rl-dl">'
+        f'<dt>reason_code</dt><dd>{code_badge}</dd>'
+        f'<dt>severity</dt><dd><span class="rl-badge{sev_cls}">{_e(meta.severity)}</span></dd>'
+        f'<dt>recoverable</dt><dd>{_e("yes" if meta.recoverable else "no")}</dd>'
+        f'<dt>summary</dt><dd>{_e(meta.summary)}</dd>'
+        "</dl></div>"
+    )
+
+
 def _symbol_link(symbol: object) -> str:
     raw = str(symbol or "").strip()
     if not raw:
@@ -318,6 +347,11 @@ def _script() -> str:
   async function refreshSession() {
     const el = document.getElementById("rl-session");
     if (!el) return;
+    if (location.protocol === "file:") {
+      el.className = "rl-live rl-live--err";
+      el.innerHTML = "offline view &middot; live actions need the served console";
+      return;
+    }
     try {
       const r = await api("/v1/auth/me");
       if (!r.ok) throw new Error(String(r.status));

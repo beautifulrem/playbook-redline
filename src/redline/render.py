@@ -565,11 +565,11 @@ def _render_seal(panel: EvidencePanel) -> str:
 
 
 def _band_meta(panel: EvidencePanel) -> str:
-    suffix = "DEMO · paptrading:1 · 非 MAINNET"
+    suffix = "DEMO paptrading:1 non-mainnet"
     if panel.invalid_reason_code:
         return f"INTEGRITY FAIL · {suffix}"
     if panel.evidence is not None and panel.verdict == "PASS":
-        return f"REPLAYED · CHAINED · SIGNED · {suffix}"
+        return f"REPLAYED CHAINED SIGNED · {suffix}"
     if panel.verdict == "WITHHELD":
         return f"BLOCKED · BITGET 未被调用 · {suffix}"
     return f"BLOCKED · {suffix}"
