@@ -44,13 +44,61 @@ The real demo order `1453610833413308417` ran on Bitget `paptrading: 1`, demo-on
 
 ## Integration
 
-Redline sits between an AI that edits a strategy and the exchange. Three ways to wire it in:
+Redline sits between an AI that edits a strategy and the exchange. Three ways to wire it in.
 
-- **CLI in CI.** Run `redline run` on the edited candidate and gate on the exit code, then `redline verify-release-bundle` before you ship: a non-zero exit stops the pipeline, a PASS leaves a signed receipt to archive. This is the path `make verify-demo` exercises.
-- **HTTP service.** Drive it from your orchestrator: `POST /v1/runs` to crash-test a candidate, then `POST /v1/runs/{run_id}/execute` to place the demo order only on a chained, signed PASS. The OpenAPI contract is checked in at `schemas/service-openapi.json` (see [`SERVICE_API.md`](SERVICE_API.md)).
-- **MCP tool.** `redline-mcp` (stdio) exposes one read-only tool, `redline_check_receipt`, so an AI agent can verify a receipt mid-conversation without ever touching the verdict path.
+### CLI in CI
 
-## MCP server (use it from an agent)
+Gate a pipeline on the edit itself. `redline run` exits non-zero when a candidate is withheld, so a CI step fails the build before a bad edit can ship. The repo doubles as a composite GitHub Action:
+
+```yaml
+# .github/workflows/redline.yml
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: beautifulrem/playbook-redline@main
+        with:
+          package: fixtures/demo_pack
+          candidate: candidate_good            # your edited release candidate
+          # allow-amber-baseline-genesis: "true"   # only for the bundled genesis demo
+```
+
+The action runs `redline doctor` and `redline run`, uploads the receipt / report / proof artifacts, and enforces the verdict. Or call the CLI directly and gate on the exit code:
+
+```bash
+uv run redline run "$PKG" --baseline baseline --candidate "$EDIT" \
+  --suite fixtures/suites/demo_suite.json --spec fixtures/specs/redline_spec.json \
+  --out artifacts/ci --json
+uv run redline verify-release-bundle "$BUNDLE" --json   # re-check the sealed bundle before you ship
+```
+
+The exit code is the contract: `0` is PASS, a non-zero block code is any withheld or tampered result (for example `4` for an integrity failure), and `10` is the amber `BASELINE_GENESIS` state (a baseline with no prior receipt). `make verify-demo` runs the full bad-edit-withheld then good-edit-passes flow end to end.
+
+### HTTP service
+
+Drive the same kernel from an orchestrator. The service is a thin FastAPI boundary: it does not shell out to the CLI and does not open a second verdict path (workers call `run_redline` and keep each run's artifacts in an isolated directory).
+
+```bash
+REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
+```
+
+```bash
+H='-H x-redline-token:redline-demo -H content-type:application/json'
+
+curl -s -H x-redline-token:redline-demo http://127.0.0.1:8080/health
+curl -s -X POST $H http://127.0.0.1:8080/v1/packages/import -d '{"package_path":"fixtures/demo_pack"}'
+
+RUN=$(curl -s -X POST $H http://127.0.0.1:8080/v1/runs \
+  -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}' | jq -r .run_id)
+curl -s -H x-redline-token:redline-demo "http://127.0.0.1:8080/v1/runs/$RUN"     # poll the verdict
+
+curl -s -X POST $H "http://127.0.0.1:8080/v1/runs/$RUN/execute"                  # the gate
+```
+
+`POST /v1/runs/{run_id}/execute` is the execution gate: it consumes a replayed, chained, signed `PASS` receipt and places one Bitget demo order under `paptrading: 1`. WITHHELD, hash-only, unsigned, unchained, tampered, missing-credential, and default-mainnet cases all return `blocked` before any order call. The release backend layers versioned releases, simulation evidence, risk-policy binding, human approval, and a hash-verified evidence bundle on top, and `/v1/judge/console` renders a read-only review surface. The OpenAPI contract is checked in at `schemas/service-openapi.json`; full endpoint semantics are in [`SERVICE_API.md`](SERVICE_API.md), and deployment is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+### MCP server (from an agent)
 
 Redline ships a narrow [MCP](https://modelcontextprotocol.io) server so an AI agent can verify a receipt mid-conversation. It registers exactly one **read-only** tool and never runs verdict logic for the caller, so an agent can check a result but cannot move it: there is no way to turn a WITHHELD into a PASS through the tool.
 
@@ -118,21 +166,6 @@ uv run redline verify-proof artifacts/demo/pass/receipt.json \
 ```
 
 `redline report` without `--verified` renders only an `UNVERIFIED PREVIEW`. A final publish path must use a chained `PASS` receipt plus an ed25519-signed ledger attestation verified against a pinned trust policy; the bundled genesis fixture is not one. Trust-key generation, ledger signing, and the sponsor-adapter publish flow are documented inline in the CLI help and in [`SERVICE_API.md`](SERVICE_API.md).
-
-## Service
-
-The HTTP service is a thin FastAPI boundary over the same proof kernel. It does not shell out to the CLI and does not create a second verdict path: workers call `run_redline`, persist run state, and expose the generated receipt, report, and proof artifacts from isolated per-run directories.
-
-```bash
-REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
-
-curl -s http://127.0.0.1:8080/health
-curl -s -X POST http://127.0.0.1:8080/v1/runs \
-  -H 'content-type: application/json' -H 'x-redline-token: redline-demo' \
-  -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}'
-```
-
-`POST /v1/runs/{run_id}/execute` is the demo execution gate. It consumes a replayed, chained, signed `PASS` receipt and places one Bitget demo order under `paptrading: 1`. WITHHELD, hash-only, unsigned, unchained, tampered, missing-credential, and default-mainnet cases all return `blocked` before any order call. The release backend layers versioned strategy releases, simulated-trading evidence, risk-policy binding, human approval, and a hash-verified evidence bundle on top of that gate, and `/v1/judge/console` renders a read-only review surface over it. The OpenAPI contract is checked in at `schemas/service-openapi.json`. Endpoint semantics live in [`SERVICE_API.md`](SERVICE_API.md); deployment and the judge runbook are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Security boundary
 

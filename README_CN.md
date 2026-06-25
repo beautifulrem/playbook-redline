@@ -44,13 +44,61 @@ open artifacts/release-demo/current/evidence.html                               
 
 ## 集成
 
-Redline 夹在「改策略的 AI」和交易所中间。三种接法：
+Redline 夹在「改策略的 AI」和交易所中间。三种接法。
 
-- **CI 里的 CLI。** 对改完的候选跑 `redline run`，用退出码当闸门，发布前再跑 `redline verify-release-bundle`：非零退出就卡住流水线，PASS 就留下一张签名回执存档。`make verify-demo` 走的就是这条路。
-- **HTTP 服务。** 从你的编排器驱动：`POST /v1/runs` 崩溃测试一个候选，再 `POST /v1/runs/{run_id}/execute`，只有链式、已签名的 PASS 才会下那笔模拟单。OpenAPI 契约签入在 `schemas/service-openapi.json`（见 [`SERVICE_API.md`](SERVICE_API.md)）。
-- **MCP 工具。** `redline-mcp`（stdio）只暴露一个只读工具 `redline_check_receipt`，让 AI agent 在对话里就能验一张回执，碰都不碰裁决路径。
+### CI 里的 CLI
 
-## MCP 服务（给 agent 用）
+在流水线里卡住这次改动。候选被拦下时 `redline run` 以非零码退出，所以 CI 这一步会在坏改动发出去之前让构建失败。这个仓库本身也是一个 composite GitHub Action：
+
+```yaml
+# .github/workflows/redline.yml
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: beautifulrem/playbook-redline@main
+        with:
+          package: fixtures/demo_pack
+          candidate: candidate_good            # 你改完的发布候选
+          # allow-amber-baseline-genesis: "true"   # 仅用于内置的 genesis demo
+```
+
+这个 action 会跑 `redline doctor` 和 `redline run`，上传回执 / 报告 / 证明产物，并按裁决判定成败。或者直接调 CLI，用退出码当闸门：
+
+```bash
+uv run redline run "$PKG" --baseline baseline --candidate "$EDIT" \
+  --suite fixtures/suites/demo_suite.json --spec fixtures/specs/redline_spec.json \
+  --out artifacts/ci --json
+uv run redline verify-release-bundle "$BUNDLE" --json   # 发出去之前再核一遍封好的 bundle
+```
+
+退出码就是约定：`0` 是 PASS，非零是被拦下或被篡改（比如 `4` 表示完整性失败），`10` 是琥珀色的 `BASELINE_GENESIS`（没有接到上一张回执的基线）。`make verify-demo` 会把「坏改动被拦、好改动通过」整条流程跑一遍。
+
+### HTTP 服务
+
+从编排器驱动同一个内核。服务是一层薄 FastAPI 边界：不调 CLI，也不另开一条裁决路径（worker 直接调 `run_redline`，把每次运行的产物放在各自隔离的目录里）。
+
+```bash
+REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
+```
+
+```bash
+H='-H x-redline-token:redline-demo -H content-type:application/json'
+
+curl -s -H x-redline-token:redline-demo http://127.0.0.1:8080/health
+curl -s -X POST $H http://127.0.0.1:8080/v1/packages/import -d '{"package_path":"fixtures/demo_pack"}'
+
+RUN=$(curl -s -X POST $H http://127.0.0.1:8080/v1/runs \
+  -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}' | jq -r .run_id)
+curl -s -H x-redline-token:redline-demo "http://127.0.0.1:8080/v1/runs/$RUN"     # 轮询裁决
+
+curl -s -X POST $H "http://127.0.0.1:8080/v1/runs/$RUN/execute"                  # 闸门
+```
+
+`POST /v1/runs/{run_id}/execute` 是执行闸门：它只收一张重放通过、已接链、已签名的 `PASS` 回执，在 `paptrading: 1` 下下一笔 Bitget 模拟单。WITHHELD、纯哈希、未签名、未接链、被篡改、缺凭证、默认主网这些情况，都会在调用下单之前返回 `blocked`。发布后端在这之上又叠了版本化发布、模拟交易证据、风险策略绑定、人工审批，以及一份哈希校验过的证据包；`/v1/judge/console` 渲染一个只读的评审界面。OpenAPI 契约签入在 `schemas/service-openapi.json`；完整端点语义见 [`SERVICE_API.md`](SERVICE_API.md)，部署见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
+
+### MCP 服务（给 agent 用）
 
 Redline 带了一个很窄的 [MCP](https://modelcontextprotocol.io) 服务，让 AI agent 在对话里就能验一张回执。它只注册**一个只读工具**，从不替调用方跑裁决逻辑：agent 能查结果，但动不了结果，没法靠这个工具把 WITHHELD 变成 PASS。
 
@@ -118,21 +166,6 @@ uv run redline verify-proof artifacts/demo/pass/receipt.json \
 ```
 
 `redline report` 不带 `--verified` 时只渲染 `UNVERIFIED PREVIEW`。最终发布得有两样东西：一张链式 `PASS` 回执，和一份 ed25519 签名的账本背书（背书要按固定 trust policy 校验通过）；内置的 genesis 夹具不算。信任密钥生成、账本签名、对接交易所的 publish 流程，都写在 CLI 帮助和 [`SERVICE_API.md`](SERVICE_API.md) 里。
-
-## 服务
-
-HTTP 服务是套在同一个证明内核外的一层薄 FastAPI 边界。它不调 CLI，也不另开一条裁决路径：worker 直接调 `run_redline`，把运行状态落库，再从每次运行各自隔离的目录对外提供生成的回执、报告和证明产物。
-
-```bash
-REDLINE_SERVICE_TOKEN=redline-demo uv run redline-api
-
-curl -s http://127.0.0.1:8080/health
-curl -s -X POST http://127.0.0.1:8080/v1/runs \
-  -H 'content-type: application/json' -H 'x-redline-token: redline-demo' \
-  -d '{"package_path":"fixtures/demo_pack","candidate":"candidate_good"}'
-```
-
-`POST /v1/runs/{run_id}/execute` 是 demo 执行闸门。它只收一张重放通过、已接链、已签名的 `PASS` 回执；满足了，才在 `paptrading: 1` 下下一笔 Bitget 模拟单。WITHHELD、纯哈希、未签名、未接链、被篡改、缺凭证、默认主网这些情况，都会在下单前返回 `blocked`。发布后端在这道闸门之上又叠了版本化策略发布、模拟交易证据、风险策略绑定、人工审批，以及一份哈希校验过的证据包；`/v1/judge/console` 在它之上渲染一个只读的评审界面。OpenAPI 契约签入在 `schemas/service-openapi.json`。端点语义见 [`SERVICE_API.md`](SERVICE_API.md)，部署和评委 runbook 见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
 
 ## 安全边界
 
