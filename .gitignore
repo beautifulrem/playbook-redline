@@ -2,6 +2,7 @@
 .codegraph/
 .pytest_cache/
 .venv/
+/site/
 __pycache__/
 *.py[cod]
 *.pyo
