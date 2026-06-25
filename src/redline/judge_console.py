@@ -474,7 +474,7 @@ def _id(value: object) -> str:
         return _e(raw or "none")
     return (
         f'<span class="rl-idcopy"><span class="rl-mono">{_e(raw)}</span>'
-        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy {_e(raw)}">copy</button></span>'
+        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy {_e(raw)}">{t("copy", "复制")}</button></span>'
     )
 
 
@@ -485,7 +485,7 @@ def _hash_field(value: object) -> str:
     short = raw if len(raw) <= 22 else raw[:12] + "…" + raw[-6:]
     return (
         f'<span class="rl-idcopy"><span class="rl-mono" title="{_e(raw)}">{_e(short)}</span>'
-        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy full hash">copy</button></span>'
+        f'<button type="button" class="rl-copy" data-copy="{_e(raw)}" aria-label="copy full hash">{t("copy", "复制")}</button></span>'
     )
 
 
