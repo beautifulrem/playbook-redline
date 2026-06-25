@@ -95,7 +95,7 @@ def render_judge_release_html(
     <p class="rl-label"><a href="/v1/judge/console">&larr; {t("Judge Console", "判官控制台")}</a></p>
     <h1 class="rl-macro rl-caret">{t("Release", "发布")}</h1>
     <p class="rl-label">{_e(DEMO_STAMP)} &nbsp;&middot;&nbsp; <span class="rl-mono">{_e(release_id)}</span> &nbsp;&middot;&nbsp; {t("principal", "主体")} {_e(principal)}</p>
-    <div class="rl-band {band_mod}">
+    <div class="rl-band {band_mod} rl-scanin">
       <span class="rl-band__verdict">{_e((state or "unknown").upper().replace("_", " "))}</span>
       <span class="rl-band__meta">{t("verdict", "裁决")} {_e(release.get("redline_reason_code") or "missing")}</span>
     </div>
@@ -265,7 +265,7 @@ def _chain_walk(release: dict[str, Any], bundle_status: dict[str, Any], attestat
             f'<span class="rl-chain__label">{_e(label)}</span>'
             f'<span class="rl-chain__hash">{_e(detail)}</span>{status}</div>'
         )
-    return f'    <div class="rl-chain">{"".join(nodes)}</div>'
+    return f'    <div class="rl-chain rl-chain--live">{"".join(nodes)}</div>'
 
 
 def _proofbar(release: dict[str, Any], showcase_orders: list[dict[str, Any]]) -> str:
@@ -481,6 +481,17 @@ def _script() -> str:
   });
   window.addEventListener("rl-lang", refreshSession);
   refreshSession();
+  // telemetry readouts boot up on load (reduced-motion: skip, leave final value)
+  if (!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+    var nums = document.querySelectorAll(".rl-proof__num");
+    for (var ni = 0; ni < nums.length; ni++) (function (e2) {
+      var raw = (e2.textContent || "").trim();
+      if (!/^[0-9]+$/.test(raw)) return;
+      var target = parseInt(raw, 10), pad = raw.length, t0 = null;
+      function step(ts) { if (!t0) t0 = ts; var p = Math.min(1, (ts - t0) / 700); e2.textContent = String(Math.round(target * p)).padStart(pad, "0"); if (p < 1) requestAnimationFrame(step); else e2.textContent = raw; }
+      e2.textContent = "".padStart(pad, "0"); requestAnimationFrame(step);
+    })(nums[ni]);
+  }
 })();
 </script>
 """

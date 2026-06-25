@@ -517,7 +517,7 @@ def _render_panel(panel: EvidencePanel, *, with_title: bool = False) -> str:
     band_mod = "rl-band--pass" if (panel.evidence is not None and panel.invalid_reason_code is None) else ""
     title_html = f'        <p class="rl-label">{_esc(panel.title)}</p>\n' if with_title else ""
     return f"""      <section>
-{title_html}        <div class="rl-band {band_mod}">
+{title_html}        <div class="rl-band {band_mod} rl-scanin">
           <span class="rl-band__verdict">{_esc(panel.verdict)}</span>
           <span class="rl-band__meta">{_band_meta(panel)}</span>
         </div>
