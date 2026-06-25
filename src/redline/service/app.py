@@ -1710,12 +1710,12 @@ def create_app(config: ServiceConfig | None = None) -> FastAPI:
         seal = ""
         if seed:
             tone = "rl-seal--pass" if verification.get("ok") else "rl-seal--void"
-            stamp = "VERIFIED" if verification.get("ok") else "VOID"
+            stamp = t("VERIFIED", "已验证") if verification.get("ok") else t("VOID", "作废")
             short = _html.escape(seed[:26] + "…" if len(seed) > 26 else seed)
             seal = (
                 f'<div class="rl-seal {tone}"><span class="rl-seal__art">{randomart_svg(seed)}</span>'
                 f'<span class="rl-seal__body"><span class="rl-seal__stamp">{stamp}</span>'
-                f'<span class="rl-seal__algo">SSH randomart &middot; attestation fingerprint</span>'
+                f'<span class="rl-seal__algo">{t("SSH randomart · attestation fingerprint", "SSH randomart · 认证指纹")}</span>'
                 f'<span class="rl-seal__hash">{short}</span></span></div>'
             )
         doc = (

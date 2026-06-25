@@ -561,7 +561,7 @@ def _render_block(panel: EvidencePanel) -> str:
     if panel.evidence is not None and panel.invalid_reason_code is None:
         return ""
     if panel.invalid_reason_code:
-        return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ {t("EVIDENCE INVALID", "证据无效")} · {_esc(_invalid_message(panel.invalid_reason_code))}</span></div>"""
+        return f"""        <div class="rl-stripe"><span class="rl-stripe__msg">⚠ {t("EVIDENCE INVALID", "证据无效")} · {_invalid_message(panel.invalid_reason_code)}</span></div>"""
     reason = panel.block_reason_code or panel.reason_code
     return f"""        <p class="rl-sec">{t("block side", "拦截侧")}</p>
         <div class="rl-box"><dl class="rl-dl">
@@ -656,10 +656,10 @@ def _invalid_panel(title: str, reason_code: str) -> EvidencePanel:
 
 def _invalid_message(reason_code: str) -> str:
     if "MISMATCH" in reason_code:
-        return "hash mismatch"
+        return t("hash mismatch", "哈希不匹配")
     if "MISSING" in reason_code:
-        return "required evidence missing"
-    return "integrity check failed"
+        return t("required evidence missing", "缺少必需证据")
+    return t("integrity check failed", "完整性校验失败")
 
 
 def _reason_from_exception(exc: BaseException) -> str:

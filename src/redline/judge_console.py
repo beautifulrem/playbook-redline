@@ -361,7 +361,11 @@ def _script() -> str:
     timeout: { en: "timed out", zh: "超时" },
     attested: { en: "bundle attested", zh: "打包已认证" },
     actionfailed: { en: "action failed", zh: "操作失败" },
-    nojobevents: { en: "No job events", zh: "暂无任务事件" }
+    nojobevents: { en: "No job events", zh: "暂无任务事件" },
+    authenticated: { en: "authenticated", zh: "已认证" },
+    devloginfailed: { en: "dev login failed", zh: "开发登录失败" },
+    showcasefailed: { en: "showcase request failed", zh: "展示请求失败" },
+    attestfailed: { en: "attest failed", zh: "认证失败" }
   };
   function S(k) { return STR[k][L()]; }
   function el(id) { return document.getElementById(id); }
@@ -397,7 +401,7 @@ def _script() -> str:
       const data = await r.json();
       const p = data.principal || {};
       e.className = "rl-live";
-      e.replaceChildren(document.createTextNode(S("session") + ": "), bold(p.principal_id || "authenticated"));
+      e.replaceChildren(document.createTextNode(S("session") + ": "), bold(p.principal_id || S("authenticated")));
       if (Array.isArray(p.scopes) && p.scopes.length) e.append(" \\u00b7 " + p.scopes.join(" "));
     } catch (err) {
       e.className = "rl-live rl-live--err";
@@ -443,7 +447,7 @@ def _script() -> str:
       if (action === "dev-login") {
         const login = window.prompt(S("loginprompt"), "") || undefined;
         const r = await api("/v1/auth/dev-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(login ? { login } : {}) });
-        if (!r.ok) throw new Error("dev login failed (" + r.status + ")");
+        if (!r.ok) throw new Error(S("devloginfailed") + " (" + r.status + ")");
         const data = await r.json();
         toast(S("loggedinas") + ((data.principal || {}).principal_id || "ok"), "ok");
         await refreshSession();
@@ -454,19 +458,19 @@ def _script() -> str:
         const status = el("rl-job-status");
         if (status) { status.className = "rl-live"; status.replaceChildren(spin(), document.createTextNode(" " + S("placing"))); }
         const r = await api("/v1/release-candidates/" + releaseId + "/jobs/showcase-order", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": "judge-console-" + Date.now() }, body: JSON.stringify({ side: "buy", size: "0.0001" }) });
-        if (!r.ok) throw new Error("showcase request failed (" + r.status + ")");
+        if (!r.ok) throw new Error(S("showcasefailed") + " (" + r.status + ")");
         const job = await r.json();
         const final = await pollJob(releaseId, job.job_id);
         if (final && final.status === "succeeded") {
           toast(S("placed"), "ok");
-          if (status) status.replaceChildren(bold("succeeded"), document.createTextNode(" \\u00b7 " + S("reloadev")));
+          if (status) status.replaceChildren(bold(final.status), document.createTextNode(" \\u00b7 " + S("reloadev")));
         } else {
           toast(S("jobword") + (final ? final.status : S("timeout")), "err");
           if (status) { status.className = "rl-live rl-live--err"; status.replaceChildren(bold(final ? final.status : S("timeout"))); }
         }
       } else if (action === "attest") {
         const r = await api("/v1/release-candidates/" + releaseId + "/attest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        if (!r.ok) throw new Error("attest failed (" + r.status + ")");
+        if (!r.ok) throw new Error(S("attestfailed") + " (" + r.status + ")");
         toast(S("attested"), "ok"); setTimeout(() => window.location.reload(), 700);
       }
     } catch (err) {
